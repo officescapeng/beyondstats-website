@@ -3147,7 +3147,37 @@ function App() {
   ]
 
   // Dynamic Routing state: 'home' | 'about' | 'programs' | 'impact-map' | 'dashboard' | 'research' | 'impact' | 'contact'
-  const [currentPage, setCurrentPage] = useState('home')
+  const [currentPage, _setCurrentPage] = useState('home')
+
+  const setCurrentPage = (page) => {
+    _setCurrentPage(page)
+    const path = page === 'home' ? '/' : `/${page}`
+    window.history.pushState({ page }, '', path)
+  }
+
+  // Handle browser Back / Forward buttons (popstate)
+  useEffect(() => {
+    const handlePopState = (event) => {
+      if (event.state && event.state.page) {
+        _setCurrentPage(event.state.page)
+      } else {
+        _setCurrentPage('home')
+      }
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  // Handle initial page load from URL path (e.g. going directly to /about)
+  useEffect(() => {
+    const path = window.location.pathname.replace('/', '')
+    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact']
+    if (validPages.includes(path)) {
+      _setCurrentPage(path)
+    } else {
+      _setCurrentPage('home')
+    }
+  }, [])
 
   // Mobile menu open
   const [isMenuOpen, setIsMenuOpen] = useState(false)
