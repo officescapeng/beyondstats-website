@@ -49,7 +49,8 @@ import {
   fetchPublications, 
   fetchProjects, 
   globalSearch, 
-  getRelatedArticles 
+  getRelatedArticles,
+  WP_API_URL
 } from './services/wordpress'
 
 
@@ -3170,10 +3171,20 @@ function App() {
 
   // Handle initial page load from URL path (e.g. going directly to /about)
   useEffect(() => {
-    const path = window.location.pathname.replace('/', '')
+    const path = window.location.pathname
+    
+    // Check if the route is for WordPress backend admin, login, or resources
+    if (path.startsWith('/wp-') || path === '/wp-login.php') {
+      let wpBase = WP_API_URL.replace(/\/wp-json\/?$/, '')
+      wpBase = wpBase.replace(/\/$/, '')
+      window.location.replace(`${wpBase}${path}${window.location.search}`)
+      return
+    }
+
+    const pagePath = path.replace('/', '')
     const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact']
-    if (validPages.includes(path)) {
-      _setCurrentPage(path)
+    if (validPages.includes(pagePath)) {
+      _setCurrentPage(pagePath)
     } else {
       _setCurrentPage('home')
     }
