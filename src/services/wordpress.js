@@ -346,14 +346,90 @@ export async function fetchArticles(params = {}) {
   
   // Real REST API Fetch Attempt
   try {
-    let url = `${WP_API_URL}/wp/v2/posts?_embed&page=${page}&per_page=${perPage}`;
-    if (category && category !== 'All') {
-      url += `&categories=${encodeURIComponent(category)}`;
+    if (WP_API_URL) {
+      const url = `${WP_API_URL}/wp/v2/posts?_embed&per_page=100`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const json = await response.json();
+        
+        let results = json.map(post => {
+          let featured_media_url = '/logo.png';
+          if (post._embedded?.['wp:featuredmedia']?.[0]?.source_url) {
+            featured_media_url = post._embedded['wp:featuredmedia'][0].source_url;
+          } else if (post.featured_media_url) {
+            featured_media_url = post.featured_media_url;
+          }
+          
+          let author_name = 'Beyond# Researcher';
+          if (post._embedded?.['author']?.[0]?.name) {
+            author_name = post._embedded['author'][0].name;
+          }
+          
+          let categories = ['Insight'];
+          if (post._embedded?.['wp:term']?.[0]) {
+            categories = post._embedded['wp:term'][0].map(t => t.name);
+          }
+          
+          let tags = [];
+          if (post._embedded?.['wp:term']?.[1]) {
+            tags = post._embedded['wp:term'][1].map(t => t.name);
+          }
+          
+          return {
+            id: post.id,
+            date: post.date,
+            title: { rendered: post.title?.rendered || '' },
+            content: { rendered: post.content?.rendered || '' },
+            excerpt: { rendered: post.excerpt?.rendered || '' },
+            featured_media_url,
+            author_name,
+            categories,
+            tags,
+            view_count: post.acf?.view_count || Math.floor(Math.random() * 500) + 100,
+            acf: post.acf || {}
+          };
+        });
+
+        // Filter Category
+        if (category && category !== 'All') {
+          results = results.filter(art => 
+            art.categories.some(c => c.toLowerCase() === category.toLowerCase())
+          );
+        }
+
+        // Filter Search
+        if (search) {
+          const q = search.toLowerCase();
+          results = results.filter(art => 
+            art.title.rendered.toLowerCase().includes(q) || 
+            art.content.rendered.toLowerCase().includes(q) || 
+            art.excerpt.rendered.toLowerCase().includes(q) ||
+            art.tags.some(t => t.toLowerCase().includes(q))
+          );
+        }
+
+        // Sorting
+        if (sortBy === 'newest') {
+          results.sort((a, b) => new Date(b.date) - new Date(a.date));
+        } else if (sortBy === 'oldest') {
+          results.sort((a, b) => new Date(a.date) - new Date(b.date));
+        } else if (sortBy === 'most-viewed') {
+          results.sort((a, b) => b.view_count - a.view_count);
+        }
+
+        // Pagination
+        const total = results.length;
+        const totalPages = Math.ceil(total / perPage);
+        const offset = (page - 1) * perPage;
+        const paginatedResults = results.slice(offset, offset + perPage);
+
+        return {
+          data: paginatedResults,
+          total,
+          totalPages
+        };
+      }
     }
-    if (search) {
-      url += `&search=${encodeURIComponent(search)}`;
-    }
-    // live fetch could go here if WP_API_URL is configured
   } catch (err) {
     console.warn("WP API Article fetch failed or unconfigured. Falling back to local schema cache.", err);
   }
@@ -407,9 +483,50 @@ export async function fetchPublications(params = {}) {
   const { type, year, topic, state, search } = params;
 
   try {
-    let url = `${WP_API_URL}/wp/v2/publications?_embed`;
+    if (WP_API_URL) {
+      const url = `${WP_API_URL}/wp/v2/publications?_embed&per_page=100`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const json = await response.json();
+        let results = json.map(pub => {
+          let cover_image_url = '/logo.png';
+          if (pub._embedded?.['wp:featuredmedia']?.[0]?.source_url) {
+            cover_image_url = pub._embedded['wp:featuredmedia'][0].source_url;
+          }
+          return {
+            id: pub.id,
+            title: { rendered: pub.title?.rendered || '' },
+            cover_image_url,
+            date: pub.date,
+            acf: pub.acf || {}
+          };
+        });
+
+        if (type && type !== 'All') {
+          results = results.filter(pub => pub.acf.publication_type === type);
+        }
+        if (year && year !== 'All') {
+          results = results.filter(pub => pub.acf.year?.toString() === year.toString());
+        }
+        if (topic && topic !== 'All') {
+          results = results.filter(pub => pub.acf.topic_area?.toLowerCase() === topic.toLowerCase());
+        }
+        if (state && state !== 'All') {
+          results = results.filter(pub => pub.acf.state_coverage?.toLowerCase() === state.toLowerCase());
+        }
+        if (search) {
+          const q = search.toLowerCase();
+          results = results.filter(pub => 
+            pub.title.rendered.toLowerCase().includes(q) || 
+            (pub.acf.summary && pub.acf.summary.toLowerCase().includes(q))
+          );
+        }
+
+        return results;
+      }
+    }
   } catch (err) {
-    console.warn("WP API Publications fetch failed. Using local mock fallbacks.");
+    console.warn("WP API Publications fetch failed. Using local mock fallbacks.", err);
   }
 
   await delay(600);
@@ -441,9 +558,20 @@ export async function fetchPublications(params = {}) {
 
 export async function fetchProjects(params = {}) {
   try {
-    let url = `${WP_API_URL}/wp/v2/projects?_embed`;
+    if (WP_API_URL) {
+      const url = `${WP_API_URL}/wp/v2/projects?_embed&per_page=100`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const json = await response.json();
+        return json.map(proj => ({
+          id: proj.id,
+          title: { rendered: proj.title?.rendered || '' },
+          acf: proj.acf || {}
+        }));
+      }
+    }
   } catch (err) {
-    console.warn("WP API Projects fetch failed. Using local mock fallbacks.");
+    console.warn("WP API Projects fetch failed. Using local mock fallbacks.", err);
   }
 
   await delay(500);
@@ -453,6 +581,32 @@ export async function fetchProjects(params = {}) {
 export async function globalSearch(query) {
   if (!query || query.trim() === '') return { articles: [], publications: [], projects: [] };
   const q = query.toLowerCase();
+
+  try {
+    if (WP_API_URL) {
+      const [articlesRes, publicationsRes, projectsRes] = await Promise.all([
+        fetchArticles({ search: query, perPage: 100 }),
+        fetchPublications({ search: query }),
+        fetchProjects()
+      ]);
+
+      const matchedArticles = articlesRes.data;
+      const matchedPublications = publicationsRes;
+      const matchedProjects = projectsRes.filter(p => 
+        (p.acf.project_name && p.acf.project_name.toLowerCase().includes(q)) || 
+        (p.acf.description && p.acf.description.toLowerCase().includes(q)) ||
+        (p.acf.partners && p.acf.partners.some(pt => pt.toLowerCase().includes(q)))
+      );
+
+      return {
+        articles: matchedArticles,
+        publications: matchedPublications,
+        projects: matchedProjects
+      };
+    }
+  } catch (err) {
+    console.warn("Live global search failed, falling back to mock search.", err);
+  }
 
   await delay(600);
 
