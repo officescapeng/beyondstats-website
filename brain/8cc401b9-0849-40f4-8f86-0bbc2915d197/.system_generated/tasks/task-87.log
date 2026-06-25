@@ -1,0 +1,36 @@
+
+> scratch@0.0.0 build
+> vite build
+
+vite v8.1.0 building client environment for production...
+transforming...✓ 35 modules transformed.
+rendering chunks...
+✗ Build failed in 332ms
+error during build:
+Build failed with 2 errors:
+
+[MISSING_EXPORT] "Linkedin" is not exported by "node_modules/lucide-react/dist/esm/lucide-react.mjs".
+   ╭─[ src/App.jsx:2:91 ]
+   │
+ 2 │ import { Menu, ArrowRight, Sparkles, Activity, BookOpen, BarChart3, Search, Globe, Users, Linkedin, Youtube } from "lucide-react";
+   │                                                                                           ────┬───  
+   │                                                                                               ╰───── Missing export
+───╯
+
+[MISSING_EXPORT] "Youtube" is not exported by "node_modules/lucide-react/dist/esm/lucide-react.mjs".
+   ╭─[ src/App.jsx:2:101 ]
+   │
+ 2 │ import { Menu, ArrowRight, Sparkles, Activity, BookOpen, BarChart3, Search, Globe, Users, Linkedin, Youtube } from "lucide-react";
+   │                                                                                                     ───┬───  
+   │                                                                                                        ╰───── Missing export
+───╯
+
+    at aggregateBindingErrorsIntoJsError (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/rolldown/dist/shared/error-T-E9reEy.mjs:48:18)
+    at unwrapBindingResult (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/rolldown/dist/shared/error-T-E9reEy.mjs:18:128)
+    at #build (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/rolldown/dist/shared/rolldown-build-DDMH4mGm.mjs:3256:34)
+    at async buildEnvironment (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:32575:66)
+    at async Object.build (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:32997:19)
+    at async Object.buildApp (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:32994:153)
+    at async CAC.<anonymous> (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/cli.js:777:3) {
+  errors: [Getter/Setter]
+}

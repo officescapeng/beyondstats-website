@@ -1,0 +1,5 @@
+Successfully scheduled one-shot timer.
+Expected to fire at: 2026-06-24T14:23:43+01:00
+Prompt: Wake up to check task status
+
+[2026-06-24T14:23:43+01:00] Timer fired.

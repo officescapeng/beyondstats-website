@@ -1,0 +1,322 @@
+
+> scratch@0.0.0 dev
+> vite
+
+
+  VITE v8.1.0  ready in 1360 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+12:43:57 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+12:43:58 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:43:58 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:44:30 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:44:30 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:44:36 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:44:36 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:44:42 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:44:42 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:44:47 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:44:47 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:45:04 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:45:04 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:46:32 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > App src/App.jsx:766:47
+    764 |                  { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    765 |                  { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represent...
+    766 |                  { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships....
+        |                                                 ^
+    767 |                  { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    768 |                ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+12:46:32 PM [vite] (client) [console.warn] An error occurred in the <App> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+12:47:13 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:07:03 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:08:07 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > ImpactPage src/App.jsx:809:45
+    807 |                { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    808 |                { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represented...
+    809 |                { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships." },
+        |                                               ^
+    810 |                { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    811 |              ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+1:08:07 PM [vite] (client) [console.warn] An error occurred in the <ImpactPage> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+1:09:28 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > ImpactPage src/App.jsx:809:45
+    807 |                { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    808 |                { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represented...
+    809 |                { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships." },
+        |                                               ^
+    810 |                { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    811 |              ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+1:09:28 PM [vite] (client) [console.warn] An error occurred in the <ImpactPage> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+1:11:01 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > ImpactPage src/App.jsx:809:45
+    807 |                { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    808 |                { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represented...
+    809 |                { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships." },
+        |                                               ^
+    810 |                { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    811 |              ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+1:11:01 PM [vite] (client) [console.warn] An error occurred in the <ImpactPage> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+1:13:43 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:14:40 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > ImpactPage src/App.jsx:935:45
+    933 |                { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    934 |                { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represented...
+    935 |                { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships." },
+        |                                               ^
+    936 |                { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    937 |              ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+1:14:40 PM [vite] (client) [console.warn] An error occurred in the <ImpactPage> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+1:19:36 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:20:29 PM [vite] (client) [Unhandled error] ReferenceError: Handshake is not defined
+ > ImpactPage src/App.jsx:935:45
+    933 |                { name: "Innovation", icon: Cpu, desc: "We embrace creative approaches to solving complex problems." },
+    934 |                { name: "Inclusion", icon: Users, desc: "We ensure that diverse voices and perspectives are represented...
+    935 |                { name: "Collaboration", icon: Handshake, desc: "We believe sustainable change requires partnerships." },
+        |                                               ^
+    936 |                { name: "Impact", icon: TrendingUp, desc: "We focus on results that improve people's lives." }
+    937 |              ].map((val) => {
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+ > performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:17641:21
+ > workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:17469:40
+ > renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:17450:10
+ > performWorkOnRoot node_modules/react-dom/cjs/react-dom-client.development.js:16583:34
+
+1:20:29 PM [vite] (client) [console.warn] An error occurred in the <ImpactPage> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+1:24:39 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:54:24 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+1:54:25 PM [vite] (client) [optimizer] bundling dependencies...
+1:54:31 PM [vite] (client) ✨ new dependencies optimized: @svg-maps/nigeria, recharts
+1:54:31 PM [vite] (client) ✨ optimized dependencies changed. reloading
+2:01:21 PM [vite] (client) hmr update /src/index.css, /src/components/HumanSecurityDashboard.jsx
+2:04:45 PM [vite] (client) hmr update /src/index.css, /src/components/HumanSecurityDashboard.jsx
+2:10:07 PM [vite] (client) hmr update /src/index.css, /src/components/HumanSecurityDashboard.jsx
+2:19:21 PM [vite] (client) hmr update /src/App.jsx, /src/index.css
+node:internal/fs/watchers:321
+    const error = new UVException({
+                  ^
+
+Error: EBUSY: resource busy or locked, watch 'C:\Users\rilwan.usman.NRS\.gemini\antigravity\scratch\public\nigerian_stakeholders.png'
+    at FSWatcher.<computed> (node:internal/fs/watchers:321:19)
+    at Object.watch (node:fs:2548:36)
+    at createFsWatchInstance (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8825:16)
+    at setFsWatchListener (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8867:14)
+    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8981:20)
+    at NodeFsHandler._handleFile (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9025:24)
+    at NodeFsHandler._addToNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9199:26)
+Emitted 'error' event on FSWatcher instance at:
+    at FSWatcher._handleError (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9998:146)
+    at NodeFsHandler._addToNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9204:18) {
+  errno: -4082,
+  syscall: 'watch',
+  code: 'EBUSY',
+  path: 'C:\\Users\\rilwan.usman.NRS\\.gemini\\antigravity\\scratch\\public\\nigerian_stakeholders.png',
+  filename: 'C:\\Users\\rilwan.usman.NRS\\.gemini\\antigravity\\scratch\\public\\nigerian_stakeholders.png'
+}
+
+Node.js v24.17.0

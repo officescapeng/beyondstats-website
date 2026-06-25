@@ -1,0 +1,13 @@
+
+> scratch@0.0.0 build
+> vite build
+
+vite v8.1.0 building client environment for production...
+transforming...✓ 33 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.08 kB │ gzip:  0.56 kB
+dist/assets/index-BQg97E7l.css   23.64 kB │ gzip:  4.93 kB
+dist/assets/index-CTu1Topo.js   203.88 kB │ gzip: 63.63 kB
+
+✓ built in 668ms

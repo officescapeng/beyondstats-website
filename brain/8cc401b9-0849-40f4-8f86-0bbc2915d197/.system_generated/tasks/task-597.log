@@ -1,0 +1,5 @@
+Successfully scheduled one-shot timer.
+Expected to fire at: 2026-06-25T08:29:18+01:00
+Prompt: Check local dev server URL
+
+[2026-06-25T08:29:18+01:00] Timer fired.

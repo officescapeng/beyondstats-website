@@ -1,0 +1,27 @@
+
+> scratch@0.0.0 dev
+> vite
+
+
+  VITE v8.1.0  ready in 2954 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+9:10:26 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:10:28 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:10:32 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:14:14 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:14:24 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:14:32 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:33:57 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:52:06 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:52:34 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:52:55 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:53:48 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:53:48 AM [vite] (client) [console.error] [vite] SyntaxError: Identifier 'AnimatedCounter' has already been declared
+9:53:48 AM [vite] (client) [console.error] [vite] Failed to reload /src/App.jsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+9:56:08 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+9:56:08 AM [vite] (client) [console.error] [vite] SyntaxError: Identifier 'AnimatedCounter' has already been declared
+9:56:08 AM [vite] (client) [console.error] [vite] Failed to reload /src/App.jsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+9:56:31 AM [vite] (client) hmr update /src/App.jsx, /src/index.css
+10:05:02 AM [vite] (client) hmr update /src/index.css, /src/App.jsx

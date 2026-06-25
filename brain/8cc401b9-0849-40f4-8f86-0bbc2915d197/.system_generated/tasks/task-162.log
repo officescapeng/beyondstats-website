@@ -1,0 +1,32 @@
+
+> scratch@0.0.0 dev
+> vite
+
+
+  VITE v8.1.0  ready in 1358 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+node:internal/fs/watchers:321
+    const error = new UVException({
+                  ^
+
+Error: EBUSY: resource busy or locked, watch 'C:\Users\rilwan.usman.NRS\.gemini\antigravity\scratch\public\stakeholder_consultation.png'
+    at FSWatcher.<computed> (node:internal/fs/watchers:321:19)
+    at Object.watch (node:fs:2548:36)
+    at createFsWatchInstance (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8825:16)
+    at setFsWatchListener (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8867:14)
+    at NodeFsHandler._watchWithNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:8981:20)
+    at NodeFsHandler._handleFile (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9025:24)
+    at NodeFsHandler._addToNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9199:26)
+Emitted 'error' event on FSWatcher instance at:
+    at FSWatcher._handleError (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9998:146)
+    at NodeFsHandler._addToNodeFs (file:///C:/Users/rilwan.usman.NRS/.gemini/antigravity/scratch/node_modules/vite/dist/node/chunks/node.js:9204:18) {
+  errno: -4082,
+  syscall: 'watch',
+  code: 'EBUSY',
+  path: 'C:\\Users\\rilwan.usman.NRS\\.gemini\\antigravity\\scratch\\public\\stakeholder_consultation.png',
+  filename: 'C:\\Users\\rilwan.usman.NRS\\.gemini\\antigravity\\scratch\\public\\stakeholder_consultation.png'
+}
+
+Node.js v24.17.0
