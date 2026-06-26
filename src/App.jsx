@@ -44,6 +44,7 @@ import {
 } from 'lucide-react'
 import HumanSecurityDashboard from './components/HumanSecurityDashboard'
 import ImpactMapPage from './components/ImpactMapPage'
+import { fetchArticles, fetchPublications } from './services/sanity'
 
 
 // ================= GLOBAL HEADER / NAVBAR =================
@@ -435,8 +436,8 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
 }
 
 // ================= SUB-PAGE 1B: NEWS CAROUSEL SECTION =================
-function InsightImpactNewsSection() {
-  const news = [
+function InsightImpactNewsSection({ articles, onArticleClick }) {
+  const fallbackNews = [
     {
       id: 1,
       date: "2026-06-24",
@@ -463,6 +464,8 @@ function InsightImpactNewsSection() {
     }
   ]
 
+  const news = articles && articles.length > 0 ? articles.slice(0, 3) : fallbackNews;
+
   return (
     <section className="bg-slate-50 text-primary py-24 px-6 md:px-12 w-full border-t border-slate-100 z-10 relative">
       <div className="max-w-7xl mx-auto flex flex-col items-center">
@@ -485,7 +488,8 @@ function InsightImpactNewsSection() {
           {news.map((item) => (
             <div 
               key={item.id}
-              className="bg-white rounded-3xl overflow-hidden border border-slate-100 hover:border-secondary shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full text-left group"
+              onClick={() => onArticleClick?.(item)}
+              className="bg-white rounded-3xl overflow-hidden border border-slate-100 hover:border-secondary shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full text-left group cursor-pointer"
             >
               <div className="h-48 overflow-hidden relative">
                 <img 
@@ -508,6 +512,12 @@ function InsightImpactNewsSection() {
                   <p className="font-inter text-slate-500 text-xs leading-relaxed line-clamp-3">
                     {item.excerpt}
                   </p>
+                </div>
+                <div className="mt-auto pt-2 border-t border-slate-50">
+                  <span className="inline-flex items-center text-xs font-bold text-secondary group-hover:underline gap-1">
+                    Read Story
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </span>
                 </div>
               </div>
             </div>
@@ -823,7 +833,7 @@ function ProgramsPage() {
 }
 
 // ================= SUB-PAGE 4: RESEARCH PAGE =================
-function ResearchPage() {
+function ResearchPage({ publications: sanityPublications }) {
   const [downloadingFile, setDownloadingFile] = useState(null)
   const [downloadProgress, setDownloadProgress] = useState(0)
   const [localDownloads, setLocalDownloads] = useState({})
@@ -849,7 +859,7 @@ function ResearchPage() {
     }, 120)
   }
 
-  const publications = [
+  const fallbackPublications = [
     {
       id: 101,
       title: "Beyond# Annual Report 2025",
@@ -911,6 +921,24 @@ function ResearchPage() {
       }
     }
   ]
+
+  const publications = sanityPublications && sanityPublications.length > 0
+    ? sanityPublications.map(pub => ({
+        id: pub.id,
+        title: pub.title,
+        cover_image_url: pub.cover_image_url,
+        acf: {
+          pdf_upload: pub.pdf_upload,
+          publication_type: pub.publication_type,
+          year: pub.year,
+          topic_area: pub.topic_area,
+          state_coverage: pub.state_coverage,
+          author: pub.author,
+          summary: pub.summary,
+          download_count: pub.download_count || 0
+        }
+      }))
+    : fallbackPublications;
 
   return (
     <div className="animate-fade-in bg-white text-primary flex-1">
@@ -1042,8 +1070,8 @@ function AnimatedCounter({ end, duration = 2000 }) {
 }
 
 // ================= SUB-PAGE 5: IMPACT & VALUES PAGE =================
-function ImpactPage() {
-  const featured = {
+function ImpactPage({ articles: sanityArticles, onArticleClick }) {
+  const fallbackFeatured = {
     title: "Tracking Emerging Human Security Trends Across Northern Nigeria",
     excerpt: "This research appraisal assesses multidimensional security challenges across Kaduna, Kano, and Katsina states. Using structural field observations and data collected by our local observers, we analyze the intersecting risks of crop yields, food security fluctuations, displacement numbers, and community peace initiatives.",
     date: "2026-06-24",
@@ -1052,7 +1080,7 @@ function ImpactPage() {
     featured_media_url: "/hero_research.png"
   }
 
-  const articles = [
+  const fallbackArticles = [
     {
       id: 2,
       date: "2026-06-18",
@@ -1087,6 +1115,10 @@ function ImpactPage() {
     }
   ]
 
+  const hasSanity = sanityArticles && sanityArticles.length > 0
+  const featured = hasSanity ? sanityArticles[0] : fallbackFeatured
+  const articles = hasSanity ? sanityArticles.slice(1) : fallbackArticles
+
   return (
     <div className="animate-fade-in bg-white text-primary flex-1">
       
@@ -1113,14 +1145,17 @@ function ImpactPage() {
             Featured Insight
           </h3>
           
-          <div className="bg-slate-50 border border-slate-100 rounded-[2rem] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid grid-cols-1 lg:grid-cols-12 gap-0 text-left animate-fade-up">
+          <div 
+            onClick={() => onArticleClick?.(featured)}
+            className="bg-slate-50 border border-slate-100 hover:border-secondary rounded-[2rem] overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 grid grid-cols-1 lg:grid-cols-12 gap-0 text-left animate-fade-up cursor-pointer group"
+          >
             
             {/* Image (6 columns) */}
-            <div className="lg:col-span-6 h-[300px] lg:h-auto min-h-[300px] relative overflow-hidden group">
+            <div className="lg:col-span-6 h-[300px] lg:h-auto min-h-[300px] relative overflow-hidden">
               <img 
                 src={featured.featured_media_url} 
                 alt={featured.title} 
-                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
               />
             </div>
 
@@ -1129,18 +1164,19 @@ function ImpactPage() {
               <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-secondary uppercase">
                 {featured.category}
               </span>
-              <h2 className="font-poppins font-bold text-2xl lg:text-3xl text-[#062b66] leading-tight">
+              <h2 className="font-poppins font-bold text-2xl lg:text-3xl text-[#062b66] leading-tight group-hover:text-secondary transition-colors">
                 {featured.title}
               </h2>
               <p className="font-inter text-slate-500 text-sm leading-relaxed">
                 {featured.excerpt}
               </p>
-              <div className="flex justify-between items-center mt-4">
+              <div className="flex justify-between items-center mt-4 border-t border-slate-100 pt-4">
                 <span className="font-inter text-[10px] opacity-40 font-semibold">
                   {new Date(featured.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                 </span>
-                <span className="font-inter text-[10px] text-slate-450 font-bold uppercase tracking-wider">
-                  By {featured.author}
+                <span className="inline-flex items-center text-xs font-bold text-secondary group-hover:underline gap-1">
+                  Read Full Story
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </span>
               </div>
             </div>
@@ -1157,7 +1193,8 @@ function ImpactPage() {
             {articles.map((art) => (
               <div 
                 key={art.id}
-                className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between h-full group"
+                onClick={() => onArticleClick?.(art)}
+                className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between h-full group cursor-pointer hover:border-secondary"
               >
                 <div>
                   {/* Thumbnail */}
@@ -1179,13 +1216,19 @@ function ImpactPage() {
                         {new Date(art.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                       </span>
                     </div>
-                    <h4 className="font-poppins font-bold text-base text-[#062b66] leading-snug group-hover:text-[#39B54A] transition-colors line-clamp-2">
+                    <h4 className="font-poppins font-bold text-base text-[#062b66] leading-snug group-hover:text-secondary transition-colors line-clamp-2">
                       {art.title}
                     </h4>
                     <p className="font-inter text-slate-500 text-xs leading-relaxed line-clamp-3">
                       {art.excerpt}
                     </p>
                   </div>
+                </div>
+                <div className="px-6 pb-6 pt-2 mt-auto">
+                  <span className="inline-flex items-center text-xs font-bold text-secondary group-hover:underline gap-1">
+                    Read Story
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </span>
                 </div>
               </div>
             ))}
@@ -2316,6 +2359,131 @@ function SupportPartnershipsPage() {
   )
 }
 
+// ================= HELPERS & DIALOGS =================
+function renderBlockContent(blocks) {
+  if (!blocks) return null
+  if (typeof blocks === 'string') return <p className="mb-4">{blocks}</p>
+  if (!Array.isArray(blocks)) return null
+
+  return blocks.map((block, index) => {
+    if (block._type === 'block') {
+      const { style = 'normal', children = [] } = block
+
+      const content = children.map((child, childIndex) => {
+        if (child._type !== 'span') return child.text || ''
+        
+        let node = child.text
+        if (child.marks && child.marks.length > 0) {
+          child.marks.forEach(mark => {
+            if (mark === 'strong') {
+              node = <strong key={childIndex} className="font-bold text-[#062b66]">{node}</strong>
+            } else if (mark === 'em') {
+              node = <em key={childIndex} className="italic">{node}</em>
+            } else if (mark === 'underline') {
+              node = <span key={childIndex} className="underline">{node}</span>
+            }
+          })
+        }
+        return node
+      })
+
+      if (style === 'h1') return <h1 key={index} className="font-poppins font-bold text-2xl sm:text-3xl text-[#062b66] mt-8 mb-4">{content}</h1>
+      if (style === 'h2') return <h2 key={index} className="font-poppins font-bold text-xl sm:text-2xl text-[#062b66] mt-6 mb-3">{content}</h2>
+      if (style === 'h3') return <h3 key={index} className="font-poppins font-bold text-lg sm:text-xl text-[#062b66] mt-4 mb-2">{content}</h3>
+      if (style === 'h4') return <h4 key={index} className="font-poppins font-bold text-base sm:text-lg text-[#062b66] mt-3 mb-2">{content}</h4>
+      
+      if (style === 'blockquote') {
+        return (
+          <blockquote key={index} className="border-l-4 border-[#39B54A] bg-slate-50 pl-4 py-2 my-4 italic text-slate-500 rounded-r-lg">
+            {content}
+          </blockquote>
+        )
+      }
+
+      if (block.listItem === 'bullet') {
+        return <li key={index} className="list-disc ml-6 mb-2 text-slate-600 text-sm sm:text-base">{content}</li>
+      }
+      if (block.listItem === 'number') {
+        return <li key={index} className="list-decimal ml-6 mb-2 text-slate-600 text-sm sm:text-base">{content}</li>
+      }
+
+      return <p key={index} className="mb-4 text-slate-600 text-sm sm:text-base leading-relaxed">{content}</p>
+    }
+
+    return null
+  })
+}
+
+function ArticleReaderModal({ article, onClose }) {
+  if (!article) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 bg-slate-950/70 backdrop-blur-md transition-all duration-300 animate-fade-in">
+      <div 
+        className="bg-white w-full max-w-4xl max-h-[85vh] rounded-[2rem] overflow-hidden border border-slate-100 shadow-2xl flex flex-col relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Close Button */}
+        <button 
+          onClick={onClose}
+          className="absolute top-6 right-6 z-10 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 p-2.5 rounded-full transition-all duration-200 cursor-pointer border-none outline-none"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="overflow-y-auto flex-1 p-6 sm:p-10 md:p-12 scrollbar-thin">
+          {/* Category Tag */}
+          <span className="font-inter text-xs font-bold tracking-[0.25em] text-secondary uppercase mb-3 block">
+            {article.category}
+          </span>
+
+          {/* Title */}
+          <h2 className="font-poppins font-bold text-2xl sm:text-3xl md:text-4xl text-[#062b66] leading-tight mb-4 pr-10">
+            {article.title}
+          </h2>
+
+          {/* Meta Info */}
+          <div className="flex flex-wrap gap-4 items-center text-xs text-slate-400 font-semibold border-b border-slate-100 pb-6 mb-8">
+            <span>
+              {new Date(article.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-250"></span>
+            <span className="text-secondary font-bold uppercase tracking-wider">
+              By {article.author}
+            </span>
+          </div>
+
+          {/* Featured Image */}
+          {article.featured_media_url && (
+            <div className="w-full h-[250px] sm:h-[350px] md:h-[400px] rounded-2xl overflow-hidden mb-8 shadow-sm">
+              <img 
+                src={article.featured_media_url} 
+                alt={article.title} 
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          {/* Rich Content Body */}
+          <div className="prose max-w-none font-inter text-slate-600 text-sm sm:text-base leading-relaxed">
+            {renderBlockContent(article.body || article.excerpt)}
+          </div>
+        </div>
+
+        {/* Modal Footer */}
+        <div className="bg-slate-50 border-t border-slate-150 px-6 sm:px-10 py-5 flex justify-end">
+          <button 
+            onClick={onClose}
+            className="bg-primary hover:bg-[#052353] text-white font-inter text-xs font-bold px-6 py-3 rounded-full transition-all duration-200 cursor-pointer shadow-sm border-none outline-none"
+          >
+            Close Story
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ================= APP COMPONENT (Router Shell) =================
 function App() {
   const slides = [
@@ -2361,7 +2529,31 @@ function App() {
   // Mobile menu open
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
-  // WordPress states removed - static layout migration
+  // Sanity.io CMS states
+  const [sanityArticles, setSanityArticles] = useState([])
+  const [sanityPublications, setSanityPublications] = useState([])
+  const [loadingSanity, setLoadingSanity] = useState(true)
+  const [activeArticle, setActiveArticle] = useState(null)
+
+  useEffect(() => {
+    async function loadSanityData() {
+      try {
+        console.log("Sanity Config - Project ID:", import.meta.env.VITE_SANITY_PROJECT_ID)
+        const [arts, pubs] = await Promise.all([
+          fetchArticles(),
+          fetchPublications()
+        ])
+        console.log("Sanity Fetch - Articles:", arts.length, "Publications:", pubs.length)
+        setSanityArticles(arts)
+        setSanityPublications(pubs)
+      } catch (err) {
+        console.error("Failed to load Sanity CMS data, using static fallbacks:", err)
+      } finally {
+        setLoadingSanity(false)
+      }
+    }
+    loadSanityData()
+  }, [])
 
   // Partner Form State
   const [formData, setFormData] = useState({
@@ -2484,7 +2676,7 @@ function App() {
             currentSlide={currentSlide}
             setCurrentPage={setCurrentPage}
           />
-          <InsightImpactNewsSection />
+          <InsightImpactNewsSection articles={sanityArticles} onArticleClick={setActiveArticle} />
         </div>
       )}
       
@@ -2507,11 +2699,11 @@ function App() {
       )}
 
       {currentPage === 'research' && (
-        <ResearchPage />
+        <ResearchPage publications={sanityPublications} />
       )}
 
       {currentPage === 'impact' && (
-        <ImpactPage />
+        <ImpactPage articles={sanityArticles} onArticleClick={setActiveArticle} />
       )}
 
       {currentPage === 'partnerships' && (
@@ -2530,7 +2722,13 @@ function App() {
       {/* GLOBAL FOOTER */}
       <Footer setCurrentPage={setCurrentPage} />
 
-      {/* Reusable Global Modals removed */}
+      {/* Reusable Global Modals */}
+      {activeArticle && (
+        <ArticleReaderModal 
+          article={activeArticle} 
+          onClose={() => setActiveArticle(null)} 
+        />
+      )}
 
     </div>
   )
