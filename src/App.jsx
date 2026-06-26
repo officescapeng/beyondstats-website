@@ -301,13 +301,13 @@ function Footer({ setCurrentPage }) {
         <div className="flex flex-col gap-3">
           <h4 className="font-poppins font-bold text-xs uppercase tracking-widest text-secondary flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-[#39B54A] animate-pulse" />
-            Site Hits
+            Site Traffic
           </h4>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm">
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#39B54A]"></span>
-                Daily Hits
+                Today
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.daily.toLocaleString()}
@@ -317,7 +317,7 @@ function Footer({ setCurrentPage }) {
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                Weekly Hits
+                This Week
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.weekly.toLocaleString()}
@@ -327,7 +327,7 @@ function Footer({ setCurrentPage }) {
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                Monthly Hits
+                This Month
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.monthly.toLocaleString()}
@@ -343,7 +343,12 @@ function Footer({ setCurrentPage }) {
           &copy; {new Date().getFullYear()} Beyond Statistics Initiative. All Rights Reserved.
         </p>
         <div className="flex gap-4">
-          <a href="#" className="font-inter text-[10px] text-white/30 hover:text-white uppercase tracking-wider transition-colors">Privacy Policy</a>
+          <button 
+            onClick={() => setCurrentPage('privacy')} 
+            className="font-inter text-[10px] text-white/30 hover:text-white uppercase tracking-wider transition-colors outline-none bg-transparent border-none cursor-pointer p-0"
+          >
+            Privacy Policy
+          </button>
           <a href="#" className="font-inter text-[10px] text-white/30 hover:text-white uppercase tracking-wider transition-colors">Terms of Service</a>
         </div>
       </div>
@@ -2592,6 +2597,96 @@ function ArticleReaderModal({ article, onClose }) {
   )
 }
 
+// ================= SUB-PAGE 7: PRIVACY POLICY PAGE =================
+function PrivacyPolicyPage({ setCurrentPage }) {
+  return (
+    <div className="animate-fade-in bg-white text-primary flex-1">
+      {/* HEADER BANNER */}
+      <div className="bg-[#052353] py-20 px-6 text-center border-b border-white/5">
+        <div className="max-w-7xl mx-auto flex flex-col items-center">
+          <span className="font-inter text-xs font-bold tracking-[0.25em] text-secondary uppercase mb-2 block animate-fade-up">
+            LEGAL INFORMATION
+          </span>
+          <h1 className="font-poppins font-bold text-3xl sm:text-4xl md:text-5xl text-white tracking-tight leading-tight max-w-2xl animate-fade-up-delay-1">
+            Privacy Policy
+          </h1>
+          <p className="font-inter text-white/70 text-sm max-w-[700px] mx-auto mt-4 leading-relaxed animate-fade-up-delay-2">
+            Last Updated: June 2026. This policy outlines how the Beyond Statistics Initiative handles your data and privacy.
+          </p>
+        </div>
+      </div>
+
+      {/* CONTENT */}
+      <div className="max-w-4xl mx-auto px-6 py-20 text-left">
+        <div className="flex flex-col gap-10">
+          
+          <div className="flex flex-col gap-4">
+            <h2 className="font-poppins font-bold text-xl text-[#062b66]">1. Introduction &amp; Commitment</h2>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              At Beyond Statistics Initiative (Beyond#), we are committed to safeguarding your privacy and protecting the integrity of any information gathered through our Observatory portal. As a professional, data-centric policy observatory, we ensure that data collection remains transparent, secure, and limited strictly to optimizing user engagement and public observatory utilities.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <h2 className="font-poppins font-bold text-xl text-[#062b66]">2. Data We Collect</h2>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              We collect and process information through two primary streams:
+            </p>
+            <ul className="list-disc ml-6 flex flex-col gap-2 font-inter text-slate-600 text-sm">
+              <li><strong>Anonymous Traffic Metrics:</strong> We log general, non-personally identifiable page request hits (e.g., daily, weekly, and monthly totals) to track observatory document access and dashboard engagement. We use a keyless public hit counter (Abacus) which does not log IP addresses or personal identifiers.</li>
+              <li><strong>Partnership Proposals &amp; Contact Forms:</strong> If you choose to submit a support/partnership application, we collect your Name, Email Address, Organization Name, and the Message content you provide to facilitate collaboration.</li>
+            </ul>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <h2 className="font-poppins font-bold text-xl text-[#062b66]">3. Cookies &amp; Local Storage</h2>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              Our site uses minor cookies and HTML5 Local Storage keys:
+            </p>
+            <ul className="list-disc ml-6 flex flex-col gap-2 font-inter text-slate-600 text-sm">
+              <li><strong>beyond_cookie_consent:</strong> Stores your cookie preference (Accept/Decline) so we do not prompt you on subsequent visits.</li>
+              <li><strong>beyond_visitor_counts:</strong> Temporarily buffers local metrics in case the public statistics server is offline.</li>
+              <li><strong>Weekly data sync checks:</strong> Used on the Observatory Dashboard to check if local cache datasets are older than 7 days.</li>
+            </ul>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              You can choose to disable cookies in your browser settings or decline consent through our cookie banner. Doing so will not restrict your access to the Human Security Dashboard or research articles.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <h2 className="font-poppins font-bold text-xl text-[#062b66]">4. Data Sharing &amp; Third-Party Services</h2>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              Beyond# does not sell, lease, or rent your personal information to third parties. We utilize <strong>Sanity.io CMS</strong> as our headless backend provider. Sanity.io processes read-only content requests securely and does not harvest personal details from visitors.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <h2 className="font-poppins font-bold text-xl text-[#062b66]">5. Contact Us</h2>
+            <p className="font-inter text-slate-600 text-sm leading-relaxed">
+              If you have any questions about this Privacy Policy, your rights under data protection laws, or wish to review/delete any contact form details submitted, please contact the secretariat at:
+            </p>
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 font-inter text-slate-600 text-sm flex flex-col gap-1">
+              <strong>Beyond Statistics Initiative (Beyond#) Secretariat</strong>
+              <span>Central Business District, Abuja, FCT, Nigeria</span>
+              <span>Email: <a href="mailto:info@beyondstatistics.org" className="text-secondary font-bold hover:underline">info@beyondstatistics.org</a></span>
+            </div>
+          </div>
+
+          <div className="pt-6 border-t flex justify-start">
+            <button 
+              onClick={() => setCurrentPage('home')}
+              className="bg-primary hover:bg-[#052353] text-white font-inter text-xs font-bold px-8 py-3.5 rounded-full transition-all duration-200 cursor-pointer shadow-md border-none outline-none"
+            >
+              Return To Home
+            </button>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ================= APP COMPONENT (Router Shell) =================
 function App() {
   const slides = [
@@ -2626,7 +2721,7 @@ function App() {
   useEffect(() => {
     const path = window.location.pathname
     const pagePath = path.replace('/', '')
-    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact']
+    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy']
     if (validPages.includes(pagePath)) {
       _setCurrentPage(pagePath)
     } else {
@@ -2642,6 +2737,29 @@ function App() {
   const [sanityPublications, setSanityPublications] = useState([])
   const [loadingSanity, setLoadingSanity] = useState(true)
   const [activeArticle, setActiveArticle] = useState(null)
+  
+  // Cookie Consent States & Handlers
+  const [showCookieBanner, setShowCookieBanner] = useState(false)
+
+  useEffect(() => {
+    const consent = localStorage.getItem('beyond_cookie_consent')
+    if (!consent) {
+      const timer = setTimeout(() => {
+        setShowCookieBanner(true)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [])
+
+  const handleAcceptCookies = () => {
+    localStorage.setItem('beyond_cookie_consent', 'accepted')
+    setShowCookieBanner(false)
+  }
+
+  const handleDeclineCookies = () => {
+    localStorage.setItem('beyond_cookie_consent', 'declined')
+    setShowCookieBanner(false)
+  }
 
   useEffect(() => {
     async function loadSanityData() {
@@ -2827,6 +2945,10 @@ function App() {
         />
       )}
 
+      {currentPage === 'privacy' && (
+        <PrivacyPolicyPage setCurrentPage={setCurrentPage} />
+      )}
+
       {/* GLOBAL FOOTER */}
       <Footer setCurrentPage={setCurrentPage} />
 
@@ -2836,6 +2958,32 @@ function App() {
           article={activeArticle} 
           onClose={() => setActiveArticle(null)} 
         />
+      )}
+
+      {/* Cookie Consent Banner */}
+      {showCookieBanner && (
+        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-50 animate-fade-in">
+          <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4 text-left">
+            <h4 className="font-poppins font-bold text-sm text-white">Cookie Consent</h4>
+            <p className="font-inter text-white/70 text-xs leading-relaxed">
+              We use cookies and browser storage to optimize site speed, record global visitors, and check dataset sync status. By clicking "Accept Cookies", you consent to our use of these tools in accordance with our <button onClick={() => { setCurrentPage('privacy'); setShowCookieBanner(false); }} className="text-secondary font-bold hover:underline bg-transparent border-none cursor-pointer p-0">Privacy Policy</button>.
+            </p>
+            <div className="flex gap-3 justify-end mt-2">
+              <button 
+                onClick={handleDeclineCookies}
+                className="font-inter text-[11px] font-bold text-white/50 hover:text-white px-4 py-2.5 rounded-full hover:bg-white/5 transition-all cursor-pointer border border-white/10 bg-transparent"
+              >
+                Decline
+              </button>
+              <button 
+                onClick={handleAcceptCookies}
+                className="font-inter text-[11px] font-bold bg-[#39B54A] hover:bg-[#39B54A]/95 text-white px-5 py-2.5 rounded-full transition-all cursor-pointer shadow-md shadow-[#39B54A]/10 border-none outline-none"
+              >
+                Accept Cookies
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
