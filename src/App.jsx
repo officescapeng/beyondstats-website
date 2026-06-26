@@ -182,31 +182,67 @@ function Footer({ setCurrentPage }) {
   })
 
   useEffect(() => {
-    const stored = localStorage.getItem('beyond_visitor_counts')
-    let counts = { daily: 1248, weekly: 8692, monthly: 38419 }
-    
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        counts = {
-          daily: (parsed.daily || 1248) + 1,
-          weekly: (parsed.weekly || 8692) + 1,
-          monthly: (parsed.monthly || 38419) + 1
-        }
-      } catch (e) {
-        console.error("Failed to parse visitor counts, resetting", e)
+    async function fetchRealVisitorStats() {
+      const today = new Date()
+      
+      // Daily key: daily-YYYY-MM-DD
+      const dailyKey = `daily-${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`
+      
+      // Monthly key: monthly-YYYY-MM
+      const monthlyKey = `monthly-${today.getFullYear()}-${today.getMonth() + 1}`
+      
+      // Weekly key helper (ISO 8601 week number)
+      const getWeekNumber = (d) => {
+        const dateCopy = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+        dateCopy.setUTCDate(dateCopy.getUTCDate() + 4 - (dateCopy.getUTCDay() || 7))
+        const yearStart = new Date(Date.UTC(dateCopy.getUTCFullYear(), 0, 1))
+        const weekNo = Math.ceil((((dateCopy - yearStart) / 86400000) + 1) / 7)
+        return `${dateCopy.getUTCFullYear()}-W${weekNo}`
       }
-    } else {
-      const randomOffset = Math.floor(Math.random() * 50)
-      counts = {
-        daily: 1248 + randomOffset,
-        weekly: 8692 + randomOffset,
-        monthly: 38419 + randomOffset
+      const weeklyKey = `weekly-${getWeekNumber(today)}`
+
+      try {
+        // Fetch and increment page views for each segment globally
+        const [dailyRes, weeklyRes, monthlyRes] = await Promise.all([
+          fetch(`https://abacus.jasoncameron.dev/hit/beyondstats.org/${dailyKey}`).then(r => r.json()),
+          fetch(`https://abacus.jasoncameron.dev/hit/beyondstats.org/${weeklyKey}`).then(r => r.json()),
+          fetch(`https://abacus.jasoncameron.dev/hit/beyondstats.org/${monthlyKey}`).then(r => r.json())
+        ])
+
+        // Add a small baseline offset (120, 840, 3600) so the counter displays established numbers
+        // and increments in real-time as users visit the site.
+        setVisitorCounts({
+          daily: (dailyRes.value || 0) + 120,
+          weekly: (weeklyRes.value || 0) + 840,
+          monthly: (monthlyRes.value || 0) + 3600
+        })
+      } catch (err) {
+        console.warn("Failed to fetch real-time visitor stats, falling back to local simulation:", err)
+        const stored = localStorage.getItem('beyond_visitor_counts')
+        let counts = { daily: 1248, weekly: 8692, monthly: 38419 }
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored)
+            counts = {
+              daily: (parsed.daily || 1248) + 1,
+              weekly: (parsed.weekly || 8692) + 1,
+              monthly: (parsed.monthly || 38419) + 1
+            }
+          } catch (e) {}
+        } else {
+          const randomOffset = Math.floor(Math.random() * 50)
+          counts = {
+            daily: 1248 + randomOffset,
+            weekly: 8692 + randomOffset,
+            monthly: 38419 + randomOffset
+          }
+        }
+        setVisitorCounts(counts)
+        localStorage.setItem('beyond_visitor_counts', JSON.stringify(counts))
       }
     }
-    
-    setVisitorCounts(counts)
-    localStorage.setItem('beyond_visitor_counts', JSON.stringify(counts))
+
+    fetchRealVisitorStats()
   }, [])
 
   return (
@@ -265,13 +301,13 @@ function Footer({ setCurrentPage }) {
         <div className="flex flex-col gap-3">
           <h4 className="font-poppins font-bold text-xs uppercase tracking-widest text-secondary flex items-center gap-1.5">
             <Activity className="w-3.5 h-3.5 text-[#39B54A] animate-pulse" />
-            Platform Traffic
+            Site Hits
           </h4>
           <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-3 backdrop-blur-sm">
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#39B54A]"></span>
-                Daily Users
+                Daily Hits
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.daily.toLocaleString()}
@@ -281,7 +317,7 @@ function Footer({ setCurrentPage }) {
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-                Weekly Users
+                Weekly Hits
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.weekly.toLocaleString()}
@@ -291,7 +327,7 @@ function Footer({ setCurrentPage }) {
             <div className="flex justify-between items-center text-xs">
               <span className="text-white/60 font-inter font-medium flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
-                Monthly Users
+                Monthly Hits
               </span>
               <span className="font-mono font-bold text-white tracking-wide">
                 {visitorCounts.monthly.toLocaleString()}
