@@ -1,13 +1,28 @@
 import os
+import sys
 import time
 import random
 from datetime import datetime
+
+# Ensure the script's own directory is on the path so sibling modules
+# (social_publisher.py) can be imported when run from the repo root by CI
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
-from social_publisher import publish_to_all_socials
+
+# Try social publisher — fail gracefully if not available
+try:
+    from social_publisher import publish_to_all_socials
+    SOCIAL_PUBLISHING_ENABLED = True
+except Exception as e:
+    print(f"Social publisher unavailable: {e}. Incident scraping will continue without social posting.")
+    SOCIAL_PUBLISHING_ENABLED = False
+    def publish_to_all_socials(*args, **kwargs):
+        pass
 
 # Try loading from local .env file (for local development)
 try:
