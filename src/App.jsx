@@ -45,10 +45,48 @@ import {
 import HumanSecurityDashboard from './components/HumanSecurityDashboard'
 import ImpactMapPage from './components/ImpactMapPage'
 import { fetchArticles, fetchPublications } from './services/sanity'
+import { PROCESSED_STATE_DATA } from './data/humanSecurityData'
 
 
 // ================= GLOBAL HEADER / NAVBAR =================
-function Header({ currentPage, setCurrentPage, setIsMenuOpen }) {
+function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId }) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchRef = useRef(null)
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  const getFilteredPages = (query) => {
+    if (!query) return []
+    const allPages = [
+      { id: 'about', name: 'About Us' },
+      { id: 'programs', name: 'Programs & What We Do' },
+      { id: 'dashboard', name: 'HSRI Dashboard' },
+      { id: 'research', name: 'Research Hub & Publications' },
+      { id: 'impact', name: 'Impact Stories' },
+      { id: 'impact-map', name: 'Impact Map' },
+      { id: 'partnerships', name: 'Support & Partnerships' },
+      { id: 'contact', name: 'Contact Us' }
+    ]
+    return allPages.filter(p => p.name.toLowerCase().includes(query.toLowerCase()))
+  }
+
+  const getFilteredStates = (query) => {
+    if (!query) return []
+    return (PROCESSED_STATE_DATA || []).filter(s => 
+      s.name.toLowerCase().includes(query.toLowerCase())
+    ).slice(0, 5)
+  }
+
   const links = [
     { name: 'About', id: 'about' },
     { name: 'Programs', id: 'programs', dropdown: true },
@@ -147,6 +185,93 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen }) {
       </div>
 
       <div className="hidden md:flex items-center gap-4">
+        {/* GLOBAL HEADER SEARCH BAR */}
+        <div className="relative" ref={searchRef}>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search site or states..."
+              value={searchQuery}
+              onFocus={() => setShowSuggestions(true)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setShowSuggestions(true)
+              }}
+              className="w-48 pl-8 pr-7 py-2 bg-white/5 hover:bg-white/10 focus:bg-white/15 border border-white/10 rounded-full text-[11px] font-semibold placeholder-white/40 focus:placeholder-white/20 focus:outline-none focus:ring-1 focus:ring-secondary transition-all text-white"
+            />
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="w-3.5 h-3.5 text-white/50" />
+            </div>
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('')
+                  setShowSuggestions(false)
+                }}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-white/50 hover:text-white cursor-pointer bg-transparent border-none outline-none"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && (
+            <div className="absolute right-0 mt-2 w-64 max-h-64 overflow-y-auto rounded-2xl bg-[#051c44] border border-white/5 shadow-2xl z-[999] p-2 flex flex-col gap-1 text-left">
+              {getFilteredPages(searchQuery).length === 0 && getFilteredStates(searchQuery).length === 0 ? (
+                <div className="text-[10px] text-white/40 text-center py-3">No matches found</div>
+              ) : (
+                <>
+                  {/* Pages Category */}
+                  {getFilteredPages(searchQuery).length > 0 && (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[9px] font-bold text-secondary uppercase tracking-wider px-3 py-1 block">Pages</span>
+                      {getFilteredPages(searchQuery).map(page => (
+                        <button
+                          key={page.id}
+                          type="button"
+                          onClick={() => {
+                            setCurrentPage(page.id)
+                            setSearchQuery('')
+                            setShowSuggestions(false)
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold hover:text-[#39B54A] hover:bg-white/5 cursor-pointer bg-transparent border-none outline-none text-white/80"
+                        >
+                          {page.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* States Category */}
+                  {getFilteredStates(searchQuery).length > 0 && (
+                    <div className="flex flex-col gap-0.5 mt-1.5 border-t border-white/5 pt-1.5">
+                      <span className="text-[9px] font-bold text-secondary uppercase tracking-wider px-3 py-1 block">States</span>
+                      {getFilteredStates(searchQuery).map(state => (
+                        <button
+                          key={state.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedStateId(state.id)
+                            setCurrentPage('dashboard')
+                            setSearchQuery('')
+                            setShowSuggestions(false)
+                          }}
+                          className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold hover:text-[#39B54A] hover:bg-white/5 cursor-pointer bg-transparent border-none outline-none text-white/80 flex justify-between items-center"
+                        >
+                          <span>{state.name} State</span>
+                          <span className="opacity-45 text-[8px] font-mono">Score: {state.risks.composite}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <button 
           onClick={() => setCurrentPage('partnerships')}
           className={`border font-inter text-[11px] font-semibold px-5 py-2.5 rounded-full flex items-center gap-2 transition-all duration-300 uppercase tracking-widest cursor-pointer outline-none ${
@@ -2720,6 +2845,7 @@ function App() {
 
   // Dynamic Routing state: 'home' | 'about' | 'programs' | 'impact-map' | 'dashboard' | 'research' | 'impact' | 'contact'
   const [currentPage, _setCurrentPage] = useState('home')
+  const [selectedStateId, setSelectedStateId] = useState('fct')
 
   const setCurrentPage = (page) => {
     _setCurrentPage(page)
@@ -2853,6 +2979,7 @@ function App() {
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
           setIsMenuOpen={setIsMenuOpen}
+          setSelectedStateId={setSelectedStateId}
         />
       </div>
 
@@ -2944,7 +3071,10 @@ function App() {
       )}
 
       {currentPage === 'dashboard' && (
-        <HumanSecurityDashboard />
+        <HumanSecurityDashboard 
+          selectedStateId={selectedStateId} 
+          setSelectedStateId={setSelectedStateId} 
+        />
       )}
 
       {currentPage === 'research' && (
