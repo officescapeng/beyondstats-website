@@ -83,7 +83,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen }) {
                     (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard')) ||
                     (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
                       ? 'text-secondary'
-                      : 'text-white/80 hover:text-white'
+                      : 'text-white/80 hover:text-secondary'
                   }`}
                 >
                   {link.name}
@@ -97,28 +97,28 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen }) {
                       <>
                         <button
                           onClick={() => setCurrentPage('programs')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           What We Do
                         </button>
                         <button
                           onClick={() => setCurrentPage('dashboard')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
-                          Observatory Dashboard
+                          HSRI Dashboard
                         </button>
                       </>
                     ) : (
                       <>
                         <button
                           onClick={() => setCurrentPage('impact')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           Our Impact Stories
                         </button>
                         <button
                           onClick={() => setCurrentPage('impact-map')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-white hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           Our Impact Map
                         </button>
@@ -137,7 +137,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen }) {
               className={`font-inter text-[11px] font-semibold uppercase tracking-widest cursor-pointer outline-none transition-colors ${
                 currentPage === link.id
                   ? 'text-secondary'
-                  : 'text-white/80 hover:text-white'
+                  : 'text-white/80 hover:text-secondary'
               }`}
             >
               {link.name}
@@ -2664,7 +2664,7 @@ function PrivacyPolicyPage({ setCurrentPage }) {
             <ul className="list-disc ml-6 flex flex-col gap-2 font-inter text-slate-600 text-sm">
               <li><strong>beyond_cookie_consent:</strong> Stores your cookie preference (Accept/Decline) so we do not prompt you on subsequent visits.</li>
               <li><strong>beyond_visitor_counts:</strong> Temporarily buffers local metrics in case the public statistics server is offline.</li>
-              <li><strong>Weekly data sync checks:</strong> Used on the Observatory Dashboard to check if local cache datasets are older than 7 days.</li>
+              <li><strong>Weekly data sync checks:</strong> Used on the HSRI Dashboard to check if local cache datasets are older than 7 days.</li>
             </ul>
             <p className="font-inter text-slate-600 text-sm leading-relaxed">
               You can choose to disable cookies in your browser settings or decline consent through our cookie banner. Doing so will not restrict your access to the Human Security Dashboard or research articles.

@@ -46,7 +46,7 @@ import {
 
 export default function HumanSecurityDashboard() {
   const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode (white theme)
-  const [selectedStateId, setSelectedStateId] = useState('kaduna');
+  const [selectedStateId, setSelectedStateId] = useState('fct');
   const [activeFilter, setActiveFilter] = useState('composite'); // 'composite' or pillar key
   const [showSourcesModal, setShowSourcesModal] = useState(false);
   const [downloadDropdownOpen, setDownloadDropdownOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function HumanSecurityDashboard() {
   const [updateNotification, setUpdateNotification] = useState(null);
 
   // State Comparison Selectors
-  const [stateAId, setStateAId] = useState('kaduna');
+  const [stateAId, setStateAId] = useState('fct');
   const [stateBId, setStateBId] = useState('kano');
 
   // Tooltip position for map hover
@@ -379,15 +379,6 @@ export default function HumanSecurityDashboard() {
               <span>Last Updated: {DATA_METADATA.lastUpdated}</span>
             </div>
 
-            {/* Sources Button */}
-            <button 
-              onClick={() => setShowSourcesModal(true)}
-              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer outline-none border-none"
-              title="Data Sources"
-            >
-              <Database className="w-4 h-4" />
-            </button>
-
             {/* Export Dropdown */}
             <div className="relative" ref={downloadMenuRef}>
               <button 
@@ -422,14 +413,26 @@ export default function HumanSecurityDashboard() {
               )}
             </div>
 
-            {/* Dark Mode Toggle */}
-            <button 
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer outline-none border-none"
-              title={isDarkMode ? "Light Mode" : "Dark Mode"}
-            >
-              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
+            {/* Icon Controls */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Sources Button */}
+              <button 
+                onClick={() => setShowSourcesModal(true)}
+                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer outline-none border-none"
+                title="Data Sources"
+              >
+                <Database className="w-4 h-4" />
+              </button>
+
+              {/* Dark Mode Toggle */}
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer outline-none border-none"
+                title={isDarkMode ? "Light Mode" : "Dark Mode"}
+              >
+                {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>
