@@ -64,6 +64,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const [updateNotification, setUpdateNotification] = useState(null);
   const [rawIncidents, setRawIncidents] = useState([]);
   const [feedViewMode, setFeedViewMode] = useState('all'); // 'all', 'daily', 'weekly', 'monthly'
+  const [dashboardTab, setDashboardTab] = useState('profile'); // 'profile', 'comparison'
 
   // State Comparison Selectors
   const [stateAId, setStateAId] = useState('fct');
@@ -211,6 +212,108 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         }
       }, 1500);
     }
+  };
+
+  // Helper for grouping and summarizing raw incidents by timeframe (daily, weekly, monthly)
+  const getAggregatedFeedData = () => {
+    if (!rawIncidents || rawIncidents.length === 0) return [];
+    
+    const groups = {};
+    
+    rawIncidents.forEach(inc => {
+      if (!inc.date) return;
+      
+      const dateParts = inc.date.split('-');
+      const dateObj = new Date(Date.UTC(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10)));
+      
+      let groupKey = '';
+      let sortVal = 0;
+      
+      if (feedViewMode === 'daily') {
+        groupKey = inc.date;
+        sortVal = dateObj.getTime();
+      } else if (feedViewMode === 'weekly') {
+        const day = dateObj.getUTCDay();
+        const diff = dateObj.getUTCDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), diff));
+        groupKey = `Week of ${monday.toISOString().split('T')[0]}`;
+        sortVal = monday.getTime();
+      } else if (feedViewMode === 'monthly') {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        groupKey = `${months[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
+        sortVal = Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), 1);
+      }
+      
+      if (groupKey) {
+        if (!groups[groupKey]) {
+          groups[groupKey] = { period: groupKey, incidents: 0, fatalities: 0, abductions: 0, states: new Set(), sortVal };
+        }
+        
+        groups[groupKey].incidents += 1;
+        groups[groupKey].fatalities += (inc.fatalities || 0);
+        groups[groupKey].abductions += (inc.abductions || 0);
+        if (inc.state) {
+          inc.state.split(',').forEach(s => groups[groupKey].states.add(s.trim()));
+        }
+      }
+    });
+    
+    return Object.values(groups).map(g => ({
+      ...g,
+      statesList: Array.from(g.states)
+    })).sort((a, b) => b.sortVal - a.sortVal);
+  };
+
+  // Compile and download active conflict feed data as CSV (raw or aggregated)
+  const handleDownloadFeedReport = () => {
+    if (!rawIncidents || rawIncidents.length === 0) return;
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    let filename = `Beyond_Observatory_Conflict_Feed_${feedViewMode.toUpperCase()}_${new Date().getFullYear()}.csv`;
+
+    if (feedViewMode === 'all') {
+      // Header Row for raw logs
+      csvContent += ["Date", "State", "Incident Type", "Fatalities", "Abductions", "Summary", "Source URL"].join(",") + "\n";
+      
+      // Data Rows
+      [...rawIncidents]
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .forEach(inc => {
+          const row = [
+            inc.date || '',
+            `"${(inc.state || '').replace(/"/g, '""')}"`,
+            `"${(inc.incident_type || '').replace(/"/g, '""')}"`,
+            inc.fatalities || 0,
+            inc.abductions || 0,
+            `"${(inc.summary || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+            inc.source_url || ''
+          ];
+          csvContent += row.join(",") + "\n";
+        });
+    } else {
+      // Header Row for aggregated reports
+      csvContent += ["Period", "Total Incidents", "Total Fatalities", "Total Abductions", "Affected States"].join(",") + "\n";
+      
+      // Data Rows
+      getAggregatedFeedData().forEach(g => {
+        const row = [
+          g.period,
+          g.incidents,
+          g.fatalities,
+          g.abductions,
+          `"${(g.statesList || []).join(", ").replace(/"/g, '""')}"`
+        ];
+        csvContent += row.join(",") + "\n";
+      });
+    }
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   useEffect(() => {
@@ -462,56 +565,6 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     ];
   };
 
-  // Helper for grouping and summarizing raw incidents by timeframe (daily, weekly, monthly)
-  const getAggregatedFeedData = () => {
-    if (!rawIncidents || rawIncidents.length === 0) return [];
-    
-    const groups = {};
-    
-    rawIncidents.forEach(inc => {
-      if (!inc.date) return;
-      
-      const dateParts = inc.date.split('-');
-      const dateObj = new Date(Date.UTC(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10)));
-      
-      let groupKey = '';
-      let sortVal = 0;
-      
-      if (feedViewMode === 'daily') {
-        groupKey = inc.date;
-        sortVal = dateObj.getTime();
-      } else if (feedViewMode === 'weekly') {
-        const day = dateObj.getUTCDay();
-        const diff = dateObj.getUTCDate() - day + (day === 0 ? -6 : 1);
-        const monday = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), diff));
-        groupKey = `Week of ${monday.toISOString().split('T')[0]}`;
-        sortVal = monday.getTime();
-      } else if (feedViewMode === 'monthly') {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        groupKey = `${months[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
-        sortVal = Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), 1);
-      }
-      
-      if (groupKey) {
-        if (!groups[groupKey]) {
-          groups[groupKey] = { period: groupKey, incidents: 0, fatalities: 0, abductions: 0, states: new Set(), sortVal };
-        }
-        
-        groups[groupKey].incidents += 1;
-        groups[groupKey].fatalities += (inc.fatalities || 0);
-        groups[groupKey].abductions += (inc.abductions || 0);
-        if (inc.state) {
-          inc.state.split(',').forEach(s => groups[groupKey].states.add(s.trim()));
-        }
-      }
-    });
-    
-    return Object.values(groups).map(g => ({
-      ...g,
-      statesList: Array.from(g.states)
-    })).sort((a, b) => b.sortVal - a.sortVal);
-  };
-
   return (
     <div className={`w-full min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20] text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       
@@ -553,7 +606,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div className="text-left">
             <span className="font-inter text-xs font-bold tracking-[0.2em] text-[#39B54A] uppercase mb-1 block">
-              Beyond# Human Security Dashboard
+              Beyond# Observatory
             </span>
             <h1 className="font-poppins font-bold text-3xl tracking-tight leading-tight uppercase select-none">
               Nigeria Human Security Dashboard
@@ -666,7 +719,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         </div>
       )}
 
-      {/* DASHBOARD BODY */}
+      {/* OBSERVATORY BODY */}
       <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col gap-10">
         
         {/* SUMMARY TILES */}
@@ -691,11 +744,34 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           })}
         </div>
 
-        {/* MAP & SELECTION GRID */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* VIEW NAVIGATION TABS */}
+        <div className="flex border-b border-slate-200/20 dark:border-white/5 pb-0.5 mb-6 no-print">
+          {[
+            { id: 'profile', label: 'Vulnerability Overview & Profile' },
+            { id: 'projections', label: 'Risk Trend Projections' },
+            { id: 'comparison', label: 'State Comparison Analyzer' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setDashboardTab(tab.id)}
+              className={`px-5 py-3 font-poppins text-xs font-bold uppercase tracking-wider transition-all duration-200 border-b-2 bg-transparent cursor-pointer outline-none ${
+                dashboardTab === tab.id
+                  ? 'border-[#39B54A] text-[#39B54A]'
+                  : 'border-transparent opacity-50 hover:opacity-100 text-current'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {dashboardTab === 'profile' && (
+          <>
+            {/* MAP & SELECTION GRID */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* LEFT SIDE: MAP & SELECTOR (LG: 7 columns) */}
-          <div className={`lg:col-span-7 flex flex-col gap-6 p-6 rounded-3xl border text-left ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card`}>
+          <div className={`lg:col-span-7 flex flex-col gap-6 p-6 rounded-3xl border text-left ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
             <div>
               <h2 className="font-poppins font-bold text-lg leading-tight uppercase">Interactive choropleth Map</h2>
               <p className="font-inter text-xs opacity-60 mt-1">
@@ -791,7 +867,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           </div>
 
           {/* RIGHT SIDE: SELECTED STATE DETAILED CARD (LG: 5 columns) */}
-          <div className={`lg:col-span-5 flex flex-col gap-6 p-6 rounded-3xl border text-left ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card`}>
+          <div className={`lg:col-span-5 flex flex-col gap-6 p-6 rounded-3xl border text-left ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
             
             {/* Header select */}
             <div className="flex justify-between items-start gap-4">
@@ -863,696 +939,682 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           </div>
         </div>
 
-        {/* DETAILED PILLAR CARD - SINGLE TABBED VIEW */}
-        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card no-print`}>
-          
-          {/* Tab Selection Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/20 dark:border-white/5 pb-4">
-            <div>
-              <h2 className="font-poppins font-bold text-lg uppercase tracking-tight text-secondary">Indicator Deep-Dive</h2>
-              <p className="font-inter text-xs opacity-60 mt-0.5">
-                Select a pillar to explore detailed metrics and national averages.
-              </p>
-            </div>
-            
-            {/* Tab Buttons */}
-            <div className="flex flex-wrap gap-1.5 bg-slate-100 dark:bg-slate-900/50 p-1 rounded-2xl border border-slate-200/20">
-              {[
-                { key: 'poverty', label: 'Poverty', icon: Coins },
-                { key: 'education', label: 'Education', icon: GraduationCap },
-                { key: 'health', label: 'Health', icon: Activity },
-                { key: 'foodSecurity', label: 'Food Security', icon: Sprout },
-                { key: 'displacement', label: 'Displacement', icon: Users },
-                { key: 'peaceSecurity', label: 'Security', icon: Shield }
-              ].map(tab => {
-                const TabIcon = tab.icon;
-                const isActive = activePillarTab === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => setActivePillarTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-inter text-xs font-bold transition-all cursor-pointer outline-none border-none ${
-                      isActive 
-                        ? 'bg-[#39B54A] text-white shadow-sm' 
-                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-white bg-transparent'
-                    }`}
-                  >
-                    <TabIcon className="w-3.5 h-3.5" />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+        {/* DETAILED PILLAR CARDS WITH RECHARTS VISUALIZATIONS */}
+        <div className="flex flex-col gap-6">
+          <div className="text-left">
+            <h2 className="font-poppins font-bold text-xl uppercase tracking-tight">Key Human Security Indicators</h2>
+            <p className="font-inter text-xs opacity-60 mt-1">
+              Comparing {activeState.name}'s specific dimensional metrics and calculated risk levels against national averages.
+            </p>
           </div>
 
-          {/* Dynamic Pillar Card Body */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center min-h-[180px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
-            {/* Left Panel: Metrics & Stats (LG: 5 columns) */}
-            <div className="lg:col-span-5 flex flex-col justify-between h-full gap-4">
-              
-              {/* Pillar Title & Risk Category Badge */}
-              <div className="flex justify-between items-center">
-                <span className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">
-                  {activePillarTab === 'poverty' && "Poverty & Livelihoods"}
-                  {activePillarTab === 'education' && "Education Indicators"}
-                  {activePillarTab === 'health' && "Health & Wellbeing"}
-                  {activePillarTab === 'foodSecurity' && "Food Security & Nutrition"}
-                  {activePillarTab === 'displacement' && "Displacement & Migration"}
-                  {activePillarTab === 'peaceSecurity' && "Peace & Public Security"}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks[activePillarTab]).class}`}>
-                  Score: {activeState.risks[activePillarTab]}
-                </span>
+            {/* Poverty card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Coins className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Poverty & Livelihoods</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.poverty).class}`}>
+                    Score: {activeState.risks.poverty}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">MPI Rate</span>
+                    <span className="font-bold font-mono">{activeState.poverty.mpi}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Unemployment</span>
+                    <span className="font-bold font-mono">{activeState.poverty.unemployment}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Inflation Impact</span>
+                    <span className="font-bold font-mono">{activeState.poverty.inflationImpact}/10</span>
+                  </div>
+                </div>
               </div>
-
-              {/* Specific Metric Fields */}
-              <div className="grid grid-cols-3 gap-4 border-y border-slate-200/20 dark:border-white/5 py-4 text-xs">
-                {activePillarTab === 'poverty' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">MPI Rate</span>
-                      <span className="font-bold font-mono text-sm">{activeState.poverty.mpi}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Unemployment</span>
-                      <span className="font-bold font-mono text-sm">{activeState.poverty.unemployment}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Inflation Impact</span>
-                      <span className="font-bold font-mono text-sm">{activeState.poverty.inflationImpact}/10</span>
-                    </div>
-                  </>
-                )}
-                {activePillarTab === 'education' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">NSAR Attendance</span>
-                      <span className="font-bold font-mono text-sm">{activeState.education.attendance}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Out-of-School</span>
-                      <span className="font-bold font-mono text-sm">{activeState.education.outOfSchool}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Youth Literacy</span>
-                      <span className="font-bold font-mono text-sm">{activeState.education.literacy}%</span>
-                    </div>
-                  </>
-                )}
-                {activePillarTab === 'health' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Maternal Health</span>
-                      <span className="font-bold font-mono text-sm">{activeState.health.maternalHealth}/100</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Child Immunization</span>
-                      <span className="font-bold font-mono text-sm">{activeState.health.childHealth}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Facility Access</span>
-                      <span className="font-bold font-mono text-sm">{activeState.health.healthcareAccess}%</span>
-                    </div>
-                  </>
-                )}
-                {activePillarTab === 'foodSecurity' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Consumption Rate</span>
-                      <span className="font-bold font-mono text-sm">{activeState.foodSecurity.foodConsumption}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Acute Insecurity</span>
-                      <span className="font-bold font-mono text-sm">{activeState.foodSecurity.acuteInsecurity}%</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Nutrition Risk</span>
-                      <span className="font-bold font-mono text-sm">{activeState.foodSecurity.nutritionRisk}/10</span>
-                    </div>
-                  </>
-                )}
-                {activePillarTab === 'displacement' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Active IDPs</span>
-                      <span className="font-bold font-mono text-sm">{activeState.displacement.idps.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Returnees</span>
-                      <span className="font-bold font-mono text-sm">{activeState.displacement.returnees.toLocaleString()}</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">New Events</span>
-                      <span className="font-bold font-mono text-sm">{activeState.displacement.newEvents}</span>
-                    </div>
-                  </>
-                )}
-                {activePillarTab === 'peaceSecurity' && (
-                  <>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Conflicts</span>
-                      <span className="font-bold font-mono text-sm">{activeState.peaceSecurity.conflictIncidents}</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Fatalities</span>
-                      <span className="font-bold font-mono text-sm">{activeState.peaceSecurity.fatalities}</span>
-                    </div>
-                    <div>
-                      <span className="opacity-50 text-[10px] block mb-1">Safety Index</span>
-                      <span className="font-bold font-mono text-sm">{activeState.peaceSecurity.communitySecurity}%</span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Data source text */}
-              <div className="text-[9px] opacity-40">
-                {activePillarTab === 'poverty' && "Sources: NBS Nigeria Poverty Index, World Bank Survey"}
-                {activePillarTab === 'education' && "Sources: NBS Annual Education Statistics, UNICEF MICS"}
-                {activePillarTab === 'health' && "Sources: NDHS Survey Registry, WHO/UNICEF database"}
-                {activePillarTab === 'foodSecurity' && "Sources: Cadre Harmonisé Joint Analysis, FAO/WFP Data"}
-                {activePillarTab === 'displacement' && "Sources: IOM DTM Registries, NEMA Situation Reports"}
-                {activePillarTab === 'peaceSecurity' && "Sources: Beyond# Live Tracker, ACLED Portal, Nigeria Security Tracker"}
-              </div>
-            </div>
-
-            {/* Right Panel: Recharts Visualization (LG: 7 columns) */}
-            <div className="lg:col-span-7 h-[160px] w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                
-                {activePillarTab === 'poverty' && (
-                  <BarChart data={[{ name: "MPI", State: activeState.poverty.mpi, Avg: NATIONAL_AVERAGES.poverty.mpi }, { name: "Unemp", State: activeState.poverty.unemployment, Avg: NATIONAL_AVERAGES.poverty.unemployment }]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[{ name: "MPI", State: activeState.poverty.mpi, Avg: NATIONAL_AVERAGES.poverty.mpi }, { name: "Unemp", State: activeState.poverty.unemployment, Avg: NATIONAL_AVERAGES.poverty.unemployment }]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide domain={[0, 100]} />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
                     <Bar dataKey="State" fill="#39B54A" radius={[4, 4, 0, 0]} name={`${activeState.name} %`} />
                     <Bar dataKey="Avg" fill="#94A3B8" opacity={0.4} radius={[4, 4, 0, 0]} name="National Avg %" />
                   </BarChart>
-                )}
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: NBS Nigeria Poverty Index, World Bank Survey
+              </div>
+            </div>
 
-                {activePillarTab === 'education' && (
+            {/* Education card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <GraduationCap className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Education Indicators</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.education).class}`}>
+                    Score: {activeState.risks.education}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Attendance</span>
+                    <span className="font-bold font-mono">{activeState.education.attendance}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Out-of-School</span>
+                    <span className="font-bold font-mono">{activeState.education.outOfSchool}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Youth Literacy</span>
+                    <span className="font-bold font-mono">{activeState.education.literacy}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={[
                     { name: "Attendance", State: activeState.education.attendance, Average: NATIONAL_AVERAGES.education.attendance },
-                    { name: "Out-of-School", State: activeState.education.outOfSchool, Average: NATIONAL_AVERAGES.education.outOfSchool },
                     { name: "Literacy", State: activeState.education.literacy, Average: NATIONAL_AVERAGES.education.literacy }
-                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                  ]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide domain={[0, 100]} />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
                     <Area type="monotone" dataKey="State" stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} name={`${activeState.name} %`} />
                     <Area type="monotone" dataKey="Average" stroke="#94A3B8" fill="#94A3B8" fillOpacity={0.05} name="National Avg %" />
                   </AreaChart>
-                )}
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: NBS Education Census, UNICEF MICS Database
+              </div>
+            </div>
 
-                {activePillarTab === 'health' && (
-                  <AreaChart data={[
-                    { name: "Maternal Health", State: activeState.health.maternalHealth, Average: NATIONAL_AVERAGES.health.maternalHealth },
-                    { name: "Child Health", State: activeState.health.childHealth, Average: NATIONAL_AVERAGES.health.childHealth },
-                    { name: "Healthcare Access", State: activeState.health.healthcareAccess, Average: NATIONAL_AVERAGES.health.healthcareAccess }
-                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+            {/* Health card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Activity className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Health & Wellbeing</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.health).class}`}>
+                    Score: {activeState.risks.health}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Maternal Index</span>
+                    <span className="font-bold font-mono">{activeState.health.maternalHealth}/100</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Child Immuniz.</span>
+                    <span className="font-bold font-mono">{activeState.health.childHealth}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Facility Access</span>
+                    <span className="font-bold font-mono">{activeState.health.healthcareAccess}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={[
+                    { name: "Maternal Health", State: activeState.health.maternalHealth, Avg: NATIONAL_AVERAGES.health.maternalHealth },
+                    { name: "Immunization", State: activeState.health.childHealth, Avg: NATIONAL_AVERAGES.health.childHealth }
+                  ]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide domain={[0, 100]} />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
-                    <Area type="monotone" dataKey="State" stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} name={`${activeState.name} %`} />
-                    <Area type="monotone" dataKey="Average" stroke="#94A3B8" fill="#94A3B8" fillOpacity={0.05} name="National Avg %" />
-                  </AreaChart>
-                )}
+                    <Bar dataKey="State" fill="#39B54A" radius={[4, 4, 0, 0]} name={`${activeState.name} %`} />
+                    <Bar dataKey="Avg" fill="#94A3B8" opacity={0.4} radius={[4, 4, 0, 0]} name="National Avg %" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: DHS Demographic Survey, WHO Health Statistics
+              </div>
+            </div>
 
-                {activePillarTab === 'foodSecurity' && (
+            {/* Food Security card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Sprout className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Food Security</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.foodSecurity).class}`}>
+                    Score: {activeState.risks.foodSecurity}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Consumption</span>
+                    <span className="font-bold font-mono">{activeState.foodSecurity.foodConsumption}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Acute Insecurity</span>
+                    <span className="font-bold font-mono">{activeState.foodSecurity.acuteInsecurity}%</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Nutrition Risk</span>
+                    <span className="font-bold font-mono">{activeState.foodSecurity.nutritionRisk}/10</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={[
                     { name: "Consumption", State: activeState.foodSecurity.foodConsumption, Average: NATIONAL_AVERAGES.foodSecurity.foodConsumption },
                     { name: "Acute Insecurity", State: activeState.foodSecurity.acuteInsecurity, Average: NATIONAL_AVERAGES.foodSecurity.acuteInsecurity }
-                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                  ]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide domain={[0, 100]} />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
                     <Area type="monotone" dataKey="State" stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} name={`${activeState.name} %`} />
                     <Area type="monotone" dataKey="Average" stroke="#94A3B8" fill="#94A3B8" fillOpacity={0.05} name="National Avg %" />
                   </AreaChart>
-                )}
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: Cadre Harmonisé Joint Analysis, FAO/WFP Data
+              </div>
+            </div>
 
-                {activePillarTab === 'displacement' && (
+            {/* Displacement card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Users className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Displacement & Returns</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.displacement).class}`}>
+                    Score: {activeState.risks.displacement}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Active IDPs</span>
+                    <span className="font-bold font-mono">{activeState.displacement.idps.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Returnees</span>
+                    <span className="font-bold font-mono">{activeState.displacement.returnees.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">New Events</span>
+                    <span className="font-bold font-mono">{activeState.displacement.newEvents}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={[
                     { name: "IDPs", State: activeState.displacement.idps, Average: NATIONAL_AVERAGES.displacement.idps },
                     { name: "Returnees", State: activeState.displacement.returnees, Average: NATIONAL_AVERAGES.displacement.returnees }
-                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                  ]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
                     <Bar dataKey="State" fill="#39B54A" radius={[4, 4, 0, 0]} name={activeState.name} />
                     <Bar dataKey="Average" fill="#94A3B8" opacity={0.4} radius={[4, 4, 0, 0]} name="National Avg" />
                   </BarChart>
-                )}
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: IOM DTM Registries, NEMA Situation Reports
+              </div>
+            </div>
 
-                {activePillarTab === 'peaceSecurity' && (
+            {/* Peace & Security card */}
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+              <div className="flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2.5">
+                    <Shield className="w-5 h-5 text-[#39B54A]" />
+                    <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-secondary">Peace & Security</h3>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${getRiskCategory(activeState.risks.peaceSecurity).class}`}>
+                    Score: {activeState.risks.peaceSecurity}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 border-y border-slate-200/20 dark:border-white/5 py-3 text-xs">
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Conflicts</span>
+                    <span className="font-bold font-mono">{activeState.peaceSecurity.conflictIncidents}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Fatalities</span>
+                    <span className="font-bold font-mono">{activeState.peaceSecurity.fatalities}</span>
+                  </div>
+                  <div>
+                    <span className="opacity-50 text-[10px] block mb-1">Neighborhood Safety</span>
+                    <span className="font-bold font-mono">{activeState.peaceSecurity.communitySecurity}%</span>
+                  </div>
+                </div>
+              </div>
+              <div className="h-[120px] w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={[
-                    { name: "Safety", State: activeState.peaceSecurity.communitySecurity, Average: NATIONAL_AVERAGES.peaceSecurity.communitySecurity }
-                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                    { name: "Neighborhood Safety", State: activeState.peaceSecurity.communitySecurity, Average: NATIONAL_AVERAGES.peaceSecurity.communitySecurity }
+                  ]}>
                     <XAxis dataKey="name" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
                     <YAxis hide domain={[0, 100]} />
                     <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
                     <Area type="monotone" dataKey="State" stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} name={`${activeState.name} %`} />
                     <Area type="monotone" dataKey="Average" stroke="#94A3B8" fill="#94A3B8" fillOpacity={0.05} name="National Avg %" />
                   </AreaChart>
-                )}
+                </ResponsiveContainer>
+              </div>
+              <div className="text-[10px] opacity-40 border-t border-slate-200/10 dark:border-white/5 pt-3">
+                Sources: ACLED Portal, Nigeria Security Tracker
+              </div>
+            </div>
 
+          </div>
+        </div>
+      </>
+    )}
+
+      {/* PREDICTIVE EARLY WARNING & FORECAST HUB */}
+      {dashboardTab === 'projections' && (
+        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card no-print`}>
+          <div>
+            <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
+              Predictive Early Warning System
+            </span>
+            <h2 className="font-poppins font-bold text-xl uppercase tracking-tight mt-1">
+              Machine-Learning Risk Projections (Q3 &amp; Q4 2026)
+            </h2>
+            <p className="font-inter text-xs opacity-60 mt-1">
+              Deterministic quarterly forecasting for {activeState.name} State based on seasonal indices and administrative trend baselines.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            {/* Forecast Line Chart (LG: 7 columns) */}
+            <div className="lg:col-span-7 h-[280px] w-full flex flex-col justify-between">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Composite Risk Trajectory</span>
+              <ResponsiveContainer width="100%" height="90%">
+                <LineChart data={getForecastChartData(activeState)} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#ffffff10" : "#00000010"} />
+                  <XAxis dataKey="quarter" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
+                  <YAxis domain={[0, 100]} stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
+                  <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
+                  <Line type="monotone" dataKey="Actual" stroke="#39B54A" strokeWidth={2.5} activeDot={{ r: 6 }} name="Historical Composite Index" />
+                  <Line type="monotone" dataKey="Forecast" stroke="#F59E0B" strokeWidth={2.5} strokeDasharray="5 5" name="Projected Risk Trend" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Outlook Sub-Cards (LG: 5 columns) */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Quarterly Forecasts</span>
+              
+              {/* Card 1: Poverty */}
+              <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Poverty &amp; Inflation Outlook</span>
+                  <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
+                    getForecastOutlook(activeState).poverty.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
+                  }`}>
+                    {getForecastOutlook(activeState).poverty.change > 0 ? `+${getForecastOutlook(activeState).poverty.change}` : getForecastOutlook(activeState).poverty.change}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[10px] opacity-60">
+                  <span>Trend: {getForecastOutlook(activeState).poverty.trend}</span>
+                </div>
+                <p className="text-[10px] opacity-75 leading-relaxed mt-1">
+                  {getForecastOutlook(activeState).poverty.alert}
+                </p>
+              </div>
+
+              {/* Card 2: Food Security */}
+              <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Food Security Outlook</span>
+                  <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
+                    getForecastOutlook(activeState).food.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
+                  }`}>
+                    {getForecastOutlook(activeState).food.change > 0 ? `+${getForecastOutlook(activeState).food.change}` : getForecastOutlook(activeState).food.change}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[10px] opacity-60">
+                  <span>Trend: {getForecastOutlook(activeState).food.trend}</span>
+                </div>
+                <p className="text-[10px] opacity-75 leading-relaxed mt-1">
+                  {getForecastOutlook(activeState).food.alert}
+                </p>
+              </div>
+
+              {/* Card 3: Security */}
+              <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex justify-between items-center">
+                  <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Conflict &amp; Safety Outlook</span>
+                  <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
+                    getForecastOutlook(activeState).security.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
+                  }`}>
+                    {getForecastOutlook(activeState).security.change > 0 ? `+${getForecastOutlook(activeState).security.change}` : getForecastOutlook(activeState).security.change}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-[10px] opacity-60">
+                  <span>Trend: {getForecastOutlook(activeState).security.trend}</span>
+                </div>
+                <p className="text-[10px] opacity-75 leading-relaxed mt-1">
+                  {getForecastOutlook(activeState).security.alert}
+                </p>
+              </div>
+
+            </div>
+
+          </div>
+          
+          {/* Warn alert banner if composite index change is significantly increasing */}
+          {getForecastOutlook(activeState).security.change > 0 && activeState.risks.composite >= 60 && (
+            <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 font-inter text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              <span>Policy Early Warning: Projected seasonal risk increases expected in {activeState.name} State. Local crisis prevention buffers recommended.</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* STATE COMPARISON TOOL */}
+      {dashboardTab === 'comparison' && (
+        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+          <div>
+            <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
+              Pillar Analytics
+            </span>
+            <h2 className="font-poppins font-bold text-xl uppercase tracking-tight mt-1">State Comparison Tool</h2>
+            <p className="font-inter text-xs opacity-60 mt-1">
+              Select two states to conduct side-by-side analysis of risk variables and human vulnerability benchmarks.
+            </p>
+          </div>
+
+          {/* Selectors Row */}
+          <div className="flex flex-wrap gap-4 items-center border-b border-slate-200/20 dark:border-white/5 pb-6 no-print">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold uppercase opacity-65">Compare:</span>
+              <select 
+                value={stateAId}
+                onChange={(e) => setStateAId(e.target.value)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
+                  isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                {PROCESSED_STATE_DATA.map(s => (
+                  <option key={s.id} value={s.id} disabled={s.id === stateBId}>{s.name} State</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="text-xs font-bold text-[#39B54A]">vs</div>
+
+            <div className="flex items-center gap-3">
+              <select 
+                value={stateBId}
+                onChange={(e) => setStateBId(e.target.value)}
+                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
+                  isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
+                }`}
+              >
+                {PROCESSED_STATE_DATA.map(s => (
+                  <option key={s.id} value={s.id} disabled={s.id === stateAId}>{s.name} State</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Grid: Table Comparison vs Radar Chart */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            {/* Table Comparison (LG: 7 columns) */}
+            <div className="lg:col-span-7 overflow-x-auto w-full">
+              <table className="w-full text-sm text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200/20 dark:border-white/5 text-xs opacity-50 uppercase tracking-widest">
+                    <th className="py-3 px-2 font-poppins font-bold text-left">Pillar Indicator</th>
+                    <th className="py-3 px-2 font-poppins font-bold text-right">{stateA.name}</th>
+                    <th className="py-3 px-2 font-poppins font-bold text-right">{stateB.name}</th>
+                    <th className="py-3 px-2 font-poppins font-bold text-right">Variance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { name: "Composite Security Index Score", key: "composite", valA: stateA.risks.composite, valB: stateB.risks.composite },
+                    { name: "Poverty & Livelihoods Risk", key: "poverty", valA: stateA.risks.poverty, valB: stateB.risks.poverty },
+                    { name: "Education Systems Risk", key: "education", valA: stateA.risks.education, valB: stateB.risks.education },
+                    { name: "Health & Wellbeing Risk", key: "health", valA: stateA.risks.health, valB: stateB.risks.health },
+                    { name: "Food Insecurity Risk", key: "foodSecurity", valA: stateA.risks.foodSecurity, valB: stateB.risks.foodSecurity },
+                    { name: "Displacement Threat", key: "displacement", valA: stateA.risks.displacement, valB: stateB.risks.displacement },
+                    { name: "Conflict & Security Risk", key: "peaceSecurity", valA: stateA.risks.peaceSecurity, valB: stateB.risks.peaceSecurity }
+                  ].map((row, idx) => {
+                    const diff = row.valA - row.valB;
+                    const sign = diff > 0 ? `+${diff}` : `${diff}`;
+                    const varColor = diff > 0 ? "text-rose-500 font-bold" : diff < 0 ? "text-emerald-500 font-bold" : "opacity-45";
+                    
+                    return (
+                      <tr 
+                        key={idx} 
+                        className={`border-b border-slate-200/10 dark:border-white/5 text-xs font-semibold ${
+                          row.key === 'composite' 
+                            ? 'font-bold bg-[#39B54A]/5 border-y border-[#39B54A]/10' 
+                            : ''
+                        }`}
+                      >
+                        <td className="py-3.5 px-2 text-left">{row.name}</td>
+                        <td className="py-3.5 px-2 text-right font-mono">{row.valA}/100</td>
+                        <td className="py-3.5 px-2 text-right font-mono">{row.valB}/100</td>
+                        <td className={`py-3.5 px-2 text-right font-mono ${varColor}`}>{sign}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Radar Chart (LG: 5 columns) */}
+            <div className="lg:col-span-5 h-[280px] w-full flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={getComparisonRadarData()}>
+                  <PolarGrid stroke={isDarkMode ? "#ffffff15" : "#00000015"} />
+                  <PolarAngleAxis dataKey="subject" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} stroke={isDarkMode ? "#ffffff30" : "#00000030"} fontSize={8} />
+                  <Radar name={stateA.name} dataKey={stateA.name} stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} />
+                  <Radar name={stateB.name} dataKey={stateB.name} stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.2} />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
+                </RadarChart>
               </ResponsiveContainer>
             </div>
 
           </div>
         </div>
+      )}
 
-        {/* PREDICTIVE EARLY WARNING & FORECAST HUB (COLLAPSIBLE ACCORDION) */}
-        <div className={`rounded-3xl border text-left flex flex-col overflow-hidden ${
-          isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'
-        } print-card no-print`}>
-          
-          {/* Accordion Trigger Header */}
-          <button 
-            type="button"
-            onClick={() => setForecastExpanded(!forecastExpanded)}
-            className={`w-full p-6 flex justify-between items-center text-left cursor-pointer outline-none border-none bg-transparent transition-colors duration-200 ${
-              isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'
-            }`}
-          >
-            <div>
-              <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
-                Predictive Analytics
-              </span>
-              <h2 className="font-poppins font-bold text-lg uppercase tracking-tight mt-1 text-[#052353] dark:text-white">
-                Machine-Learning Risk Projections (Q3 &amp; Q4 2026)
-              </h2>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-[10px] font-bold tracking-wider uppercase opacity-55">
-                {forecastExpanded ? "COLLAPSE PANEL" : "EXPAND FORECAST"}
-              </span>
-              <div className={`transition-transform duration-300 ${forecastExpanded ? 'rotate-180' : 'rotate-0'}`}>
-                <ChevronDown className="w-5 h-5 opacity-60 text-slate-800 dark:text-white" />
+      {/* RECENT TRACKED INCIDENTS FEED */}
+        {rawIncidents && rawIncidents.length > 0 && (
+          <div className={`mt-10 p-6 rounded-3xl border shadow-sm ${
+            isDarkMode ? 'bg-[#051630] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h3 className="font-poppins font-bold text-sm uppercase tracking-tight flex items-center gap-2">
+                  <Database className="w-5 h-5 text-[#39B54A]" />
+                  Live Conflict Incidents Feed
+                </h3>
+                <p className={`text-[10px] mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Real-time security updates parsed and validated from Nigerian news feeds.
+                </p>
+              </div>
+              
+              {/* View Mode Tabs */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className={`flex p-0.5 rounded-xl gap-0.5 text-[9px] font-bold ${
+                  isDarkMode ? 'bg-white/5' : 'bg-slate-100'
+                }`}>
+                  {[
+                    { mode: 'all', label: 'All Logs' },
+                    { mode: 'daily', label: 'Daily' },
+                    { mode: 'weekly', label: 'Weekly' },
+                    { mode: 'monthly', label: 'Monthly' }
+                  ].map((btn) => (
+                    <button
+                      key={btn.mode}
+                      type="button"
+                      onClick={() => setFeedViewMode(btn.mode)}
+                      className={`px-2.5 py-1.5 rounded-lg uppercase transition-all duration-150 border-none outline-none cursor-pointer ${
+                        feedViewMode === btn.mode
+                          ? 'bg-[#39B54A] text-white shadow-sm'
+                          : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                      }`}
+                    >
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 border-l border-slate-200/20 dark:border-white/5 pl-3">
+                  <span className="flex h-2 w-2 relative">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="font-inter text-[9px] font-bold uppercase tracking-wider text-emerald-500 whitespace-nowrap">
+                    Sync: Active ({rawIncidents.length})
+                  </span>
+                </div>
+
+                {/* Export feed report */}
+                <button
+                  type="button"
+                  onClick={handleDownloadFeedReport}
+                  className="ml-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-inter text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm hover:scale-102 active:scale-98 transition-all border-none outline-none cursor-pointer"
+                  title="Export Current View to CSV"
+                >
+                  <Download className="w-3 h-3" />
+                  <span>Export CSV</span>
+                </button>
               </div>
             </div>
-          </button>
 
-          {/* Accordion Content Block */}
-          {forecastExpanded && (
-            <div className="p-6 pt-0 border-t border-slate-200/20 dark:border-white/5 flex flex-col gap-6 animate-fade-in">
-              <p className="font-inter text-xs opacity-60 mt-4">
-                Deterministic quarterly forecasting for {activeState.name} State based on seasonal indices and administrative trend baselines.
-              </p>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                
-                {/* Forecast Line Chart (LG: 7 columns) */}
-                <div className="lg:col-span-7 h-[280px] w-full flex flex-col justify-between">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Composite Risk Trajectory</span>
-                  <ResponsiveContainer width="100%" height="90%">
-                    <LineChart data={getForecastChartData(activeState)} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke={isDarkMode ? "#ffffff10" : "#00000010"} />
-                      <XAxis dataKey="quarter" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
-                      <YAxis domain={[0, 100]} stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
-                      <ChartTooltip wrapperStyle={{ outline: 'none' }} contentStyle={{ backgroundColor: isDarkMode ? '#051c3a' : '#fff', border: 'none', borderRadius: '8px', fontSize: '10px' }} />
-                      <Legend wrapperStyle={{ fontSize: '10px' }} />
-                      <Line type="monotone" dataKey="Actual" stroke="#39B54A" strokeWidth={2.5} activeDot={{ r: 6 }} name="Historical Composite Index" />
-                      <Line type="monotone" dataKey="Forecast" stroke="#F59E0B" strokeWidth={2.5} strokeDasharray="5 5" name="Projected Risk Trend" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Outlook Sub-Cards (LG: 5 columns) */}
-                <div className="lg:col-span-5 flex flex-col gap-4">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">Quarterly Forecasts</span>
-                  
-                  {/* Card 1: Poverty */}
-                  <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Poverty &amp; Inflation Outlook</span>
-                      <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
-                        getForecastOutlook(activeState).poverty.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
-                        {getForecastOutlook(activeState).poverty.change > 0 ? `+${getForecastOutlook(activeState).poverty.change}` : getForecastOutlook(activeState).poverty.change}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] opacity-60">
-                      <span>Trend: {getForecastOutlook(activeState).poverty.trend}</span>
-                    </div>
-                    <p className="text-[10px] opacity-75 leading-relaxed mt-1">
-                      {getForecastOutlook(activeState).poverty.alert}
-                    </p>
-                  </div>
-
-                  {/* Card 2: Food Security */}
-                  <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Food Security Outlook</span>
-                      <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
-                        getForecastOutlook(activeState).food.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
-                        {getForecastOutlook(activeState).food.change > 0 ? `+${getForecastOutlook(activeState).food.change}` : getForecastOutlook(activeState).food.change}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] opacity-60">
-                      <span>Trend: {getForecastOutlook(activeState).food.trend}</span>
-                    </div>
-                    <p className="text-[10px] opacity-75 leading-relaxed mt-1">
-                      {getForecastOutlook(activeState).food.alert}
-                    </p>
-                  </div>
-
-                  {/* Card 3: Security */}
-                  <div className={`p-4 rounded-2xl border text-xs flex flex-col gap-1.5 ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-slate-50 border-slate-200'}`}>
-                    <div className="flex justify-between items-center">
-                      <span className="font-poppins font-bold uppercase text-[#052353] dark:text-white">Conflict &amp; Safety Outlook</span>
-                      <span className={`font-bold font-mono px-2 py-0.5 rounded text-[10px] ${
-                        getForecastOutlook(activeState).security.change > 0 ? 'bg-red-500/10 text-red-500' : 'bg-emerald-500/10 text-emerald-500'
-                      }`}>
-                        {getForecastOutlook(activeState).security.change > 0 ? `+${getForecastOutlook(activeState).security.change}` : getForecastOutlook(activeState).security.change}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] opacity-60">
-                      <span>Trend: {getForecastOutlook(activeState).security.trend}</span>
-                    </div>
-                    <p className="text-[10px] opacity-75 leading-relaxed mt-1">
-                      {getForecastOutlook(activeState).security.alert}
-                    </p>
-                  </div>
-
-                </div>
-
-              </div>
-
-              {/* Warn alert banner if composite index change is significantly increasing */}
-              {getForecastOutlook(activeState).security.change > 0 && activeState.risks.composite >= 60 && (
-                <div className="p-3.5 rounded-xl border border-red-500/20 bg-red-500/10 text-red-500 font-inter text-xs font-bold uppercase tracking-wider flex items-center gap-2 mb-2">
-                  <Shield className="w-4 h-4" />
-                  <span>Policy Early Warning: Projected seasonal risk increases expected in {activeState.name} State. Local crisis prevention buffers recommended.</span>
-                </div>
-              )}
-            </div>
-          )}
-
-        </div>
-
-        {/* STATE COMPARISON TOOL (COLLAPSIBLE ACCORDION) */}
-        <div className={`rounded-3xl border text-left flex flex-col overflow-hidden ${
-          isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'
-        } print-card no-print`}>
-          
-          {/* Accordion Trigger Header */}
-          <button 
-            type="button"
-            onClick={() => setComparisonExpanded(!comparisonExpanded)}
-            className={`w-full p-6 flex justify-between items-center text-left cursor-pointer outline-none border-none bg-transparent transition-colors duration-200 ${
-              isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'
-            }`}
-          >
-            <div>
-              <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
-                Pillar Analytics
-              </span>
-              <h2 className="font-poppins font-bold text-lg uppercase tracking-tight text-[#052353] dark:text-white mt-1">
-                State Comparison Tool
-              </h2>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="text-[10px] font-bold tracking-wider uppercase opacity-55">
-                {comparisonExpanded ? "COLLAPSE PANEL" : "EXPAND COMPARISON"}
-              </span>
-              <div className={`transition-transform duration-300 ${comparisonExpanded ? 'rotate-180' : 'rotate-0'}`}>
-                <ChevronDown className="w-5 h-5 opacity-60 text-slate-800 dark:text-white" />
-              </div>
-            </div>
-          </button>
-
-          {/* Accordion Content Block */}
-          {comparisonExpanded && (
-            <div className="p-6 pt-0 border-t border-slate-200/20 dark:border-white/5 flex flex-col gap-6 animate-fade-in">
-              <p className="font-inter text-xs opacity-60 mt-4">
-                Select two states to conduct side-by-side analysis of risk variables and human vulnerability benchmarks.
-              </p>
-
-              {/* Selectors Row */}
-              <div className="flex flex-wrap gap-4 items-center border-b border-slate-200/20 dark:border-white/5 pb-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-semibold uppercase opacity-65">Compare:</span>
-                  <select 
-                    value={stateAId}
-                    onChange={(e) => setStateAId(e.target.value)}
-                    className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
-                      isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
-                    }`}
-                  >
-                    {PROCESSED_STATE_DATA.map(s => (
-                      <option key={s.id} value={s.id} disabled={s.id === stateBId}>{s.name} State</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="text-xs font-bold text-[#39B54A]">vs</div>
-
-                <div className="flex items-center gap-3">
-                  <select 
-                    value={stateBId}
-                    onChange={(e) => setStateBId(e.target.value)}
-                    className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
-                      isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
-                    }`}
-                  >
-                    {PROCESSED_STATE_DATA.map(s => (
-                      <option key={s.id} value={s.id} disabled={s.id === stateAId}>{s.name} State</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Grid: Table Comparison vs Radar Chart */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-                
-                {/* Table Comparison (LG: 7 columns) */}
-                <div className="lg:col-span-7 overflow-x-auto w-full">
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200/20 dark:border-white/5 text-xs opacity-50 uppercase tracking-widest">
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Pillar Indicator</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-right">{stateA.name}</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-right">{stateB.name}</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-right">Variance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { name: "Composite Security Index Score", key: "composite", valA: stateA.risks.composite, valB: stateB.risks.composite },
-                        { name: "Poverty & Livelihoods Risk", key: "poverty", valA: stateA.risks.poverty, valB: stateB.risks.poverty },
-                        { name: "Education Systems Risk", key: "education", valA: stateA.risks.education, valB: stateB.risks.education },
-                        { name: "Health & Wellbeing Risk", key: "health", valA: stateA.risks.health, valB: stateB.risks.health },
-                        { name: "Food Insecurity Risk", key: "foodSecurity", valA: stateA.risks.foodSecurity, valB: stateB.risks.foodSecurity },
-                        { name: "Displacement Threat", key: "displacement", valA: stateA.risks.displacement, valB: stateB.risks.displacement },
-                        { name: "Conflict & Security Risk", key: "peaceSecurity", valA: stateA.risks.peaceSecurity, valB: stateB.risks.peaceSecurity }
-                      ].map((row, idx) => {
-                        const diff = row.valA - row.valB;
-                        const sign = diff > 0 ? `+${diff}` : `${diff}`;
-                        const varColor = diff > 0 ? "text-rose-500 font-bold" : diff < 0 ? "text-emerald-500 font-bold" : "opacity-45";
-                        
-                        return (
-                          <tr 
-                            key={idx} 
-                            className={`border-b border-slate-200/10 dark:border-white/5 text-xs font-semibold ${
-                              row.key === 'composite' 
-                                ? 'font-bold bg-[#39B54A]/5 border-y border-[#39B54A]/10' 
-                                : ''
-                            }`}
-                          >
-                            <td className="py-3.5 px-2 text-left">{row.name}</td>
-                            <td className="py-3.5 px-2 text-right font-mono">{row.valA}/100</td>
-                            <td className="py-3.5 px-2 text-right font-mono">{row.valB}/100</td>
-                            <td className={`py-3.5 px-2 text-right font-mono ${varColor}`}>{sign}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Radar Chart (LG: 5 columns) */}
-                <div className="lg:col-span-5 h-[280px] w-full flex items-center justify-center">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart cx="50%" cy="50%" outerRadius="80%" data={getComparisonRadarData()}>
-                      <PolarGrid stroke={isDarkMode ? "#ffffff15" : "#00000015"} />
-                      <PolarAngleAxis dataKey="subject" stroke={isDarkMode ? "#ffffff80" : "#00000080"} fontSize={9} />
-                      <PolarRadiusAxis angle={30} domain={[0, 100]} stroke={isDarkMode ? "#ffffff30" : "#00000030"} fontSize={8} />
-                      <Radar name={stateA.name} dataKey={stateA.name} stroke="#39B54A" fill="#39B54A" fillOpacity={0.2} />
-                      <Radar name={stateB.name} dataKey={stateB.name} stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.2} />
-                      <Legend wrapperStyle={{ fontSize: '10px' }} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                </div>
-
-              </div>
-            </div>
-          )}
-          </div>
-
-          {/* RECENT TRACKED INCIDENTS FEED */}
-          {rawIncidents && rawIncidents.length > 0 && (
-            <div className={`mt-10 p-6 rounded-3xl border shadow-sm ${
-              isDarkMode ? 'bg-[#051630] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
-            }`}>
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h3 className="font-poppins font-bold text-sm uppercase tracking-tight flex items-center gap-2">
-                    <Database className="w-5 h-5 text-[#39B54A]" />
-                    Live Conflict Incidents Feed
-                  </h3>
-                  <p className={`text-[10px] mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Real-time security updates parsed and validated from Nigerian news feeds.
-                  </p>
-                </div>
-                
-                {/* View Mode Tabs */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className={`flex p-0.5 rounded-xl gap-0.5 text-[9px] font-bold ${
-                    isDarkMode ? 'bg-white/5' : 'bg-slate-100'
-                  }`}>
-                    {[
-                      { mode: 'all', label: 'All Logs' },
-                      { mode: 'daily', label: 'Daily' },
-                      { mode: 'weekly', label: 'Weekly' },
-                      { mode: 'monthly', label: 'Monthly' }
-                    ].map((btn) => (
-                      <button
-                        key={btn.mode}
-                        type="button"
-                        onClick={() => setFeedViewMode(btn.mode)}
-                        className={`px-2.5 py-1.5 rounded-lg uppercase transition-all duration-150 border-none outline-none cursor-pointer ${
-                          feedViewMode === btn.mode
-                            ? 'bg-[#39B54A] text-white shadow-sm'
-                            : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
-                      >
-                        {btn.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 border-l border-slate-200/20 dark:border-white/5 pl-3">
-                    <span className="flex h-2 w-2 relative">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                    <span className="font-inter text-[9px] font-bold uppercase tracking-wider text-emerald-500 whitespace-nowrap">
-                      Sync: Active ({rawIncidents.length})
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="overflow-y-auto max-h-[300px] w-full border border-slate-200/10 dark:border-white/5 rounded-2xl pr-1">
-                {feedViewMode === 'all' ? (
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
-                      <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Date</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-left">State</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Incident Type</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Summary</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Source</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[...rawIncidents]
-                        .sort((a, b) => new Date(b.date) - new Date(a.date))
-                        .slice(0, 30)
-                        .map((inc, idx) => (
-                          <tr 
-                            key={idx}
-                            className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
-                          >
-                            <td className="py-3.5 px-2 font-mono whitespace-nowrap">{inc.date}</td>
-                            <td className="py-3.5 px-2 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-                                isDarkMode ? 'bg-[#030e20] text-emerald-400 border border-white/5' : 'bg-slate-100 text-slate-700'
-                              }`}>
-                                {inc.state}
-                              </span>
-                            </td>
-                            <td className="py-3.5 px-2 font-bold whitespace-nowrap text-[#39B54A]">{inc.incident_type}</td>
-                            <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{inc.fatalities || 0}</td>
-                            <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{inc.abductions || 0}</td>
-                            <td className={`py-3.5 px-2 max-w-xs md:max-w-md ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.summary}</td>
-                            <td className="py-3.5 px-2 text-center">
-                              {inc.source_url && (
-                                <a 
-                                  href={inc.source_url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 text-secondary hover:text-secondary-hover shadow-sm hover:scale-105 active:scale-95 transition-all outline-none"
-                                  title="View News Source"
-                                >
-                                  <ArrowUpRight className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table className="w-full text-sm text-left border-collapse">
-                    <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
-                      <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Period</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Total Incidents</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
-                        <th className="py-3 px-2 font-poppins font-bold text-left">Affected States</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getAggregatedFeedData().map((g, idx) => (
+            <div className="overflow-y-auto max-h-[300px] w-full border border-slate-200/10 dark:border-white/5 rounded-2xl pr-1">
+              {feedViewMode === 'all' ? (
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
+                    <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
+                      <th className="py-3 px-2 font-poppins font-bold text-left">Date</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-left">State</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-left">Incident Type</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-left">Summary</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...rawIncidents]
+                      .sort((a, b) => new Date(b.date) - new Date(a.date))
+                      .slice(0, 30)
+                      .map((inc, idx) => (
                         <tr 
                           key={idx}
                           className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
                         >
-                          <td className="py-3.5 px-2 font-mono font-bold whitespace-nowrap">{g.period}</td>
-                          <td className="py-3.5 px-2 text-center font-mono font-bold">{g.incidents}</td>
-                          <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{g.fatalities}</td>
-                          <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{g.abductions}</td>
-                          <td className="py-3.5 px-2">
-                            <div className="flex flex-wrap gap-1">
-                              {g.statesList.map((state, sIdx) => (
-                                <span 
-                                  key={sIdx}
-                                  className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                                    isDarkMode ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'
-                                  }`}
-                                >
-                                  {state}
-                                </span>
-                              ))}
-                            </div>
+                          <td className="py-3.5 px-2 font-mono whitespace-nowrap">{inc.date}</td>
+                          <td className="py-3.5 px-2 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                              isDarkMode ? 'bg-[#030e20] text-emerald-400 border border-white/5' : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {inc.state}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-2 font-bold whitespace-nowrap text-[#39B54A]">{inc.incident_type}</td>
+                          <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{inc.fatalities || 0}</td>
+                          <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{inc.abductions || 0}</td>
+                          <td className={`py-3.5 px-2 max-w-xs md:max-w-md ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.summary}</td>
+                          <td className="py-3.5 px-2 text-center">
+                            {inc.source_url && (
+                              <a 
+                                href={inc.source_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 text-secondary hover:text-secondary-hover shadow-sm hover:scale-105 active:scale-95 transition-all outline-none"
+                                title="View News Source"
+                              >
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                              </a>
+                            )}
                           </td>
                         </tr>
                       ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-
-              {/* FEED METHODOLOGY & DISCLAIMER DETAILS */}
-              <div className="mt-4 pt-4 border-t border-slate-200/10 dark:border-white/5 flex flex-col gap-2.5">
-                <p className={`text-[10px] leading-relaxed opacity-65 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <strong>Methodology &amp; Sourcing:</strong> This conflict feed aggregates security incidents dynamically compiled by a custom backend crawler polling major national news networks (including <em>Premium Times, Daily Trust, Vanguard, Channels TV, Punch, and TheCable</em>). Relevant events are structured using LLM-assisted analysis (Llama 3.1 8B on Groq) and cross-referenced with a database registry to prevent duplication.
-                </p>
-                <p className={`text-[9px] leading-relaxed italic opacity-50 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-                  <strong>Disclaimer:</strong> While automated deduplication filters are applied to isolate unique reports, local reporting constraints, publication delays, and media censorship may slightly affect data granularity. These statistics serve as analytical indices for research and evidence-guided public policy planning rather than exhaustive records.
-                </p>
-              </div>
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
+                    <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
+                      <th className="py-3 px-2 font-poppins font-bold text-left">Period</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Total Incidents</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
+                      <th className="py-3 px-2 font-poppins font-bold text-left">Affected States</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getAggregatedFeedData().map((g, idx) => (
+                      <tr 
+                        key={idx}
+                        className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <td className="py-3.5 px-2 font-mono font-bold whitespace-nowrap">{g.period}</td>
+                        <td className="py-3.5 px-2 text-center font-mono font-bold">{g.incidents}</td>
+                        <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{g.fatalities}</td>
+                        <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{g.abductions}</td>
+                        <td className="py-3.5 px-2">
+                          <div className="flex flex-wrap gap-1">
+                            {g.statesList.map((state, sIdx) => (
+                              <span 
+                                key={sIdx}
+                                className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                  isDarkMode ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                }`}
+                              >
+                                {state}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-          )}
-        </div>
+
+            {/* FEED METHODOLOGY & DISCLAIMER DETAILS */}
+            <div className="mt-4 pt-4 border-t border-slate-200/10 dark:border-white/5 flex flex-col gap-2.5">
+              <p className={`text-[10px] leading-relaxed opacity-65 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                <strong>Methodology &amp; Sourcing:</strong> This conflict feed aggregates security incidents dynamically compiled by a custom backend crawler polling major national news networks (including <em>Premium Times, Daily Trust, Vanguard, Channels TV, Punch, and TheCable</em>). Relevant events are structured using LLM-assisted analysis (Llama 3.1 8B on Groq) and cross-referenced with a database registry to prevent duplication.
+              </p>
+              <p className={`text-[9px] leading-relaxed italic opacity-50 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                <strong>Disclaimer:</strong> While automated deduplication filters are applied to isolate unique reports, local reporting constraints, publication delays, and media censorship may slightly affect data granularity. These statistics serve as analytical indices for research and evidence-guided public policy planning rather than exhaustive records.
+              </p>
+            </div>
+          </div>
+        )}
 
       {/* DATA SOURCES MODAL */}
       {showSourcesModal && (
@@ -1563,7 +1625,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             <div className="p-6 border-b border-slate-200/20 dark:border-white/5 flex justify-between items-center">
               <h3 className="font-poppins font-bold text-lg uppercase tracking-tight flex items-center gap-2">
                 <Database className="w-5 h-5 text-[#39B54A]" />
-                Dashboard Registry & Sources
+                Observatory Registry & Sources
               </h3>
               <button 
                 onClick={() => setShowSourcesModal(false)}
@@ -1628,7 +1690,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         </div>
       )}
 
-      </div> {/* Close interactive-dashboard-layout */}
+      </div>
+      </div>
 
       {/* 2. PRINT-ONLY EXECUTIVE BRIEF (Only visible on print) */}
       <div className="print-only-brief text-black bg-white p-8 max-w-[800px] mx-auto text-left">
