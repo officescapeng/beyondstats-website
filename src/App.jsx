@@ -723,17 +723,25 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
       excerpt: "An assessment of urban flooding vulnerabilities and municipal drainage responses in coastal Nigerian cities using community-sourced flood mapping.",
       featured_media_url: "/nigerian_stakeholders.png",
       category: "Climate Vulnerability"
+    },
+    {
+      id: 7,
+      date: "2026-04-18",
+      title: "Analyzing Regional Health Care Access in Rural Settlements",
+      excerpt: "A data-driven appraisal of secondary health care facilities, medical staffing levels, and referral networks across remote local government areas.",
+      featured_media_url: "/hero_women.png",
+      category: "Public Health"
     }
   ]
 
-  // Get exactly 6 articles, padded by fallbackNews if needed (using unique fallbacks)
+  // Get exactly 7 articles, padded by fallbackNews if needed (using unique fallbacks)
   const news = React.useMemo(() => {
     let list = [...(articles || [])];
-    if (list.length < 6) {
-      const needed = 6 - list.length;
+    if (list.length < 7) {
+      const needed = 7 - list.length;
       list = [...list, ...fallbackNews.slice(list.length, list.length + needed)];
     }
-    return list.slice(0, 6);
+    return list.slice(0, 7);
   }, [articles]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -748,7 +756,7 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
   // Auto scroll enabled with manual interaction reset
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % 6);
+      setCurrentIndex((prev) => (prev + 1) % 7);
     }, 4500);
     return () => clearInterval(timer);
   }, [currentIndex]);
@@ -787,14 +795,14 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
           {/* Navigation buttons */}
           <div className="flex gap-2.5 no-print shrink-0 pb-1">
             <button 
-              onClick={() => setCurrentIndex((prev) => (prev === 0 ? 5 : prev - 1))}
+              onClick={() => setCurrentIndex((prev) => (prev === 0 ? 6 : prev - 1))}
               className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
               aria-label="Previous Slide"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % 6)}
+              onClick={() => setCurrentIndex((prev) => (prev + 1) % 7)}
               className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
               aria-label="Next Slide"
             >
@@ -851,7 +859,7 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
 
         {/* Dot Indicators */}
         <div className="flex gap-2 mt-8 no-print">
-          {[0, 1, 2, 3, 4, 5].map((idx) => (
+          {[0, 1, 2, 3, 4, 5, 6].map((idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
