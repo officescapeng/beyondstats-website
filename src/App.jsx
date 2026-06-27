@@ -952,7 +952,9 @@ function ResearchPage({ publications: sanityPublications }) {
   const [localDownloads, setLocalDownloads] = useState({})
 
   const handleDownload = (pubId, fileName) => {
-    setDownloadingFile(fileName)
+    const activeFileName = (fileName && fileName !== '#') ? fileName : 'Beyond_Annual_Report_2025.pdf'
+    
+    setDownloadingFile(activeFileName)
     setDownloadProgress(0)
     let p = 0
     const interval = setInterval(() => {
@@ -967,6 +969,22 @@ function ResearchPage({ publications: sanityPublications }) {
             ...prev,
             [pubId]: (prev[pubId] || 0) + 1
           }))
+          
+          try {
+            const link = document.createElement('a')
+            const href = activeFileName.startsWith('http') ? activeFileName : (activeFileName.startsWith('/') ? activeFileName : `/${activeFileName}`)
+            link.href = href
+            link.target = '_blank'
+            if (!activeFileName.startsWith('http')) {
+              const basename = activeFileName.split('/').pop()
+              link.setAttribute('download', basename || 'document.pdf')
+            }
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+          } catch (err) {
+            console.error('Triggering browser download failed:', err)
+          }
         }, 600)
       }
     }, 120)
