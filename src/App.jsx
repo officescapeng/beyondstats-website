@@ -726,14 +726,14 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
     }
   ]
 
-  // Get exactly 6 articles, padded by fallbackNews if needed
+  // Get exactly 4 articles, padded by fallbackNews if needed
   const news = React.useMemo(() => {
     let list = [...(articles || [])];
-    if (list.length < 6) {
-      const needed = 6 - list.length;
+    if (list.length < 4) {
+      const needed = 4 - list.length;
       list = [...list, ...fallbackNews.slice(0, needed)];
     }
-    return list.slice(0, 6);
+    return list.slice(0, 4);
   }, [articles]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -745,13 +745,13 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Auto scroll enabled
+  // Auto scroll enabled with manual interaction reset
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % 6);
+      setCurrentIndex((prev) => (prev + 1) % 4);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [currentIndex]);
 
   const getTranslateX = () => {
     if (windowWidth >= 1024) { // lg (4 items)
@@ -787,14 +787,14 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
           {/* Navigation buttons */}
           <div className="flex gap-2.5 no-print shrink-0 pb-1">
             <button 
-              onClick={() => setCurrentIndex((prev) => (prev === 0 ? 5 : prev - 1))}
+              onClick={() => setCurrentIndex((prev) => (prev === 0 ? 3 : prev - 1))}
               className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
               aria-label="Previous Slide"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button 
-              onClick={() => setCurrentIndex((prev) => (prev + 1) % 6)}
+              onClick={() => setCurrentIndex((prev) => (prev + 1) % 4)}
               className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
               aria-label="Next Slide"
             >
@@ -851,7 +851,7 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
 
         {/* Dot Indicators */}
         <div className="flex gap-2 mt-8 no-print">
-          {[0, 1, 2, 3, 4, 5].map((idx) => (
+          {[0, 1, 2, 3].map((idx) => (
             <button
               key={idx}
               onClick={() => setCurrentIndex(idx)}
