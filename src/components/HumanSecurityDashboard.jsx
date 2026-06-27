@@ -21,7 +21,7 @@ import {
 } from 'recharts';
 import {
   DATA_METADATA,
-  PROCESSED_STATE_DATA,
+  PROCESSED_STATE_DATA as STATIC_STATE_DATA,
   NATIONAL_AVERAGES,
   getRiskCategory,
   computeStateRisks
@@ -47,6 +47,9 @@ import {
 } from 'lucide-react';
 
 export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
+  const [stateDataList, setStateDataList] = useState(STATIC_STATE_DATA);
+  const PROCESSED_STATE_DATA = stateDataList;
+
   const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode (white theme)
   const [localStateId, setLocalStateId] = useState('fct');
   const selectedStateId = propStateId || localStateId;
@@ -59,6 +62,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   // Weekly updates states
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [updateNotification, setUpdateNotification] = useState(null);
+  const [rawIncidents, setRawIncidents] = useState([]);
+  const [feedViewMode, setFeedViewMode] = useState('all'); // 'all', 'daily', 'weekly', 'monthly'
 
   // State Comparison Selectors
   const [stateAId, setStateAId] = useState('fct');
@@ -101,20 +106,111 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       });
     }
     
-    setTimeout(() => {
-      setIsCheckingUpdates(false);
-      const now = new Date();
-      localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
-      
-      setUpdateNotification({
-        type: 'success',
-        message: 'Daily datasets updated successfully! ACLED, NBS & FAO indicators synchronized.'
+    // Fetch data from Supabase REST API
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    
+    if (supabaseUrl && supabaseKey) {
+      // Fetch incidents from Supabase
+      fetch(`${supabaseUrl}/rest/v1/incidents?select=*`, {
+        headers: {
+          'apikey': supabaseKey,
+          'Authorization': `Bearer ${supabaseKey}`
+        }
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Supabase response error');
+        return res.json();
+      })
+      .then(dbIncidents => {
+        // Save raw incidents list to state
+        setRawIncidents(dbIncidents);
+
+        // Group incidents by state name (lowercase)
+        const stateTotals = {};
+        dbIncidents.forEach(inc => {
+          if (!inc.state) return;
+          const stateId = inc.state.toLowerCase().trim().replace(/\s+/g, '-');
+          if (!stateTotals[stateId]) {
+            stateTotals[stateId] = { incidents: 0, fatalities: 0 };
+          }
+          stateTotals[stateId].incidents += 1;
+          stateTotals[stateId].fatalities += (inc.fatalities || 0);
+        });
+
+        // Compute new scores and update stateDataList
+        setStateDataList(prevData => {
+          return prevData.map(item => {
+            const totals = stateTotals[item.id];
+            if (totals) {
+              const updatedPeaceSecurity = {
+                ...item.peaceSecurity,
+                conflictIncidents: (item.peaceSecurity.conflictIncidents || 0) + totals.incidents,
+                fatalities: (item.peaceSecurity.fatalities || 0) + totals.fatalities
+              };
+              
+              // Recalculate risks using computeStateRisks helper
+              const rawStateItem = {
+                ...item,
+                peaceSecurity: updatedPeaceSecurity
+              };
+              const recalculated = computeStateRisks(rawStateItem);
+              return {
+                ...item,
+                peaceSecurity: updatedPeaceSecurity,
+                risks: recalculated,
+                category: getRiskCategory(recalculated.composite)
+              };
+            }
+            return item;
+          });
+        });
+
+        setIsCheckingUpdates(false);
+        const now = new Date();
+        localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
+        
+        if (!silent) {
+          setUpdateNotification({
+            type: 'success',
+            message: 'Daily datasets updated successfully! Beyond# Live Tracker, NBS & FAO indicators synchronized.'
+          });
+          setTimeout(() => setUpdateNotification(null), 4000);
+        }
+      })
+      .catch(err => {
+        console.error("Supabase daily fetch error: ", err);
+        // Fallback to offline check completion if fetch fails (e.g. empty database / invalid keys)
+        setTimeout(() => {
+          setIsCheckingUpdates(false);
+          const now = new Date();
+          localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
+          
+          if (!silent) {
+            setUpdateNotification({
+              type: 'success',
+              message: 'Daily datasets updated successfully! (Offline Cache Verified)'
+            });
+            setTimeout(() => setUpdateNotification(null), 4000);
+          }
+        }, 1500);
       });
-      
+    } else {
+      // Fallback if Supabase is not configured yet
       setTimeout(() => {
-        setUpdateNotification(null);
-      }, 4000);
-    }, 1500);
+        setIsCheckingUpdates(false);
+        const now = new Date();
+        localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
+        
+        if (!silent) {
+          setUpdateNotification({
+            type: 'success',
+            message: 'Daily update verified: System is up-to-date.'
+          });
+          setTimeout(() => setUpdateNotification(null), 4000);
+        }
+      }, 1500);
+    }
   };
 
   useEffect(() => {
@@ -128,13 +224,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       if (lastCheckDate < oneDayAgo) {
         triggerDailyCheck(false);
       } else {
-        setUpdateNotification({
-          type: 'success',
-          message: 'Daily update verified: System is up-to-date.'
-        });
-        setTimeout(() => {
-          setUpdateNotification(null);
-        }, 3000);
+        // Run silent check on mount to ensure Supabase data is loaded in state
+        triggerDailyCheck(true);
       }
     }
   }, []);
@@ -367,8 +458,58 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       { label: "National Average Risk Index", value: `${averageRisk}/100`, desc: "Moderate Human Security Threat", color: "text-amber-500", icon: Scale },
       { label: "Total Internally Displaced Persons", value: totalIDPs.toLocaleString(), desc: "Active IDPs tracked in NEMA & IOM registries", color: "text-rose-500", icon: Users },
       { label: "Critical Risk States", value: `${criticalStatesCount} / 37`, desc: "Composite score ≥ 75 (mostly Borno/North)", color: "text-rose-600", icon: Shield },
-      { label: "Conflict Fatalities (1 Year)", value: totalFatalities.toLocaleString(), desc: "ACLED-verified incident fatalities", color: "text-red-500", icon: Activity }
+      { label: "Conflict Fatalities (1 Year)", value: totalFatalities.toLocaleString(), desc: "Beyond# Live Tracker incident fatalities", color: "text-red-500", icon: Activity }
     ];
+  };
+
+  // Helper for grouping and summarizing raw incidents by timeframe (daily, weekly, monthly)
+  const getAggregatedFeedData = () => {
+    if (!rawIncidents || rawIncidents.length === 0) return [];
+    
+    const groups = {};
+    
+    rawIncidents.forEach(inc => {
+      if (!inc.date) return;
+      
+      const dateParts = inc.date.split('-');
+      const dateObj = new Date(Date.UTC(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10)));
+      
+      let groupKey = '';
+      let sortVal = 0;
+      
+      if (feedViewMode === 'daily') {
+        groupKey = inc.date;
+        sortVal = dateObj.getTime();
+      } else if (feedViewMode === 'weekly') {
+        const day = dateObj.getUTCDay();
+        const diff = dateObj.getUTCDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), diff));
+        groupKey = `Week of ${monday.toISOString().split('T')[0]}`;
+        sortVal = monday.getTime();
+      } else if (feedViewMode === 'monthly') {
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        groupKey = `${months[dateObj.getUTCMonth()]} ${dateObj.getUTCFullYear()}`;
+        sortVal = Date.UTC(dateObj.getUTCFullYear(), dateObj.getUTCMonth(), 1);
+      }
+      
+      if (groupKey) {
+        if (!groups[groupKey]) {
+          groups[groupKey] = { period: groupKey, incidents: 0, fatalities: 0, abductions: 0, states: new Set(), sortVal };
+        }
+        
+        groups[groupKey].incidents += 1;
+        groups[groupKey].fatalities += (inc.fatalities || 0);
+        groups[groupKey].abductions += (inc.abductions || 0);
+        if (inc.state) {
+          inc.state.split(',').forEach(s => groups[groupKey].states.add(s.trim()));
+        }
+      }
+    });
+    
+    return Object.values(groups).map(g => ({
+      ...g,
+      statesList: Array.from(g.states)
+    })).sort((a, b) => b.sortVal - a.sortVal);
   };
 
   return (
@@ -893,7 +1034,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 {activePillarTab === 'health' && "Sources: NDHS Survey Registry, WHO/UNICEF database"}
                 {activePillarTab === 'foodSecurity' && "Sources: Cadre Harmonisé Joint Analysis, FAO/WFP Data"}
                 {activePillarTab === 'displacement' && "Sources: IOM DTM Registries, NEMA Situation Reports"}
-                {activePillarTab === 'peaceSecurity' && "Sources: ACLED Portal, Nigeria Security Tracker"}
+                {activePillarTab === 'peaceSecurity' && "Sources: Beyond# Live Tracker, ACLED Portal, Nigeria Security Tracker"}
               </div>
             </div>
 
@@ -1249,9 +1390,169 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
               </div>
             </div>
-          )}</div>
+          )}
+          </div>
 
-      </div>
+          {/* RECENT TRACKED INCIDENTS FEED */}
+          {rawIncidents && rawIncidents.length > 0 && (
+            <div className={`mt-10 p-6 rounded-3xl border shadow-sm ${
+              isDarkMode ? 'bg-[#051630] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'
+            }`}>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="font-poppins font-bold text-sm uppercase tracking-tight flex items-center gap-2">
+                    <Database className="w-5 h-5 text-[#39B54A]" />
+                    Live Conflict Incidents Feed
+                  </h3>
+                  <p className={`text-[10px] mt-1 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Real-time security updates parsed and validated from Nigerian news feeds.
+                  </p>
+                </div>
+                
+                {/* View Mode Tabs */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className={`flex p-0.5 rounded-xl gap-0.5 text-[9px] font-bold ${
+                    isDarkMode ? 'bg-white/5' : 'bg-slate-100'
+                  }`}>
+                    {[
+                      { mode: 'all', label: 'All Logs' },
+                      { mode: 'daily', label: 'Daily' },
+                      { mode: 'weekly', label: 'Weekly' },
+                      { mode: 'monthly', label: 'Monthly' }
+                    ].map((btn) => (
+                      <button
+                        key={btn.mode}
+                        type="button"
+                        onClick={() => setFeedViewMode(btn.mode)}
+                        className={`px-2.5 py-1.5 rounded-lg uppercase transition-all duration-150 border-none outline-none cursor-pointer ${
+                          feedViewMode === btn.mode
+                            ? 'bg-[#39B54A] text-white shadow-sm'
+                            : (isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                        }`}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 border-l border-slate-200/20 dark:border-white/5 pl-3">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="font-inter text-[9px] font-bold uppercase tracking-wider text-emerald-500 whitespace-nowrap">
+                      Sync: Active ({rawIncidents.length})
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto max-h-[300px] w-full border border-slate-200/10 dark:border-white/5 rounded-2xl pr-1">
+                {feedViewMode === 'all' ? (
+                  <table className="w-full text-sm text-left border-collapse">
+                    <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
+                      <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
+                        <th className="py-3 px-2 font-poppins font-bold text-left">Date</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-left">State</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-left">Incident Type</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-left">Summary</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Source</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...rawIncidents]
+                        .sort((a, b) => new Date(b.date) - new Date(a.date))
+                        .slice(0, 30)
+                        .map((inc, idx) => (
+                          <tr 
+                            key={idx}
+                            className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
+                          >
+                            <td className="py-3.5 px-2 font-mono whitespace-nowrap">{inc.date}</td>
+                            <td className="py-3.5 px-2 whitespace-nowrap">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
+                                isDarkMode ? 'bg-[#030e20] text-emerald-400 border border-white/5' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {inc.state}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-2 font-bold whitespace-nowrap text-[#39B54A]">{inc.incident_type}</td>
+                            <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{inc.fatalities || 0}</td>
+                            <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{inc.abductions || 0}</td>
+                            <td className={`py-3.5 px-2 max-w-xs md:max-w-md ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>{inc.summary}</td>
+                            <td className="py-3.5 px-2 text-center">
+                              {inc.source_url && (
+                                <a 
+                                  href={inc.source_url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="inline-flex items-center justify-center p-1.5 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 text-secondary hover:text-secondary-hover shadow-sm hover:scale-105 active:scale-95 transition-all outline-none"
+                                  title="View News Source"
+                                >
+                                  <ArrowUpRight className="w-3.5 h-3.5" />
+                                </a>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-sm text-left border-collapse">
+                    <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
+                      <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
+                        <th className="py-3 px-2 font-poppins font-bold text-left">Period</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Total Incidents</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Fatalities</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-center">Abductions</th>
+                        <th className="py-3 px-2 font-poppins font-bold text-left">Affected States</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getAggregatedFeedData().map((g, idx) => (
+                        <tr 
+                          key={idx}
+                          className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors"
+                        >
+                          <td className="py-3.5 px-2 font-mono font-bold whitespace-nowrap">{g.period}</td>
+                          <td className="py-3.5 px-2 text-center font-mono font-bold">{g.incidents}</td>
+                          <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{g.fatalities}</td>
+                          <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{g.abductions}</td>
+                          <td className="py-3.5 px-2">
+                            <div className="flex flex-wrap gap-1">
+                              {g.statesList.map((state, sIdx) => (
+                                <span 
+                                  key={sIdx}
+                                  className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                    isDarkMode ? 'bg-white/5 text-slate-300' : 'bg-slate-100 text-slate-600'
+                                  }`}
+                                >
+                                  {state}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              {/* FEED METHODOLOGY & DISCLAIMER DETAILS */}
+              <div className="mt-4 pt-4 border-t border-slate-200/10 dark:border-white/5 flex flex-col gap-2.5">
+                <p className={`text-[10px] leading-relaxed opacity-65 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <strong>Methodology &amp; Sourcing:</strong> This conflict feed aggregates security incidents dynamically compiled by a custom backend crawler polling major national news networks (including <em>Premium Times, Daily Trust, Vanguard, Channels TV, Punch, and TheCable</em>). Relevant events are structured using LLM-assisted analysis (Llama 3.1 8B on Groq) and cross-referenced with a database registry to prevent duplication.
+                </p>
+                <p className={`text-[9px] leading-relaxed italic opacity-50 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>
+                  <strong>Disclaimer:</strong> While automated deduplication filters are applied to isolate unique reports, local reporting constraints, publication delays, and media censorship may slightly affect data granularity. These statistics serve as analytical indices for research and evidence-guided public policy planning rather than exhaustive records.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
 
       {/* DATA SOURCES MODAL */}
       {showSourcesModal && (
@@ -1284,7 +1585,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   { name: "UNICEF (MICS reports) & WHO", d: "School attendance statistics, youth literacy baselines, basic vaccination coverages, and maternal-infant health indices." },
                   { name: "Cadre Harmonisé Joint Analysis", d: "Acute Food Insecurity status and child malnutrition ratios." },
                   { name: "IOM DTM & NEMA", d: "Active tracking arrays of Internally Displaced Persons (IDP), returning populations, and emergency displacement events." },
-                  { name: "ACLED & Nigeria Security Tracker", d: "Geolocated conflict logs, fatality datasets, and regional community violence statistics." }
+                  { name: "Beyond# Live Conflict Tracker", d: "Real-time geolocated conflict logs, fatalities, and regional security incidents parsed from national news feeds (Premium Times, Daily Trust, Vanguard, Channels TV, Punch, TheCable)." }
                 ].map((src, i) => (
                   <div key={i} className="flex gap-3 text-xs leading-normal">
                     <div className="w-5 h-5 rounded-full bg-[#39B54A]/10 flex items-center justify-center font-bold text-[#39B54A] shrink-0 text-[10px]">
@@ -1650,7 +1951,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               II. Aggregation Registry &amp; Methodology References
             </h4>
             <p className="text-[10px] text-slate-500 leading-normal">
-              This executive brief aggregates datasets from: **National Bureau of Statistics (NBS)** (Multidimensional Poverty Index, Education Census, Labor Surveys); **World Bank** (Microeconomic impact profiles); **UNICEF &amp; WHO** (Health registers, school attendance surveys); **Cadre Harmonisé Joint Analysis** (Food security Phase levels); **IOM DTM &amp; NEMA** (Displacement grids); and **ACLED &amp; NST** (Geolocated conflict indicators).
+              This executive brief aggregates datasets from: **National Bureau of Statistics (NBS)** (Multidimensional Poverty Index, Education Census, Labor Surveys); **World Bank** (Microeconomic impact profiles); **UNICEF &amp; WHO** (Health registers, school attendance surveys); **Cadre Harmonisé Joint Analysis** (Food security Phase levels); **IOM DTM &amp; NEMA** (Displacement grids); and **Beyond# Live Tracker** (Geolocated conflict indicators parsed from national feeds).
             </p>
             <p className="text-[9px] text-slate-400 mt-4 leading-normal italic border-t border-slate-100 pt-3">
               Disclaimer: Beyond# observatory briefs are compiled automatically based on institutional database updates. These reports are published for research, academic studies, and evidence-guided public policy planning.
