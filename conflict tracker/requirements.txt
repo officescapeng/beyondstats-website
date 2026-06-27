@@ -1,0 +1,7 @@
+feedparser
+requests
+beautifulsoup4
+groq
+supabase
+tweepy
+python-dotenv
