@@ -20,7 +20,8 @@ import {
   CheckCircle2,
   Trash2,
   Sun,
-  Moon
+  Moon,
+  Lock
 } from 'lucide-react';
 import { getProjects, addProject, deleteProject, resetProjects } from '../services/firebaseMock';
 
@@ -89,6 +90,10 @@ export default function ImpactMapPage() {
   const [geoLayer, setGeoLayer] = useState('community'); // 'state' | 'lga' | 'community'
 
   // Admin Portal States
+  const [isAdmin, setIsAdmin] = useState(() => sessionStorage.getItem('beyond_is_admin') === 'true');
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [authError, setAuthError] = useState('');
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [isPickingCoords, setIsPickingCoords] = useState(false);
   const [adminStatus, setAdminStatus] = useState(null); // { type: 'success'|'error', msg: '' }
@@ -156,6 +161,7 @@ export default function ImpactMapPage() {
 
   // Reset database back to default seed projects
   const handleResetDB = () => {
+    if (!isAdmin) return;
     if (window.confirm("Are you sure you want to reset the database? This will clear any added projects and restore the default 10 projects.")) {
       const resetData = resetProjects();
       setProjects(resetData);
@@ -167,6 +173,7 @@ export default function ImpactMapPage() {
 
   // Delete project handler
   const handleDeleteProject = (id) => {
+    if (!isAdmin) return;
     if (window.confirm("Are you sure you want to delete this project?")) {
       deleteProject(id);
       loadProjects();
@@ -181,6 +188,10 @@ export default function ImpactMapPage() {
   // Handle Admin Project Submit
   const handleAddProjectSubmit = (e) => {
     e.preventDefault();
+    if (!isAdmin) {
+      setAdminStatus({ type: 'error', msg: 'Unauthorized action.' });
+      return;
+    }
     if (!formTitle || !formState || !formLat || !formLng) {
       setAdminStatus({
         type: 'error',
@@ -335,7 +346,7 @@ export default function ImpactMapPage() {
             </p>
           </div>
           
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={() => setIsDarkMode(!isDarkMode)}
@@ -349,11 +360,22 @@ export default function ImpactMapPage() {
               {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
+            {isAdmin && (
+              <div className="hidden sm:flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-full">
+                <span className="w-1.5 h-1.5 bg-[#39B54A] rounded-full animate-pulse" />
+                <span className="font-mono text-[9px] font-bold text-emerald-400 uppercase tracking-widest leading-none">Admin Active</span>
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => {
-                setShowAdminPanel(!showAdminPanel);
-                setSelectedProject(null);
+                if (isAdmin) {
+                  setShowAdminPanel(!showAdminPanel);
+                  setSelectedProject(null);
+                } else {
+                  setShowAuthModal(true);
+                }
               }}
               className={`px-5 py-2.5 rounded-full font-inter text-xs font-semibold uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all duration-300 border ${
                 showAdminPanel 
@@ -366,18 +388,40 @@ export default function ImpactMapPage() {
               <Database className="w-4 h-4" />
               {showAdminPanel ? 'View Impact Map' : 'Admin Portal'}
             </button>
-            <button
-              type="button"
-              onClick={handleResetDB}
-              className={`p-2.5 rounded-full border cursor-pointer transition-colors ${
-                isDarkMode 
-                  ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' 
-                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
-              }`}
-              title="Reset Database to Defaults"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={handleResetDB}
+                className={`p-2.5 rounded-full border cursor-pointer transition-colors ${
+                  isDarkMode 
+                    ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' 
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700'
+                }`}
+                title="Reset Database to Defaults"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            )}
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdmin(false);
+                  sessionStorage.removeItem('beyond_is_admin');
+                  setShowAdminPanel(false);
+                }}
+                className={`p-2.5 rounded-full border cursor-pointer transition-colors ${
+                  isDarkMode 
+                    ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20 text-red-400' 
+                    : 'bg-red-50 border-red-200 hover:bg-red-100 text-red-600'
+                }`}
+                title="Log Out of Admin Mode"
+              >
+                <Lock className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1251,17 +1295,107 @@ export default function ImpactMapPage() {
           </div>
           
           {/* Delete Project in Admin Portal mode */}
-          <div className={`p-4 border-t flex justify-between items-center flex-shrink-0 transition-colors ${
-            isDarkMode ? 'border-white/5 bg-[#041633]' : 'border-slate-100 bg-slate-50'
-          }`}>
-            <span className={`font-inter text-[10px] ${isDarkMode ? 'text-white/40' : 'text-slate-400'}`}>Registered Pin ID: {selectedProject.id}</span>
+          {isAdmin && (
+            <div className={`p-4 border-t flex justify-between items-center flex-shrink-0 transition-colors ${
+              isDarkMode ? 'border-white/5 bg-[#041633]' : 'border-slate-100 bg-slate-50'
+            }`}>
+              <span className={`font-inter text-[10px] ${isDarkMode ? 'text-white/40' : 'text-slate-400'}`}>Registered Pin ID: {selectedProject.id}</span>
+              <button
+                onClick={() => handleDeleteProject(selectedProject.id)}
+                className="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-inter text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Remove Pin
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ADMIN AUTH MODAL */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in text-left">
+          <div 
+            className={`w-full max-w-sm rounded-[2rem] p-8 border shadow-2xl flex flex-col gap-6 relative transition-colors ${
+              isDarkMode 
+                ? 'bg-[#051735]/95 border-white/10 text-white' 
+                : 'bg-white border-slate-200 text-slate-800'
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
             <button
-              onClick={() => handleDeleteProject(selectedProject.id)}
-              className="px-3 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-inter text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              onClick={() => {
+                setShowAuthModal(false);
+                setPasscode('');
+                setAuthError('');
+              }}
+              className={`absolute top-6 right-6 p-2 rounded-full border cursor-pointer transition-colors outline-none ${
+                isDarkMode 
+                  ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70' 
+                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-400'
+              }`}
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              Remove Pin
+              <X className="w-4 h-4" />
             </button>
+
+            <div className="flex flex-col gap-2">
+              <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase">
+                ADMIN AUTHORIZATION
+              </span>
+              <h3 className="font-poppins font-bold text-lg leading-tight">
+                Enter Admin Passcode
+              </h3>
+              <p className={`font-inter text-xs ${isDarkMode ? 'text-white/60' : 'text-slate-500'}`}>
+                Access is restricted to Beyond# administrators. Please enter the operational passcode.
+              </p>
+            </div>
+
+            {authError && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-xl text-xs font-semibold">
+                {authError}
+              </div>
+            )}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (passcode === 'beyond2026') {
+                  setIsAdmin(true);
+                  sessionStorage.setItem('beyond_is_admin', 'true');
+                  setShowAuthModal(false);
+                  setShowAdminPanel(true);
+                  setPasscode('');
+                  setAuthError('');
+                } else {
+                  setAuthError('Invalid passcode. Access denied.');
+                }
+              }}
+              className="flex flex-col gap-4"
+            >
+              <div className="flex flex-col gap-1.5">
+                <input
+                  type="password"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="••••••••"
+                  className={`border focus:border-[#39B54A] rounded-xl px-4 py-3 text-sm outline-none transition-colors ${
+                    isDarkMode 
+                      ? 'bg-[#051735]/90 border-white/10 text-white placeholder-white/30' 
+                      : 'bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400'
+                  }`}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#39B54A] hover:bg-[#39B54A]/90 text-white rounded-xl font-inter text-xs font-bold uppercase tracking-wider cursor-pointer transition-transform duration-200 hover:scale-103 active:scale-97"
+              >
+                Authenticate
+              </button>
+            </form>
           </div>
         </div>
       )}
