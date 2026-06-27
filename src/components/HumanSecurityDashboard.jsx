@@ -42,12 +42,16 @@ import {
   ArrowUpRight,
   TrendingUp,
   X,
-  ChevronDown
+  ChevronDown,
+  Search
 } from 'lucide-react';
 
-export default function HumanSecurityDashboard() {
+export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
   const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode (white theme)
-  const [selectedStateId, setSelectedStateId] = useState('fct');
+  const [localStateId, setLocalStateId] = useState('fct');
+  const selectedStateId = propStateId || localStateId;
+  const setSelectedStateId = propSetSelectedStateId || setLocalStateId;
+
   const [activeFilter, setActiveFilter] = useState('composite'); // 'composite' or pillar key
   const [showSourcesModal, setShowSourcesModal] = useState(false);
   const [downloadDropdownOpen, setDownloadDropdownOpen] = useState(false);
