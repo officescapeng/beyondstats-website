@@ -1764,9 +1764,6 @@ function SupportPartnershipsPage() {
   const [downloadingFile, setDownloadingFile] = useState(null)
   const [downloadProgress, setDownloadProgress] = useState(0)
 
-  // Partners Filter State
-  const [selectedPartnerCategory, setSelectedPartnerCategory] = useState('All')
-
   // Form State
   const [form, setForm] = useState({
     name: '',
@@ -1884,28 +1881,7 @@ function SupportPartnershipsPage() {
     }
   ]
 
-  const partnerCategories = [
-    'All',
-    'Government Institutions',
-    'Development Partners',
-    'Foundations',
-    'Universities',
-    'Research Institutes',
-    'Corporate Organizations',
-    'Civil Society Networks'
-  ]
 
-  const partnerLogos = [
-    { name: "Federal Ministry of Budget & Economic Planning", category: "Government Institutions", shortcut: "FMBEP", desc: "National Planning Authority" },
-    { name: "UN Development Programme", category: "Development Partners", shortcut: "UNDP", desc: "Empowered lives. Resilient nations." },
-    { name: "MacArthur Foundation", category: "Foundations", shortcut: "MAC", desc: "Supporting creative people & institutions." },
-    { name: "Abuja Policy Research Institute", category: "Research Institutes", shortcut: "APRI", desc: "Independent public policy research." },
-    { name: "The Ford Foundation", category: "Foundations", shortcut: "FORD", desc: "Social justice and shared opportunity." },
-    { name: "Dangote Social Impact Fund", category: "Corporate Organizations", shortcut: "DANGOTE", desc: "Driving African industrialization and impact." },
-    { name: "Lagos Business School", category: "Universities", shortcut: "LBS", desc: "Developing business and society leaders." },
-    { name: "National Human Security Council", category: "Government Institutions", shortcut: "NHSC", desc: "National Coordination Dashboard" },
-    { name: "Civil Society Accountability Network", category: "Civil Society Networks", shortcut: "CSAN", desc: "Transparency and governance watchdog." }
-  ]
 
   const reportsList = [
     { name: "Annual Report 2025", type: "Annual Reports" },
@@ -1923,9 +1899,7 @@ function SupportPartnershipsPage() {
     "Generating transaction log..."
   ]
 
-  const filteredPartners = selectedPartnerCategory === 'All' 
-    ? partnerLogos 
-    : partnerLogos.filter(p => p.category === selectedPartnerCategory)
+
 
   const activeAmount = customAmount ? parseFloat(customAmount) : amount
 
@@ -2266,79 +2240,7 @@ function SupportPartnershipsPage() {
         </div>
       </section>
 
-      {/* 5. CURRENT & FUTURE PARTNERS (LOGO SHOWCASE) */}
-      <section className="bg-slate-50 border-t border-slate-100 py-24 px-6 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col items-center">
-          
-          <div className="mb-12">
-            <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block mb-2">SHARED VALUE NETWORK</span>
-            <h2 className="font-poppins font-bold text-2xl md:text-3xl text-[#062b66]">Building Impact Through Collaboration</h2>
-            <p className="font-inter text-slate-500 text-xs sm:text-sm max-w-xl mx-auto mt-2">
-              Beyond# welcomes collaboration with institutions committed to evidence, accountability, and sustainable development.
-            </p>
-          </div>
 
-          {/* Categories Tab Filter */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-12 max-w-4xl border-b border-slate-200 pb-6">
-            {partnerCategories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedPartnerCategory(cat)}
-                className={`font-inter text-[9px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-full border transition-all cursor-pointer outline-none ${
-                  selectedPartnerCategory === cat
-                    ? 'bg-[#062b66] text-white border-[#062b66]'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-[#062b66]'
-                }`}
-              >
-                {cat.replace(' Institutions', '').replace(' Organizations', '').replace(' Networks', '')}
-              </button>
-            ))}
-          </div>
-
-          {/* Logo Cards Grid */}
-          <div className="w-full grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredPartners.map((logo, idx) => (
-              <div 
-                key={idx}
-                className="bg-white border border-slate-200/80 p-6 rounded-2xl flex flex-col justify-between items-start text-left hover:border-[#39B54A] hover:shadow-sm transition-all duration-300 group h-[140px] relative overflow-hidden"
-              >
-                <span className="absolute top-4 right-4 font-poppins font-extrabold text-[10px] text-slate-200 group-hover:text-[#39B54A]/30 transition-colors">
-                  PARTNER
-                </span>
-                <div>
-                  <div className="font-poppins font-black text-2xl tracking-tighter text-slate-300 group-hover:text-[#062b66] transition-colors mb-2">
-                    {logo.shortcut}
-                  </div>
-                  <h4 className="font-poppins font-bold text-xs text-[#062b66] line-clamp-1 leading-snug">
-                    {logo.name}
-                  </h4>
-                  <p className="font-inter text-[9px] text-slate-400 mt-1 line-clamp-2">
-                    {logo.desc}
-                  </p>
-                </div>
-                <div className="font-inter text-[8px] font-semibold text-slate-400 group-hover:text-[#39B54A] transition-colors uppercase mt-2">
-                  {logo.category.replace(' Institutions', '').replace(' Organizations', '')}
-                </div>
-              </div>
-            ))}
-
-            {/* Future placeholders */}
-            {Array.from({ length: 4 - (filteredPartners.length % 4 || 4) + 4 }).map((_, idx) => (
-              <div 
-                key={`placeholder-${idx}`}
-                className="border border-dashed border-slate-300 bg-white/5 p-6 rounded-2xl flex flex-col justify-center items-center text-center opacity-65 h-[140px] hover:opacity-100 hover:border-[#39B54A] hover:bg-slate-100/50 transition-all duration-300"
-              >
-                <div className="w-8 h-8 rounded-full border border-dashed border-slate-400 text-slate-400 flex items-center justify-center font-inter text-sm mb-2 font-bold">+</div>
-                <span className="font-poppins font-bold text-[10px] tracking-wide text-slate-500">Future Partner</span>
-                <span className="font-inter text-[8px] text-slate-400 mt-0.5 uppercase tracking-wider">
-                  {selectedPartnerCategory === 'All' ? 'Select Domain' : selectedPartnerCategory.replace(' Institutions', '')}
-                </span>
-              </div>
-            ))}
-          </div>
-
-        </div>
-      </section>
 
       {/* 6. TRANSPARENCY & ACCOUNTABILITY */}
       <section className="py-24 px-6 max-w-7xl mx-auto border-t border-slate-100 text-left">
