@@ -1719,7 +1719,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
             CONTACT
           </span>
           <h1 className="font-poppins font-bold text-3xl sm:text-4xl md:text-5xl text-white tracking-tight leading-tight max-w-2xl">
-            Partner With Beyond#
+            Contact Beyond#
           </h1>
         </div>
       </div>
@@ -1732,7 +1732,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
               Connect With the Beyond# Secretariat
             </h2>
             <p className="font-inter text-slate-600 text-sm leading-relaxed max-w-md">
-              We collaborate with government entities, international development agencies, research bodies, civil society groups, and local community leadership. Reach out to our offices in Abuja.
+              We welcome general inquiries, feedback, research proposals, press outreach, and community engagement queries. Reach out to our offices in Abuja or send a message directly.
             </p>
           </div>
 
@@ -1785,10 +1785,10 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
         <div className="w-full lg:w-1/2">
           <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-sm relative">
             <h3 className="font-poppins font-bold text-xl mb-2 text-[#062b66]">
-              Partner With Us
+              Send Us a Message
             </h3>
             <p className="font-inter text-slate-500 text-xs mb-6">
-              Tell us about your organization and how we can collaborate to turn evidence into action.
+              Complete the form below and our secretariat will get back to you shortly.
             </p>
 
             {formSubmitted ? (
@@ -1855,7 +1855,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
 
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="message" className="font-inter text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                    How can we collaborate?
+                    Your Message *
                   </label>
                   <textarea 
                     id="message"
@@ -1863,7 +1863,8 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
                     rows="4"
                     value={formData.message}
                     onChange={handleInputChange}
-                    placeholder="Share details about your project or inquiry..."
+                    required
+                    placeholder="Write your message or inquiry here..."
                     className="bg-slate-50 border border-slate-200 focus:border-secondary focus:ring-1 focus:ring-secondary rounded-xl px-4 py-3 font-inter text-sm text-primary placeholder-slate-300 outline-none resize-none transition-all duration-200"
                   ></textarea>
                 </div>
@@ -1872,7 +1873,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
                   type="submit"
                   className="mt-2 w-full bg-secondary hover:bg-secondary/90 text-white font-inter font-bold text-xs uppercase tracking-widest py-4 rounded-full flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-secondary/15 hover:scale-102 active:scale-98 cursor-pointer outline-none border-none"
                 >
-                  SUBMIT INQUIRY
+                  SEND MESSAGE
                   <ArrowUpRight className="w-4 h-4" />
                 </button>
               </form>
