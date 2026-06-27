@@ -574,66 +574,169 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
       excerpt: "A comprehensive assessment of harvest yields, market price dynamics, and household resilience indices across Middle Belt agricultural belts.",
       featured_media_url: "/hero_community.png",
       category: "Human Security Monitor"
+    },
+    {
+      id: 4,
+      date: "2026-05-28",
+      title: "Using Data to Improve Public Service Delivery",
+      excerpt: "Analyzing the role of citizen scorecards in driving institutional reforms and responsive health and education service provision in local government areas.",
+      featured_media_url: "/community_lab.png",
+      category: "Policy Insight"
+    },
+    {
+      id: 5,
+      date: "2026-05-14",
+      title: "How Local Partnerships Are Transforming Evidence Into Action",
+      excerpt: "Highlighting collaborative efforts between local governance structures and community actors to address sanitation and secondary schooling bottlenecks.",
+      featured_media_url: "/hero_women.png",
+      category: "Community Solutions"
+    },
+    {
+      id: 6,
+      date: "2026-05-02",
+      title: "Building Resilient Urban Infrastructure against Climate Risks",
+      excerpt: "An assessment of urban flooding vulnerabilities and municipal drainage responses in coastal Nigerian cities using community-sourced flood mapping.",
+      featured_media_url: "/nigerian_stakeholders.png",
+      category: "Climate Vulnerability"
     }
   ]
 
-  const news = articles && articles.length > 0 ? articles.slice(0, 3) : fallbackNews;
+  // Get exactly 6 articles, padded by fallbackNews if needed
+  const news = React.useMemo(() => {
+    let list = [...(articles || [])];
+    if (list.length < 6) {
+      const needed = 6 - list.length;
+      list = [...list, ...fallbackNews.slice(0, needed)];
+    }
+    return list.slice(0, 6);
+  }, [articles]);
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Auto scroll enabled
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % 6);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getTranslateX = () => {
+    if (windowWidth >= 1024) { // lg (4 items)
+      return `calc(-${currentIndex * 25}% - ${currentIndex * 6}px)`;
+    } else if (windowWidth >= 640) { // sm (2 items)
+      return `calc(-${currentIndex * 50}% - ${currentIndex * 12}px)`;
+    } else { // xs (1 item)
+      return `-${currentIndex * 100}%`;
+    }
+  };
+
+  // Duplicate for smooth loop translation
+  const doubleNews = [...news, ...news];
 
   return (
     <section className="bg-slate-50 text-primary py-24 px-6 md:px-12 w-full border-t border-slate-100 z-10 relative">
       <div className="max-w-7xl mx-auto flex flex-col items-center">
         
-        {/* Section Header */}
-        <div className="w-full mb-16 text-left">
-          <span className="font-inter text-xs font-bold tracking-[0.25em] text-secondary uppercase mb-3 block">
-            INSIGHT &amp; IMPACT
-          </span>
-          <h2 className="font-poppins font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight text-[#062b66] leading-[1.1] mb-4">
-            Stories &amp; Analysis From The Field
-          </h2>
-          <p className="font-inter text-slate-500 text-sm">
-            Discover our latest research releases, policy briefs, and community development updates.
-          </p>
+        {/* Section Header with Navigation */}
+        <div className="w-full flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6 mb-12 text-left">
+          <div className="flex-1">
+            <span className="font-inter text-xs font-bold tracking-[0.25em] text-secondary uppercase mb-3 block">
+              INSIGHT &amp; IMPACT
+            </span>
+            <h2 className="font-poppins font-bold text-3xl sm:text-4xl md:text-5xl tracking-tight text-[#062b66] leading-[1.1] mb-4">
+              Stories &amp; Analysis From The Field
+            </h2>
+            <p className="font-inter text-slate-500 text-sm">
+              Discover our latest research releases, policy briefs, and community development updates.
+            </p>
+          </div>
+          
+          {/* Navigation buttons */}
+          <div className="flex gap-2.5 no-print shrink-0 pb-1">
+            <button 
+              onClick={() => setCurrentIndex((prev) => (prev === 0 ? 5 : prev - 1))}
+              className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
+              aria-label="Previous Slide"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setCurrentIndex((prev) => (prev + 1) % 6)}
+              className="p-3 rounded-full border border-slate-200 hover:border-secondary hover:text-secondary text-primary bg-white cursor-pointer transition-all duration-200 outline-none flex items-center justify-center"
+              aria-label="Next Slide"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
-        {/* Static Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
-          {news.map((item) => (
-            <div 
-              key={item.id}
-              onClick={() => onArticleClick?.(item)}
-              className="bg-white rounded-3xl overflow-hidden border border-slate-100 hover:border-secondary shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full text-left group cursor-pointer"
-            >
-              <div className="h-48 overflow-hidden relative">
-                <img 
-                  src={item.featured_media_url} 
-                  alt={item.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm text-secondary font-inter text-[9px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
-                  {item.category}
-                </span>
-              </div>
-              <div className="p-6 flex flex-col flex-1 justify-between gap-4">
-                <div className="flex flex-col gap-2">
-                  <span className="font-inter text-[10px] text-slate-400 font-semibold">
-                    {new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </span>
-                  <h3 className="font-poppins font-bold text-base text-[#062b66] leading-snug group-hover:text-secondary transition-colors">
-                    {item.title}
-                  </h3>
-                  <p className="font-inter text-slate-500 text-xs leading-relaxed line-clamp-3">
-                    {item.excerpt}
-                  </p>
-                </div>
-                <div className="mt-auto pt-2 border-t border-slate-50">
-                  <span className="inline-flex items-center text-xs font-bold text-secondary group-hover:underline gap-1">
-                    Read Story
-                    <ArrowUpRight className="w-3.5 h-3.5" />
+        {/* Carousel sliding track */}
+        <div className="w-full overflow-hidden relative">
+          <div 
+            className="flex transition-transform duration-500 ease-out gap-6"
+            style={{ transform: getTranslateX() }}
+          >
+            {doubleNews.map((item, idx) => (
+              <div 
+                key={`${item.id}-${idx}`}
+                onClick={() => onArticleClick?.(item)}
+                className="w-full sm:w-[calc(50%-12px)] lg:w-[calc(25%-18px)] shrink-0 bg-white rounded-3xl overflow-hidden border border-slate-100 hover:border-secondary shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full text-left group cursor-pointer"
+              >
+                <div className="h-48 overflow-hidden relative">
+                  <img 
+                    src={item.featured_media_url} 
+                    alt={item.title} 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <span className="absolute top-4 left-4 bg-white/95 backdrop-blur-sm text-secondary font-inter text-[9px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+                    {item.category}
                   </span>
                 </div>
+                <div className="p-6 flex flex-col flex-1 justify-between gap-4">
+                  <div className="flex flex-col gap-2">
+                    <span className="font-inter text-[10px] text-slate-400 font-semibold">
+                      {new Date(item.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </span>
+                    <h3 className="font-poppins font-bold text-base text-[#062b66] leading-snug group-hover:text-secondary transition-colors line-clamp-2">
+                      {item.title}
+                    </h3>
+                    <p className="font-inter text-slate-500 text-xs leading-relaxed line-clamp-3">
+                      {item.excerpt}
+                    </p>
+                  </div>
+                  <div className="mt-auto pt-2 border-t border-slate-50">
+                    <span className="inline-flex items-center text-xs font-bold text-secondary group-hover:underline gap-1">
+                      Read Story
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Dot Indicators */}
+        <div className="flex gap-2 mt-8 no-print">
+          {[0, 1, 2, 3, 4, 5].map((idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              className={`w-2 h-2 rounded-full transition-all duration-300 outline-none border-none cursor-pointer ${
+                currentIndex === idx 
+                  ? 'bg-secondary w-5' 
+                  : 'bg-slate-300 hover:bg-slate-400'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
           ))}
         </div>
 
