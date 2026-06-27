@@ -92,7 +92,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const triggerWeeklyCheck = (silent = false) => {
+  const triggerDailyCheck = (silent = false) => {
     setIsCheckingUpdates(true);
     if (!silent) {
       setUpdateNotification({
@@ -104,11 +104,11 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     setTimeout(() => {
       setIsCheckingUpdates(false);
       const now = new Date();
-      localStorage.setItem('beyond_dashboard_last_weekly_check', now.toISOString());
+      localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
       
       setUpdateNotification({
         type: 'success',
-        message: 'Weekly datasets updated successfully! ACLED, NBS & FAO indicators synchronized.'
+        message: 'Daily datasets updated successfully! ACLED, NBS & FAO indicators synchronized.'
       });
       
       setTimeout(() => {
@@ -118,19 +118,19 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   };
 
   useEffect(() => {
-    const lastCheck = localStorage.getItem('beyond_dashboard_last_weekly_check');
+    const lastCheck = localStorage.getItem('beyond_dashboard_last_daily_check');
     if (!lastCheck) {
-      triggerWeeklyCheck(true);
+      triggerDailyCheck(true);
     } else {
       const lastCheckDate = new Date(lastCheck);
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      if (lastCheckDate < oneWeekAgo) {
-        triggerWeeklyCheck(false);
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      if (lastCheckDate < oneDayAgo) {
+        triggerDailyCheck(false);
       } else {
         setUpdateNotification({
           type: 'success',
-          message: 'Weekly update verified: System is up-to-date.'
+          message: 'Daily update verified: System is up-to-date.'
         });
         setTimeout(() => {
           setUpdateNotification(null);
@@ -423,19 +423,19 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Weekly Update Sync Badge */}
+            {/* Daily Update Sync Badge */}
             <button
-              onClick={() => triggerWeeklyCheck(false)}
+              onClick={() => triggerDailyCheck(false)}
               disabled={isCheckingUpdates}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors border ${
                 isCheckingUpdates 
                   ? 'bg-blue-950/30 border-blue-500/30 text-blue-300' 
                   : 'bg-white/10 border-transparent text-white/80 hover:bg-white/20'
               }`}
-              title="Click to check for weekly updates"
+              title="Click to check for daily updates"
             >
               <span className={`w-1.5 h-1.5 rounded-full ${isCheckingUpdates ? 'bg-blue-400 animate-ping' : 'bg-[#39B54A]'}`} />
-              <span>{isCheckingUpdates ? "Syncing..." : "Weekly Sync: Active"}</span>
+              <span>{isCheckingUpdates ? "Syncing..." : "Daily Sync: Active"}</span>
             </button>
 
             {/* Last Updated badge */}
