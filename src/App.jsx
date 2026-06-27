@@ -763,11 +763,11 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
 
   const getTranslateX = () => {
     if (windowWidth >= 1024) { // lg (4 items)
-      return `calc(-${currentIndex * 25}% - ${currentIndex * 6}px)`;
+      return `translateX(calc(-${currentIndex * 25}% - ${currentIndex * 6}px))`;
     } else if (windowWidth >= 640) { // sm (2 items)
-      return `calc(-${currentIndex * 50}% - ${currentIndex * 12}px)`;
+      return `translateX(calc(-${currentIndex * 50}% - ${currentIndex * 12}px))`;
     } else { // xs (1 item)
-      return `-${currentIndex * 100}%`;
+      return `translateX(-${currentIndex * 100}%)`;
     }
   };
 
