@@ -37,6 +37,7 @@ import {
   Database,
   Search
 } from 'lucide-react';
+import { Sun, Moon, Info, Scale, ArrowUpRight, TrendingUp, X, ChevronDown } from 'lucide-react';
 import { supabase } from '../services/liveData/supabaseClient';
 
 
