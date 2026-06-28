@@ -33,15 +33,26 @@ except ImportError:
 
 # 1. Configuration & Key Verification
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-if not all([GROQ_API_KEY, SUPABASE_URL, SUPABASE_KEY]):
-    print("Error: Missing required environment variables (GROQ_API_KEY, SUPABASE_URL, SUPABASE_KEY).")
+if not (SUPABASE_URL and SUPABASE_KEY):
+    print("Error: Missing required database environment variables (SUPABASE_URL, SUPABASE_KEY).")
+    exit(1)
+
+if not (GROQ_API_KEY or GEMINI_API_KEY):
+    print("Error: Either GROQ_API_KEY or GEMINI_API_KEY must be configured in environment.")
     exit(1)
 
 # Initialize API Clients
-client = Groq(api_key=GROQ_API_KEY)
+client = None
+if GROQ_API_KEY:
+    try:
+        client = Groq(api_key=GROQ_API_KEY)
+    except Exception as e:
+        print(f"Warning: Could not initialize Groq client: {e}")
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 2. National Daily News RSS Feeds (6 diverse sources)
@@ -135,6 +146,83 @@ def extract_incident_with_groq(article_title, article_text):
     print("Failed to parse article after multiple retries due to Groq rate limits.")
     return None
 
+def extract_incident_with_gemini(article_title, article_text, gemini_key):
+    """Uses Gemini 1.5 Flash via REST API to extract structured JSON data from news articles"""
+    prompt = f"""
+    Analyze the following news article. If it describes a security incident, conflict, clash, banditry attack, 
+    kidnapping, or military operation in Nigeria, extract the information into the following JSON format.
+    If the article is not about a violent security incident, return an empty JSON object.
+
+    Article Title: {article_title}
+    Article Content: {article_text}
+
+    JSON Output Schema:
+    {{
+      "is_relevant": true/false,
+      "state": "Name of the Nigerian state",
+      "lga": "Name of the LGA (use null if not specified)",
+      "incident_type": "e.g. Banditry, Kidnapping, Communal Clash, Terrorist Attack, Security Force Operation",
+      "fatalities": 0, (count of deaths, use 0 if unknown/none)
+      "abductions": 0, (count of kidnapped people, use 0 if unknown/none)
+      "summary": "1-sentence summary"
+    }}
+    """
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+    
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=15)
+            if response.status_code == 200:
+                res_data = response.json()
+                text_response = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                # Clean code blocks markdown if present
+                if text_response.strip().startswith("```"):
+                    lines = text_response.strip().split("\n")
+                    if lines[0].startswith("```json"):
+                        text_response = "\n".join(lines[1:-1])
+                    elif lines[0].startswith("```"):
+                        text_response = "\n".join(lines[1:-1])
+                import json
+                return json.loads(text_response)
+            else:
+                print(f"Gemini API returned status {response.status_code}: {response.text}")
+                time.sleep(2)
+        except Exception as e:
+            print(f"Gemini API connection error: {e}")
+            time.sleep(2)
+    return None
+
+def extract_incident(article_title, article_text):
+    """Try Groq first (if available), then fall back to Gemini REST API"""
+    if GROQ_API_KEY and client:
+        try:
+            data = extract_incident_with_groq(article_title, article_text)
+            if data is not None:
+                return data
+        except Exception as e:
+            print(f"Groq extraction failed: {e}. Falling back to Gemini...")
+            
+    if GEMINI_API_KEY:
+        try:
+            data = extract_incident_with_gemini(article_title, article_text, GEMINI_API_KEY)
+            if data is not None:
+                return data
+        except Exception as e:
+            print(f"Gemini extraction failed: {e}")
+            
+    return None
+
 def run_daily_scraper():
     print("Initiating Conflict Tracker Scraper...")
     
@@ -180,8 +268,8 @@ def run_daily_scraper():
                     if full_text:
                         text_content = full_text
                 
-                # Extract structured record using Groq API
-                data = extract_incident_with_groq(entry.title, text_content)
+                # Extract structured record using AI (Groq with Gemini fallback)
+                data = extract_incident(entry.title, text_content)
                 
                 # Cooldown delay of 2 seconds to respect Groq's 30 Requests Per Minute (RPM) limits
                 time.sleep(2)
