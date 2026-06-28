@@ -35,6 +35,10 @@ import {
   Coins,
   Download,
   Database,
+  Search
+} from 'lucide-react';
+import { supabase } from '../services/liveData/supabaseClient';
+import {
   Sun,
   Moon,
   Info,
@@ -103,27 +107,22 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   }, []);
 
   // ─── Hourly conflict feed fetch ───────────────────────────────────────────
-  const fetchConflictFeed = () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
-    if (!supabaseUrl || !supabaseKey) return;
+  const fetchConflictFeed = async () => {
     setIsFeedSyncing(true);
-    fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
-      }
-    })
-    .then(res => { if (!res.ok) throw new Error('Feed fetch failed'); return res.json(); })
-    .then(data => {
-      setRawIncidents(data);
-      setFeedLastSynced(new Date());
+    const { data, error } = await supabase
+      .from('incidents')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase fetch error:', error);
       setIsFeedSyncing(false);
-    })
-    .catch(err => {
-      console.warn('Conflict feed auto-sync error:', err);
-      setIsFeedSyncing(false);
-    });
+      return;
+    }
+
+    setRawIncidents(data);
+    setFeedLastSynced(new Date());
+    setIsFeedSyncing(false);
   };
 
   // Run conflict feed fetch on mount then every 2 hours
@@ -1076,7 +1075,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       { label: "National Average Risk Index", value: `${averageRisk}/100`, desc: "Moderate Human Security Threat", color: "text-amber-500", icon: Scale },
       { label: "Total Internally Displaced Persons", value: totalIDPs.toLocaleString(), desc: "Active IDPs tracked in NEMA & IOM registries", color: "text-rose-500", icon: Users },
       { label: "Critical Risk States", value: `${criticalStatesCount} / 37`, desc: "Composite score ≥ 75 (mostly Borno/North)", color: "text-rose-600", icon: Shield },
-      { label: "Conflict Fatalities (1 Year)", value: totalFatalities.toLocaleString(), desc: "Beyond# Live Tracker incident fatalities", color: "text-red-500", icon: Activity }
+      { label: "Conflict Fatalities (1 Year)", value: totalFatalities.toLocaleString(), desc: "Sources: ACLED Data Portal, Nigeria Security Tracker (CFR)", color: "text-red-500", icon: Activity }
     ];
   };
 
