@@ -993,7 +993,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
           <div class="section-title">I. Seasonal Risk Projections (Q3 &amp; Q4 2026)</div>
           
-          <div class="grid">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div class="card">
               <div class="card-header">
                 <span class="card-title">Poverty &amp; Livelihoods</span>
@@ -1235,7 +1235,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       )}
 
       {/* OBSERVATORY BODY */}
-      <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col gap-10">
+      <div className="max-w-full sm:max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-10 flex flex-col gap-6 sm:gap-10">
         
         {/* SUMMARY TILES */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 no-print">
@@ -1322,7 +1322,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Map Canvas */}
-            <div className="relative w-full max-w-[500px] mx-auto py-6">
+            <div className="relative w-full max-w-full mx-auto py-6">
               <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
                 {nigeriaMap.locations.map(loc => {
                   const state = PROCESSED_STATE_DATA.find(s => s.id === loc.id);
