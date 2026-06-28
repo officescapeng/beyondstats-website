@@ -77,6 +77,36 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const [stateAId, setStateAId] = useState('fct');
   const [stateBId, setStateBId] = useState('kano');
 
+} from 'lucide-react';
+
+export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
+  const [stateDataList, setStateDataList] = useState(STATIC_STATE_DATA);
+  const PROCESSED_STATE_DATA = stateDataList;
+
+  const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode (white theme)
+  const [localStateId, setLocalStateId] = useState('fct');
+  const selectedStateId = propStateId || localStateId;
+  const setSelectedStateId = propSetSelectedStateId || setLocalStateId;
+
+  const [activeFilter, setActiveFilter] = useState('composite'); // 'composite' or pillar key
+  const [showSourcesModal, setShowSourcesModal] = useState(false);
+  const [downloadDropdownOpen, setDownloadDropdownOpen] = useState(false);
+  
+  // Weekly updates states
+  const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [updateNotification, setUpdateNotification] = useState(null);
+  const [rawIncidents, setRawIncidents] = useState([]);
+  const [feedViewMode, setFeedViewMode] = useState('all'); // 'all', 'daily', 'weekly', 'monthly'
+  const [dashboardTab, setDashboardTab] = useState('profile'); // 'profile', 'comparison'
+
+  // Conflict feed hourly sync states
+  const [isFeedSyncing, setIsFeedSyncing] = useState(false);
+  const [feedLastSynced, setFeedLastSynced] = useState(null);
+
+  // State Comparison Selectors
+  const [stateAId, setStateAId] = useState('fct');
+  const [stateBId, setStateBId] = useState('kano');
+
   // UI Simplification States (Single-screen Refactor)
   const [activePillarTab, setActivePillarTab] = useState('poverty');
   const [forecastExpanded, setForecastExpanded] = useState(false);
@@ -105,36 +135,33 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ─── Hourly conflict feed fetch ───────────────────────────────────────────
+  // Fetch conflict incidents with deduplication
   const fetchConflictFeed = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
     if (!supabaseUrl || !supabaseKey) return;
     setIsFeedSyncing(true);
-    fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
+    fetch(`${supabaseUrl}/rest/v1/incidents?select=*\&order=date.desc`, {
       headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`
       }
     })
-    .then(res => { if (!res.ok) throw new Error('Feed fetch failed'); return res.json(); })
-    .then(data => {
-      setRawIncidents(data);
-      setFeedLastSynced(new Date());
-      setIsFeedSyncing(false);
-    })
-    .catch(err => {
-      console.warn('Conflict feed auto-sync error:', err);
-      setIsFeedSyncing(false);
-    });
-  };
-
-  // Run conflict feed fetch on mount then every 2 hours
-  useEffect(() => {
-    fetchConflictFeed();
-    const FEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
-    const feedTimer = setInterval(fetchConflictFeed, FEED_INTERVAL_MS);
-    return () => clearInterval(feedTimer);
+      .then(res => { if (!res.ok) throw new Error('Feed fetch failed'); return res.json(); })
+      .then(data => {
+        const deduped = data.reduce((acc, item) => {
+          const key = `${(item.title || '').trim().toLowerCase()}|${item.date}|${(item.state || '').trim().toLowerCase()}|${(item.source_url || '').trim()}`;
+          if (!acc.seen.has(key)) {
+            acc.seen.add(key);
+            acc.result.push(item);
+          }
+          return acc;
+        }, { seen: new Set(), result: [] }).result;
+        setRawIncidents(deduped);
+        setFeedLastSynced(new Date());
+        setIsFeedSyncing(false);
+      })
+      .catch(err => { console.warn('Conflict feed auto-sync error:', err); setIsFeedSyncing(false); });
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -148,25 +175,6 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     }
     
     // Fetch data from Supabase REST API
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
-    
-    if (supabaseUrl && supabaseKey) {
-      // Fetch incidents from Supabase
-      fetch(`${supabaseUrl}/rest/v1/incidents?select=*`, {
-        headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`
-        }
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Supabase response error');
-        return res.json();
-      })
-      .then(dbIncidents => {
-        // Save raw incidents list to state
-        setRawIncidents(dbIncidents);
-
         // Group incidents by state name (lowercase)
         const stateTotals = {};
         dbIncidents.forEach(inc => {
@@ -2094,6 +2102,15 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   </span>
                 )}
 
+                {/* Sync Now button */}
+                <button
+                  type="button"
+                  onClick={fetchConflictFeed}
+                  className="ml-1 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-inter text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm hover:scale-102 active:scale-98 transition-all border-none outline-none cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Sync Now</span>
+                </button>
                 {/* Export feed report */}
                 <button
                   type="button"
