@@ -14,21 +14,13 @@ from supabase import create_client
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-try:
-    from social_publisher import publish_to_all_socials
-    SOCIAL_PUBLISHING_ENABLED = True
-except:
-    SOCIAL_PUBLISHING_ENABLED = False
-    def publish_to_all_socials(*args, **kwargs):
-        pass
-
-
 # ---------------- CONFIG ---------------- #
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -42,12 +34,10 @@ FEEDS = [
     "https://www.channelstv.com/feed/"
 ]
 
-SCRAPE_FROM_DATE = "2026-01-01"
-
 
 # ---------------- LOCK ---------------- #
 
-LOCK_FILE = "/tmp/conflict_scraper.lock"
+LOCK_FILE = "/tmp/scraper.lock"
 if os.path.exists(LOCK_FILE):
     print("SCRAPER ALREADY RUNNING")
     exit(0)
@@ -73,13 +63,12 @@ def semantic_fp(state, fatalities, incident_type):
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-# ---------------- RSS FETCH ---------------- #
+# ---------------- FETCH ---------------- #
 
-def fetch_full_article_text(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
+def fetch_full_article(url):
     try:
         time.sleep(random.uniform(2, 5))
-        r = requests.get(url, headers=headers, timeout=10)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         if r.status_code != 200:
             return ""
         soup = BeautifulSoup(r.text, "html.parser")
@@ -89,17 +78,16 @@ def fetch_full_article_text(url):
         return ""
 
 
-# ---------------- NIGERIA DETECTION ---------------- #
+# ---------------- NIGERIA FILTER ---------------- #
 
-NIGERIA_ENTITIES = [
+NIGERIA_TERMS = [
     "nigeria","abuja","lagos","kaduna","kano","borno","plateau",
     "army","police","dss","bandits","boko haram","herdsmen"
 ]
 
 def nigeria_score(text):
     text = text.lower()
-    score = sum(1 for x in NIGERIA_ENTITIES if x in text)
-    return score
+    return sum(1 for t in NIGERIA_TERMS if t in text)
 
 
 def is_nigeria_related(title, text):
@@ -140,66 +128,79 @@ Text: {text}
         return None
 
 
+# ---------------- SAFE STORE ---------------- #
+
+def safe_store(payload):
+    if DRY_RUN:
+        print("[DRY RUN] INSERT:")
+        print(payload)
+        return {"dry_run": True}
+
+    return supabase.table("incidents").upsert(
+        payload,
+        on_conflict="content_fp"
+    ).execute()
+
+
 # ---------------- MAIN ---------------- #
 
 def run():
     print("STARTING SCRAPER")
+    print("DRY_RUN =", DRY_RUN)
+
+    stats = {
+        "feeds": 0,
+        "entries": 0,
+        "saved": 0,
+        "skipped_nigeria": 0,
+        "ai_failed": 0
+    }
 
     try:
         res = supabase.table("incidents").select("source_url").execute()
-        processed = {normalize_url(x["source_url"]) for x in res.data}
+        processed = set(x["source_url"] for x in res.data)
     except:
         processed = set()
 
     for feed in FEEDS:
+        stats["feeds"] += 1
         print("\nFEED:", feed)
 
         f = feedparser.parse(feed)
-        print("ENTRIES:", len(f.entries))
 
         for e in f.entries:
-            url = normalize_url(e.link)
+            stats["entries"] += 1
 
+            url = e.link
             if url in processed:
-                print("SKIP DUP URL")
                 continue
 
-            text = fetch_full_article_text(e.link)
+            text = fetch_full_article(url)
             if not text:
                 continue
 
             decision = is_nigeria_related(e.title, text)
 
             if decision is False:
-                print("SKIP NON-NIGERIA")
+                stats["skipped_nigeria"] += 1
                 continue
-
-            if decision == "borderline":
-                print("BORDERLINE (still processing)")
 
             print("PROCESSING:", e.title)
 
             ai = extract_incident(e.title, text)
-            print("AI RESULT:", ai)
-
             if not ai:
+                stats["ai_failed"] += 1
                 continue
 
+            import json
             try:
-                import json
                 data = json.loads(ai)
             except:
+                stats["ai_failed"] += 1
                 continue
 
             if not data.get("is_relevant"):
                 continue
-
-            cfp = content_fp(e.title, text)
-            sfp = semantic_fp(
-                data.get("state"),
-                data.get("fatalities", 0),
-                data.get("incident_type")
-            )
 
             payload = {
                 "date": datetime.today().strftime("%Y-%m-%d"),
@@ -210,27 +211,34 @@ def run():
                 "abductions": data.get("abductions", 0),
                 "summary": data.get("summary"),
                 "source_url": e.link,
-                "content_fp": cfp,
-                "semantic_fp": sfp
+                "content_fp": content_fp(e.title, text),
+                "semantic_fp": semantic_fp(
+                    data.get("state"),
+                    data.get("fatalities", 0),
+                    data.get("incident_type")
+                )
             }
 
             try:
-                supabase.table("incidents").upsert(
-                    payload,
-                    on_conflict="content_fp"
-                ).execute()
-
-                print("SAVED:", e.title)
+                safe_store(payload)
+                stats["saved"] += 1
                 processed.add(url)
-
-                publish_to_all_socials(payload["summary"], e.link)
+                print("SAVED:", e.title)
 
             except Exception as ex:
                 print("DB ERROR:", ex)
+
+    print("\n===== FINAL REPORT =====")
+    for k, v in stats.items():
+        print(k, ":", v)
+    print("========================")
 
 
 # ---------------- RUN ---------------- #
 
 if __name__ == "__main__":
-    run()
-    os.remove(LOCK_FILE)
+    try:
+        run()
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
