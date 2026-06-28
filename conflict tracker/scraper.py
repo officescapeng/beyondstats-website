@@ -65,6 +65,10 @@ FEEDS = [
     "https://www.channelstv.com/feed/"
 ]
 
+# Only log incidents on or after this date (inclusive)
+SCRAPE_FROM_DATE = "2026-01-01"
+
+
 def fetch_full_article_text(url):
     """Fetches webpage HTML with exponential backoff for rate limits and extracts paragraphs"""
     headers = {
@@ -258,8 +262,14 @@ def run_daily_scraper():
                 else:
                     date_str = datetime.today().strftime('%Y-%m-%d')
                 
+                # Date gate: skip articles published before Jan 1 2026
+                if date_str < SCRAPE_FROM_DATE:
+                    print(f"Skipping pre-2026 article ({date_str}): '{entry.title}'")
+                    continue
+                
                 # Fetch text summary or description
                 text_content = entry.get('summary') or entry.get('description') or ""
+
                 
                 # If summary is too short, fetch the full article webpage
                 if len(text_content) < 150:

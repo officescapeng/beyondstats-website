@@ -70,6 +70,14 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const [isFeedSyncing, setIsFeedSyncing] = useState(false);
   const [feedLastSynced, setFeedLastSynced] = useState(null);
 
+  // Export CSV panel state
+  const [exportPanelOpen, setExportPanelOpen] = useState(false);
+  const [exportTab, setExportTab] = useState('month'); // 'day' | 'month' | 'year'
+  const [exportDay, setExportDay] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  const [exportMonth, setExportMonth] = useState(new Date().getMonth()); // 0-11
+  const [exportYear, setExportYear] = useState(new Date().getFullYear());
+  const exportPanelRef = useRef(null);
+
   // State Comparison Selectors
   const [stateAId, setStateAId] = useState('fct');
   const [stateBId, setStateBId] = useState('kano');
@@ -90,12 +98,16 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   });
 
   const downloadMenuRef = useRef(null);
+  const exportButtonRef = useRef(null);
 
-  // Close dropdown on click outside
+  // Close dropdown / export panel on click outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target)) {
         setDownloadDropdownOpen(false);
+      }
+      if (exportPanelRef.current && !exportPanelRef.current.contains(event.target)) {
+        setExportPanelOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -341,49 +353,61 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     })).sort((a, b) => b.sortVal - a.sortVal);
   };
 
-  // Compile and download active conflict feed data as CSV (raw or aggregated)
-  const handleDownloadFeedReport = () => {
-    if (!rawIncidents || rawIncidents.length === 0) return;
-    
-    let csvContent = "data:text/csv;charset=utf-8,";
-    let filename = `Beyond_Observatory_Conflict_Feed_${feedViewMode.toUpperCase()}_${new Date().getFullYear()}.csv`;
+  // Export CSV: filter rawIncidents by a specific day, month, or year then download
+  const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-    if (feedViewMode === 'all') {
-      // Header Row for raw logs
-      csvContent += ["Date", "State", "Incident Type", "Fatalities", "Abductions", "Summary", "Source URL"].join(",") + "\n";
-      
-      // Data Rows
-      [...rawIncidents]
-        .sort((a, b) => new Date(b.date) - new Date(a.date))
-        .forEach(inc => {
-          const row = [
-            inc.date || '',
-            `"${(inc.state || '').replace(/"/g, '""')}"`,
-            `"${(inc.incident_type || '').replace(/"/g, '""')}"`,
-            inc.fatalities || 0,
-            inc.abductions || 0,
-            `"${(inc.summary || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
-            inc.source_url || ''
-          ];
-          csvContent += row.join(",") + "\n";
-        });
-    } else {
-      // Header Row for aggregated reports
-      csvContent += ["Period", "Total Incidents", "Total Fatalities", "Total Abductions", "Affected States"].join(",") + "\n";
-      
-      // Data Rows
-      getAggregatedFeedData().forEach(g => {
-        const row = [
-          g.period,
-          g.incidents,
-          g.fatalities,
-          g.abductions,
-          `"${(g.statesList || []).join(", ").replace(/"/g, '""')}"`
-        ];
-        csvContent += row.join(",") + "\n";
-      });
+  const handleExportCSV = () => {
+    if (!rawIncidents || rawIncidents.length === 0) {
+      alert('No incident data available to export.');
+      return;
     }
 
+    let filtered = [];
+    let fileLabel = '';
+
+    if (exportTab === 'day') {
+      // exportDay is YYYY-MM-DD
+      filtered = rawIncidents.filter(inc => inc.date === exportDay);
+      fileLabel = exportDay;
+    } else if (exportTab === 'month') {
+      // exportMonth 0-11, exportYear
+      const monthStr = String(exportMonth + 1).padStart(2, '0');
+      const prefix = `${exportYear}-${monthStr}`;
+      filtered = rawIncidents.filter(inc => inc.date && inc.date.startsWith(prefix));
+      fileLabel = `${MONTH_SHORT[exportMonth]}-${exportYear}`;
+    } else {
+      // year
+      const yearStr = String(exportYear);
+      filtered = rawIncidents.filter(inc => inc.date && inc.date.startsWith(yearStr));
+      fileLabel = yearStr;
+    }
+
+    filtered = [...filtered].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (filtered.length === 0) {
+      alert(`No incidents found for the selected period.`);
+      return;
+    }
+
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += ["Date", "State", "LGA", "Incident Type", "Fatalities", "Abductions", "Summary", "Source URL"].join(",") + "\n";
+
+    filtered.forEach(inc => {
+      const row = [
+        inc.date || '',
+        `"${(inc.state || '').replace(/"/g, '""')}"`,
+        `"${(inc.lga || '').replace(/"/g, '""')}"`,
+        `"${(inc.incident_type || '').replace(/"/g, '""')}"`,
+        inc.fatalities || 0,
+        inc.abductions || 0,
+        `"${(inc.summary || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+        inc.source_url || ''
+      ];
+      csvContent += row.join(",") + "\n";
+    });
+
+    const filename = `Beyond_Incidents_${fileLabel}.csv`;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -391,7 +415,12 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setExportPanelOpen(false);
   };
+
+  // Keep legacy handler for any remaining references
+  const handleDownloadByTimeframe = (tf) => {};
+  const handleDownloadFeedReport = () => {};
 
   useEffect(() => {
     const lastCheck = localStorage.getItem('beyond_dashboard_last_daily_check');
@@ -2082,7 +2111,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   <span className={`font-inter text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${isFeedSyncing ? 'text-amber-500' : 'text-emerald-500'}`}>
                     {isFeedSyncing
                       ? 'Syncing Feed...'
-                      : `Live · 2h Cycle · ${getEnrichedIncidents().length} Events`}
+                      : `Live · 2h Cycle · Showing 20 of ${getEnrichedIncidents().length}`}
                   </span>
                 </div>
                 {feedLastSynced && !isFeedSyncing && (
@@ -2091,15 +2120,165 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   </span>
                 )}
 
-                {/* Export feed report */}
-                <button
-                  type="button"
-                  onClick={handleDownloadFeedReport}
-                  className="ml-1 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-inter text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm hover:scale-102 active:scale-98 transition-all border-none outline-none cursor-pointer"
-                >
-                  <Download className="w-3 h-3" />
-                  <span>Export CSV</span>
-                </button>
+                {/* Export CSV — single button with popover panel */}
+                <div className="relative ml-1" ref={exportPanelRef}>
+                  <button
+                    ref={exportButtonRef}
+                    type="button"
+                    onClick={() => setExportPanelOpen(prev => !prev)}
+                    className={`px-3 py-1.5 rounded-lg font-inter text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-sm hover:scale-105 active:scale-95 transition-all border outline-none cursor-pointer ${
+                      isDarkMode
+                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                    }`}
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Export CSV</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${exportPanelOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Export popover panel */}
+                  {exportPanelOpen && (
+                    <div
+                      className={`absolute right-0 top-full mt-2 z-50 w-72 rounded-2xl shadow-2xl border p-4 ${
+                        isDarkMode
+                          ? 'bg-[#051630] border-white/10 text-white'
+                          : 'bg-white border-slate-200 text-slate-800'
+                      }`}
+                      style={{ minWidth: '280px' }}
+                    >
+                      {/* Panel header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-poppins font-bold text-[11px] uppercase tracking-wider">Export Conflict Data</span>
+                        <button
+                          type="button"
+                          onClick={() => setExportPanelOpen(false)}
+                          className={`p-1 rounded-lg border-none outline-none cursor-pointer ${
+                            isDarkMode ? 'text-slate-400 hover:text-white hover:bg-white/5' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                          }`}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Tab selector: Day / Month / Year */}
+                      <div className={`flex p-0.5 rounded-xl gap-0.5 text-[9px] font-bold mb-4 ${
+                        isDarkMode ? 'bg-white/5' : 'bg-slate-100'
+                      }`}>
+                        {['day', 'month', 'year'].map(tab => (
+                          <button
+                            key={tab}
+                            type="button"
+                            onClick={() => setExportTab(tab)}
+                            className={`flex-1 py-1.5 rounded-lg uppercase tracking-wider transition-all duration-150 border-none outline-none cursor-pointer ${
+                              exportTab === tab
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : isDarkMode ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            {tab === 'day' ? 'Day' : tab === 'month' ? 'Month' : 'Year'}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Day picker */}
+                      {exportTab === 'day' && (
+                        <div className="mb-4">
+                          <label className={`block text-[9px] font-bold uppercase tracking-widest mb-1.5 ${
+                            isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                          }`}>Select Date</label>
+                          <input
+                            type="date"
+                            value={exportDay}
+                            min="2026-01-01"
+                            max={new Date().toISOString().split('T')[0]}
+                            onChange={e => setExportDay(e.target.value)}
+                            className={`w-full px-3 py-2 rounded-xl text-[11px] font-mono border outline-none transition-all ${
+                              isDarkMode
+                                ? 'bg-white/5 border-white/10 text-white focus:border-emerald-500/60'
+                                : 'bg-slate-50 border-slate-200 text-slate-800 focus:border-emerald-400'
+                            }`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Month picker */}
+                      {exportTab === 'month' && (
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <label className={`text-[9px] font-bold uppercase tracking-widest ${
+                              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                            }`}>Select Month</label>
+                            <select
+                              value={exportYear}
+                              onChange={e => setExportYear(Number(e.target.value))}
+                              className={`text-[10px] font-bold rounded-lg px-2 py-1 border outline-none cursor-pointer ${
+                                isDarkMode
+                                  ? 'bg-white/5 border-white/10 text-white'
+                                  : 'bg-slate-50 border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              {[2026, 2027, 2028].map(y => (
+                                <option key={y} value={y}>{y}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m, i) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setExportMonth(i)}
+                                className={`py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wide border-none outline-none cursor-pointer transition-all ${
+                                  exportMonth === i
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : isDarkMode ? 'bg-white/5 text-slate-300 hover:bg-white/10' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Year picker */}
+                      {exportTab === 'year' && (
+                        <div className="mb-4">
+                          <label className={`block text-[9px] font-bold uppercase tracking-widest mb-2 ${
+                            isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                          }`}>Select Year</label>
+                          <div className="flex gap-2">
+                            {[2026, 2027, 2028].map(y => (
+                              <button
+                                key={y}
+                                type="button"
+                                onClick={() => setExportYear(y)}
+                                className={`flex-1 py-2 rounded-xl text-[11px] font-bold border-none outline-none cursor-pointer transition-all ${
+                                  exportYear === y
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : isDarkMode ? 'bg-white/5 text-slate-300 hover:bg-white/10' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {y}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Download action */}
+                      <button
+                        type="button"
+                        onClick={handleExportCSV}
+                        className="w-full py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-inter text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm hover:scale-102 active:scale-98 transition-all border-none outline-none cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Download CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2120,7 +2299,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   <tbody>
                     {getEnrichedIncidents()
                       .sort((a, b) => new Date(b.date) - new Date(a.date))
-                      .slice(0, 30)
+                      .slice(0, 20)
                       .map((inc, idx) => (
                         <tr 
                           key={idx}
