@@ -208,8 +208,7 @@ def run_daily_scraper():
                         processed_urls.add(entry.link)
                       
                     except Exception as db_err:
-                        # Silently pass on duplicate source_url unique key violations
-                        pass
+                        print(f"Database insertion failed for {entry.link}: {db_err}")
 
 def poll_and_post_sanity_updates():
     print("\nPolling Sanity CMS for new site posts (Articles & Publications)...")
