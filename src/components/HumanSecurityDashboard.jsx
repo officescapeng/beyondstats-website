@@ -1260,7 +1260,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         </div>
 
         {/* VIEW NAVIGATION TABS */}
-        <div className="flex border-b border-slate-200/20 dark:border-white/5 pb-0.5 mb-6 no-print">
+        <div className="flex overflow-x-auto whitespace-nowrap scrollbar-hide border-b border-slate-200/20 dark:border-white/5 pb-0.5 mb-6 no-print">
           {[
             { id: 'profile', label: 'Vulnerability Overview & Profile' },
             { id: 'projections', label: 'Risk Trend Projections' },
@@ -1269,7 +1269,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             <button
               key={tab.id}
               onClick={() => setDashboardTab(tab.id)}
-              className={`px-5 py-3 font-poppins text-xs font-bold uppercase tracking-wider transition-all duration-200 border-b-2 bg-transparent cursor-pointer outline-none ${
+              className={`px-5 py-3 font-poppins text-xs font-bold uppercase tracking-wider transition-all duration-200 border-b-2 bg-transparent cursor-pointer outline-none shrink-0 ${
                 dashboardTab === tab.id
                   ? 'border-[#39B54A] text-[#39B54A]'
                   : 'border-transparent opacity-50 hover:opacity-100 text-current'
@@ -1385,7 +1385,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           <div className={`lg:col-span-5 flex flex-col gap-6 p-6 rounded-3xl border text-left ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
             
             {/* Header select */}
-            <div className="flex justify-between items-start gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
                   Selected Profile
@@ -1971,7 +1971,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             
             {/* Table Comparison (LG: 7 columns) */}
             <div className="lg:col-span-7 overflow-x-auto w-full">
-              <table className="w-full text-sm text-left border-collapse">
+              <table className="w-full min-w-[500px] text-sm text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200/20 dark:border-white/5 text-xs opacity-50 uppercase tracking-widest">
                     <th className="py-3 px-2 font-poppins font-bold text-left">Pillar Indicator</th>
@@ -2103,9 +2103,9 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               </div>
             </div>
 
-            <div className="overflow-y-auto max-h-[300px] w-full border border-slate-200/10 dark:border-white/5 rounded-2xl pr-1">
+            <div className="overflow-y-auto overflow-x-auto max-h-[300px] w-full border border-slate-200/10 dark:border-white/5 rounded-2xl pr-1">
               {feedViewMode === 'all' ? (
-                <table className="w-full text-sm text-left border-collapse">
+                <table className="w-full min-w-[650px] text-sm text-left border-collapse">
                   <thead className={`sticky top-0 z-10 ${isDarkMode ? 'bg-[#051630]' : 'bg-white'}`}>
                     <tr className="border-b border-slate-200/20 dark:border-white/5 text-[10px] opacity-65 uppercase tracking-widest">
                       <th className="py-3 px-2 font-poppins font-bold text-left">Date</th>
