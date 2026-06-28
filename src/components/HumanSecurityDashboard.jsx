@@ -358,8 +358,13 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const handleExportCSV = () => {
-    if (!rawIncidents || rawIncidents.length === 0) {
-      alert('No incident data available to export.');
+    // Use the same dataset the table displays; exclude mock placeholder entries
+    const allIncidents = getEnrichedIncidents().filter(
+      inc => inc.source_url && !String(inc.source_url).startsWith('mock-')
+    );
+
+    if (allIncidents.length === 0) {
+      alert('No incident data available to export. The scraper may not have logged any entries yet.');
       return;
     }
 
@@ -367,19 +372,16 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     let fileLabel = '';
 
     if (exportTab === 'day') {
-      // exportDay is YYYY-MM-DD
-      filtered = rawIncidents.filter(inc => inc.date === exportDay);
+      filtered = allIncidents.filter(inc => inc.date === exportDay);
       fileLabel = exportDay;
     } else if (exportTab === 'month') {
-      // exportMonth 0-11, exportYear
       const monthStr = String(exportMonth + 1).padStart(2, '0');
       const prefix = `${exportYear}-${monthStr}`;
-      filtered = rawIncidents.filter(inc => inc.date && inc.date.startsWith(prefix));
+      filtered = allIncidents.filter(inc => inc.date && inc.date.startsWith(prefix));
       fileLabel = `${MONTH_SHORT[exportMonth]}-${exportYear}`;
     } else {
-      // year
       const yearStr = String(exportYear);
-      filtered = rawIncidents.filter(inc => inc.date && inc.date.startsWith(yearStr));
+      filtered = allIncidents.filter(inc => inc.date && inc.date.startsWith(yearStr));
       fileLabel = yearStr;
     }
 
