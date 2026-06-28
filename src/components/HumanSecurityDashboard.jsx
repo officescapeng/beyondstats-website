@@ -126,10 +126,10 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     });
   };
 
-  // Run conflict feed fetch on mount then every 1 hour
+  // Run conflict feed fetch on mount then every 2 hours
   useEffect(() => {
     fetchConflictFeed();
-    const FEED_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+    const FEED_INTERVAL_MS = 2 * 60 * 60 * 1000; // 2 hours
     const feedTimer = setInterval(fetchConflictFeed, FEED_INTERVAL_MS);
     return () => clearInterval(feedTimer);
   }, []);
@@ -2082,7 +2082,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   <span className={`font-inter text-[9px] font-bold uppercase tracking-wider whitespace-nowrap ${isFeedSyncing ? 'text-amber-500' : 'text-emerald-500'}`}>
                     {isFeedSyncing
                       ? 'Syncing Feed...'
-                      : `Live · 1h Cycle · ${getEnrichedIncidents().length} Events`}
+                      : `Live · 2h Cycle · ${getEnrichedIncidents().length} Events`}
                   </span>
                 </div>
                 {feedLastSynced && !isFeedSyncing && (
