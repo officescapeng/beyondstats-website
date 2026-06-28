@@ -47,7 +47,6 @@ import {
   TrendingUp,
   X,
   ChevronDown,
-  Search
 } from 'lucide-react';
 
 export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
