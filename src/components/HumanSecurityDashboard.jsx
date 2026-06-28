@@ -38,17 +38,7 @@ import {
   Search
 } from 'lucide-react';
 import { supabase } from '../services/liveData/supabaseClient';
-import {
-  Sun,
-  Moon,
-  Info,
-  Scale,
-  ArrowUpRight,
-  TrendingUp,
-  X,
-  ChevronDown,
-  Search
-} from 'lucide-react';
+
 
 export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
   const [stateDataList, setStateDataList] = useState(STATIC_STATE_DATA);
