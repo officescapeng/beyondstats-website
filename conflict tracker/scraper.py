@@ -275,7 +275,7 @@ def run_daily_scraper():
                 time.sleep(2)
                 
                 if data and data.get("is_relevant"):
-                    state_name = data["state"].strip()
+                    state_name = (data.get("state") or "").strip()
                     try:
                         supabase.table("incidents").insert({
                             "date": date_str,
