@@ -3,7 +3,9 @@ import sys
 import time
 import random
 import hashlib
-from datetime import datetime
+import json
+import logging
+from datetime import datetime, timedelta
 from urllib.parse import urlsplit, parse_qsl, urlencode
 
 import feedparser
@@ -12,10 +14,17 @@ from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
 
+# Ensure the module path includes the script's directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# ---------------- CONFIG ---------------- #
+# ---------------- LOGGING SETUP ---------------- #
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
+# ---------------- CONFIG & CLIENTS ---------------- #
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
@@ -34,18 +43,16 @@ FEEDS = [
     "https://www.channelstv.com/feed/"
 ]
 
-
-# ---------------- LOCK ---------------- #
-
+# ---------------- CONCURRENCY LOCK ---------------- #
 LOCK_FILE = "/tmp/scraper.lock"
 if os.path.exists(LOCK_FILE):
-    print("SCRAPER ALREADY RUNNING")
+    logging.warning("SCRAPER ALREADY RUNNING. EXITING.")
     exit(0)
-open(LOCK_FILE, "w").write("running")
 
+with open(LOCK_FILE, "w") as f:
+    f.write("running")
 
-# ---------------- UTIL ---------------- #
-
+# ---------------- UTILITY FUNCTIONS ---------------- #
 def normalize_url(url):
     parts = urlsplit(url.lower().strip())
     keep = {"id", "slug", "article"}
@@ -58,31 +65,39 @@ def content_fp(title, text):
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-def semantic_fp(state, fatalities, incident_type):
-    base = f"{state}|{fatalities}|{incident_type}".lower()
+def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
+    # Normalize inputs to prevent hashing discrepancies from capitalization or missing data
+    state = str(state).strip().lower() if state else "unknown"
+    lga = str(lga).strip().lower() if lga else "unknown"
+    inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
+    
+    base = f"{date_str}|{state}|{lga}|{inc_type}|{fatalities}|{abductions}"
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-# ---------------- FETCH ---------------- #
-
+# ---------------- WEB SCRAPING ---------------- #
 def fetch_full_article(url):
     try:
         time.sleep(random.uniform(2, 5))
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        if r.status_code != 200:
-            return ""
+        r.raise_for_status()
+        
         soup = BeautifulSoup(r.text, "html.parser")
         paras = soup.find_all("p")
         return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:3000]
-    except:
+    except requests.exceptions.RequestException as e:
+        logging.warning(f"Network error fetching {url}: {e}")
+        return ""
+    except Exception as e:
+        logging.error(f"Unexpected error parsing {url}: {e}")
         return ""
 
 
-# ---------------- NIGERIA FILTER ---------------- #
-
+# ---------------- NIGERIA FILTER HEURISTIC ---------------- #
 NIGERIA_TERMS = [
-    "nigeria","abuja","lagos","kaduna","kano","borno","plateau",
-    "army","police","dss","bandits","boko haram","herdsmen"
+    "nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
+    "army", "police", "dss", "bandits", "boko haram", "herdsmen", 
+    "kidnap", "kidnapped", "abducted", "hostage", "ransom"
 ]
 
 def nigeria_score(text):
@@ -92,8 +107,6 @@ def nigeria_score(text):
 
 def is_nigeria_related(title, text):
     score = nigeria_score(title + " " + text)
-    print("Nigeria score:", score)
-
     if score >= 3:
         return True
     if 1 <= score < 3:
@@ -101,39 +114,56 @@ def is_nigeria_related(title, text):
     return False
 
 
-# ---------------- AI ---------------- #
-
-def extract_incident(title, text):
+# ---------------- AI INCIDENT EXTRACTION ---------------- #
+def extract_incident(title, text, retries=3):
     prompt = f"""
-Return JSON only.
+Return strictly valid JSON only. Do not include markdown formatting.
 
-If NOT Nigeria-related:
-{{"is_relevant": false}}
+If the article is NOT related to a Nigerian security incident (including terrorism, banditry, clashes, or kidnapping/abductions), return:
+{{"incidents": []}}
 
-Else extract:
-state, lga, incident_type, fatalities, abductions, summary
+If it is related, extract an array of distinct incidents under the key "incidents". 
+Each incident object must contain: state, lga, incident_type, fatalities, abductions, summary.
+Ensure you specifically capture kidnapping/abduction tracking metrics.
+
+EXAMPLE OUTPUT:
+{{
+    "incidents": [
+        {{
+            "state": "Kaduna",
+            "lga": "Chikun",
+            "incident_type": "kidnapping",
+            "fatalities": 1,
+            "abductions": 14,
+            "summary": "Gunmen raided a village overnight, killing one community member and taking 14 hostages into the forest."
+        }}
+    ]
+}}
 
 Title: {title}
 Text: {text}
 """
+    for attempt in range(retries):
+        try:
+            res = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+                temperature=0.1
+            )
+            return res.choices[0].message.content
+        except Exception as e:
+            logging.warning(f"Groq API error on attempt {attempt + 1}: {e}")
+            time.sleep(2)
+            
+    logging.error("Failed to extract context via AI after max retries.")
+    return None
 
-    try:
-        res = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
-        )
-        return res.choices[0].message.content
-    except:
-        return None
 
-
-# ---------------- SAFE STORE ---------------- #
-
+# ---------------- SAFE STORAGE ---------------- #
 def safe_store(payload):
     if DRY_RUN:
-        print("[DRY RUN] INSERT:")
-        print(payload)
+        logging.info(f"[DRY RUN] Target Payload Insert:\n{json.dumps(payload, indent=2)}")
         return {"dry_run": True}
 
     return supabase.table("incidents").upsert(
@@ -142,100 +172,133 @@ def safe_store(payload):
     ).execute()
 
 
-# ---------------- MAIN ---------------- #
-
+# ---------------- CORE PIPELINE ---------------- #
 def run():
-    print("STARTING SCRAPER")
-    print("DRY_RUN =", DRY_RUN)
+    logging.info("STARTING SECURITY SCRAPER PIPELINE")
+    logging.info(f"DRY_RUN status: {DRY_RUN}")
 
     stats = {
         "feeds": 0,
         "entries": 0,
-        "saved": 0,
+        "saved_incidents": 0,
         "skipped_nigeria": 0,
+        "semantic_duplicates": 0,
         "ai_failed": 0
     }
+    
+    current_date = datetime.today().strftime("%Y-%m-%d")
 
+    # --- SEMANTIC DEDUPLICATION (7-DAY LOOKBACK) ---
+    recent_semantic_fps = set()
     try:
-        res = supabase.table("incidents").select("source_url").execute()
-        processed = set(x["source_url"] for x in res.data)
-    except:
-        processed = set()
+        seven_days_ago = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
+        res = supabase.table("incidents").select("semantic_fp").gte("date", seven_days_ago).execute()
+        recent_semantic_fps = set(x["semantic_fp"] for x in res.data if x.get("semantic_fp"))
+        logging.info(f"Loaded {len(recent_semantic_fps)} recent semantic fingerprints for deduplication.")
+    except Exception as e:
+        logging.error(f"Failed to fetch recent semantic_fps from Supabase: {e}")
 
     for feed in FEEDS:
         stats["feeds"] += 1
-        print("\nFEED:", feed)
+        logging.info(f"Parsing Feed Source: {feed}")
 
         f = feedparser.parse(feed)
+        
+        # --- TECHNICAL URL DEDUPLICATION ---
+        current_urls = [e.link for e in f.entries]
+        processed_batch = set()
+        if current_urls:
+            try:
+                res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
+                processed_batch = set(x["source_url"] for x in res.data)
+            except Exception as e:
+                logging.error(f"Failed to fetch batch deduplication records: {e}")
 
         for e in f.entries:
             stats["entries"] += 1
-
             url = e.link
-            if url in processed:
+            
+            if url in processed_batch:
                 continue
 
             text = fetch_full_article(url)
             if not text:
                 continue
 
-            decision = is_nigeria_related(e.title, text)
-
-            if decision is False:
+            if is_nigeria_related(e.title, text) is False:
                 stats["skipped_nigeria"] += 1
                 continue
 
-            print("PROCESSING:", e.title)
+            logging.info(f"Processing candidate article: {e.title}")
 
-            ai = extract_incident(e.title, text)
-            if not ai:
+            ai_response = extract_incident(e.title, text)
+            if not ai_response:
                 stats["ai_failed"] += 1
                 continue
 
-            import json
             try:
-                data = json.loads(ai)
-            except:
+                data = json.loads(ai_response)
+                incidents_list = data.get("incidents", [])
+            except json.JSONDecodeError as ex:
+                logging.error(f"JSON parsing exception for entry {e.title}: {ex}")
                 stats["ai_failed"] += 1
                 continue
 
-            if not data.get("is_relevant"):
+            if not incidents_list:
+                stats["skipped_nigeria"] += 1
                 continue
 
-            payload = {
-                "date": datetime.today().strftime("%Y-%m-%d"),
-                "state": data.get("state"),
-                "lga": data.get("lga"),
-                "incident_type": data.get("incident_type"),
-                "fatalities": data.get("fatalities", 0),
-                "abductions": data.get("abductions", 0),
-                "summary": data.get("summary"),
-                "source_url": e.link,
-                "content_fp": content_fp(e.title, text),
-                "semantic_fp": semantic_fp(
-                    data.get("state"),
-                    data.get("fatalities", 0),
-                    data.get("incident_type")
+            base_article_fp = content_fp(e.title, text)
+
+            for idx, incident in enumerate(incidents_list):
+                
+                # Generate Semantic Fingerprint
+                sem_fp = semantic_fp(
+                    current_date,
+                    incident.get("state"),
+                    incident.get("lga"),
+                    incident.get("incident_type"),
+                    incident.get("fatalities", 0),
+                    incident.get("abductions", 0)
                 )
-            }
+                
+                # Check for Semantic Duplication
+                if sem_fp in recent_semantic_fps:
+                    logging.info(f"Semantic duplicate caught! Skipping incident in {incident.get('state')}.")
+                    stats["semantic_duplicates"] += 1
+                    continue
+                
+                # Add to local memory so we don't save it twice if it appears in the same run
+                recent_semantic_fps.add(sem_fp)
 
-            try:
-                safe_store(payload)
-                stats["saved"] += 1
-                processed.add(url)
-                print("SAVED:", e.title)
+                unique_content_fp = f"{base_article_fp}_{idx}"
 
-            except Exception as ex:
-                print("DB ERROR:", ex)
+                payload = {
+                    "date": current_date,
+                    "state": incident.get("state"),
+                    "lga": incident.get("lga"),
+                    "incident_type": incident.get("incident_type"),
+                    "fatalities": incident.get("fatalities", 0),
+                    "abductions": incident.get("abductions", 0),
+                    "summary": incident.get("summary"),
+                    "source_url": url,
+                    "content_fp": unique_content_fp,
+                    "semantic_fp": sem_fp
+                }
 
-    print("\n===== FINAL REPORT =====")
-    for k, v in stats.items():
-        print(k, ":", v)
-    print("========================")
+                try:
+                    safe_store(payload)
+                    stats["saved_incidents"] += 1
+                except Exception as ex:
+                    logging.error(f"Database insertion exception on '{e.title}' (Index {idx}): {ex}")
+
+    logging.info("\n===== PIPELINE FINAL EXECUTION REPORT =====")
+    for key, value in stats.items():
+        logging.info(f"{key.replace('_', ' ').title()}: {value}")
+    logging.info("===========================================")
 
 
-# ---------------- RUN ---------------- #
-
+# ---------------- EXECUTION RUNNER ---------------- #
 if __name__ == "__main__":
     try:
         run()
