@@ -120,6 +120,9 @@ If NOT Nigeria-related:
 Else extract:
 state, lga, incident_type, fatalities, abductions, summary
 
+Example JSON:
+{{"is_relevant": true, "state": "Lagos", "lga": "Ikeja", "incident_type": "Robbery", "fatalities": 0, "abductions": 0, "summary": "..."}}
+
 Title: {title}
 Text: {text}
 """
@@ -131,8 +134,16 @@ Text: {text}
             response_format={"type": "json_object"}
         )
         return res.choices[0].message.content
-    except:
-        return None
+    except Exception as e:
+        print("AI extraction error:", e)
+        # Fallback: treat as not relevant
+        return "{\"is_relevant\": false}"
+
+# Add a short pause to respect API rate limits
+def safe_extract(title, text):
+    result = extract_incident(title, text)
+    time.sleep(2)  # 2‑second cooldown per request
+    return result
 
 
 # ---------------- SAFE STORE ---------------- #
@@ -191,30 +202,36 @@ def run():
 
             print("PROCESSING:", e.title)
 
-            ai = extract_incident(e.title, text)
+            ai = safe_extract(e.title, text)
             if not ai:
+                print("AI call failed or returned None for", e.title)
                 stats["ai_failed"] += 1
                 continue
+
+            # Debug raw AI output
+            print("RAW AI RESPONSE:", ai.encode("utf-8", errors="replace").decode("utf-8"))
 
             import json
             try:
                 data = json.loads(ai)
-            except:
+            except json.JSONDecodeError as e:
+                print("JSON decode error:", e, "Raw:", ai)
                 stats["ai_failed"] += 1
                 continue
 
             if not data.get("is_relevant"):
                 continue
 
+            # Build payload with safe defaults – DB columns are NOT NULL
             payload = {
                 "date": datetime.today().strftime("%Y-%m-%d"),
-                "state": data.get("state"),
-                "lga": data.get("lga"),
-                "incident_type": data.get("incident_type"),
-                "fatalities": data.get("fatalities", 0),
-                "abductions": data.get("abductions", 0),
-                "summary": data.get("summary"),
-                "source_url": e.link
+                "state": data.get("state") or "",
+                "lga": data.get("lga") or "",
+                "incident_type": data.get("incident_type") or "Unspecified",
+                "fatalities": data.get("fatalities") if isinstance(data.get("fatalities"), (int, float)) else 0,
+                "abductions": data.get("abductions") if isinstance(data.get("abductions"), (int, float)) else 0,
+                "summary": data.get("summary") or "",
+                "source_url": e.link,
             }
 
             try:
