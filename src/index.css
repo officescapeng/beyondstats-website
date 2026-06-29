@@ -198,3 +198,8 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 1rem;
 }
+/* Print-only styling */
+.print-only-brief { display: none; }
+@media print {
+  .print-only-brief { display: block !important; }
+}
