@@ -12,6 +12,10 @@ from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
 
+# Load environment variables from .env in this folder
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # ---------------- CONFIG ---------------- #
@@ -135,11 +139,8 @@ def safe_store(payload):
         print("[DRY RUN] INSERT:")
         print(payload)
         return {"dry_run": True}
-
-    return supabase.table("incidents").upsert(
-        payload,
-        on_conflict="content_fp"
-    ).execute()
+    # Upsert using source_url as conflict key (assuming unique)
+    return supabase.table("incidents").upsert(payload, on_conflict="source_url").execute()
 
 
 # ---------------- MAIN ---------------- #
@@ -210,13 +211,7 @@ def run():
                 "fatalities": data.get("fatalities", 0),
                 "abductions": data.get("abductions", 0),
                 "summary": data.get("summary"),
-                "source_url": e.link,
-                "content_fp": content_fp(e.title, text),
-                "semantic_fp": semantic_fp(
-                    data.get("state"),
-                    data.get("fatalities", 0),
-                    data.get("incident_type")
-                )
+                "source_url": e.link
             }
 
             try:

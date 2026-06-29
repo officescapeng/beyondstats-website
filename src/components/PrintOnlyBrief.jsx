@@ -4,7 +4,7 @@ export default function PrintOnlyBrief({ activeState }) {
   if (!activeState) return null;
 
   return (
-    <div className="hidden print:block w-full p-10 bg-white text-slate-900">
+    <div className="w-full p-10 bg-white text-slate-900">
       <header className="border-b-2 border-slate-900 pb-6 mb-8">
         <h1 className="text-3xl font-bold uppercase tracking-tight">Executive Security Profile</h1>
         <p className="text-sm opacity-70">Generated: {new Date().toLocaleDateString()}</p>
