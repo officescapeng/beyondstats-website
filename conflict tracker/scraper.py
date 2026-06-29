@@ -41,11 +41,14 @@ FEEDS = [
 
 # ---------------- LOCK ---------------- #
 
-LOCK_FILE = "/tmp/scraper.lock"
+import tempfile, atexit
+LOCK_FILE = os.path.join(tempfile.gettempdir(), "scraper.lock")
 if os.path.exists(LOCK_FILE):
     print("SCRAPER ALREADY RUNNING")
     exit(0)
 open(LOCK_FILE, "w").write("running")
+# Ensure lock file is removed on exit
+atexit.register(lambda: os.path.exists(LOCK_FILE) and os.remove(LOCK_FILE))
 
 
 # ---------------- UTIL ---------------- #
