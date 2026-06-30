@@ -3087,7 +3087,7 @@ function App() {
       {currentPage === 'impact' && (
         <ImpactPage articles={sanityArticles} onArticleClick={setActiveArticle} />
       )}
-      */
+      */}
 
       {currentPage === 'partnerships' && (
         <SupportPartnershipsPage />
