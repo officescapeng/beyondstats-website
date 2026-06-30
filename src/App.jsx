@@ -71,9 +71,9 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
       { id: 'about', name: 'About Us' },
       { id: 'programs', name: 'Programs & What We Do' },
       { id: 'dashboard', name: 'HSRI Dashboard' },
-      { id: 'research', name: 'Research Hub & Publications' },
-      { id: 'impact', name: 'Impact Stories' },
-      { id: 'impact-map', name: 'Impact Map' },
+      // DISABLED: { id: 'research', name: 'Research Hub & Publications' },
+      // DISABLED: { id: 'impact', name: 'Impact Stories' },
+      // DISABLED: { id: 'impact-map', name: 'Impact Map' },
       { id: 'partnerships', name: 'Support & Partnerships' },
       { id: 'contact', name: 'Contact Us' }
     ]
@@ -90,8 +90,8 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   const links = [
     { name: 'About', id: 'about' },
     { name: 'Programs', id: 'programs', dropdown: true },
-    { name: 'Research', id: 'research' },
-    { name: 'Impact', id: 'impact', dropdown: true },
+    // DISABLED: { name: 'Research', id: 'research' },
+    // DISABLED: { name: 'Impact', id: 'impact', dropdown: true },
     { name: 'Contact', id: 'contact' }
   ]
 
@@ -148,18 +148,23 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                       </>
                     ) : (
                       <>
+                        {/* DISABLED: Our Impact Stories
                         <button
                           onClick={() => setCurrentPage('impact')}
                           className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           Our Impact Stories
                         </button>
+                        */}
+                        {/* DISABLED: Our Impact Map
                         <button
                           onClick={() => setCurrentPage('impact-map')}
                           className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           Our Impact Map
                         </button>
+                        */}
+                        <span className="font-inter text-[10px] text-white/30 px-4 py-2.5 block">Coming Soon</span>
                       </>
                     )}
                   </div>
@@ -394,10 +399,10 @@ function Footer({ setCurrentPage }) {
             {[
               { name: 'About', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              { name: 'Our Impact Map', id: 'impact-map' },
+              // DISABLED: { name: 'Our Impact Map', id: 'impact-map' },
               { name: 'Human Security Dashboard', id: 'dashboard' },
-              { name: 'Research & Deliverables', id: 'research' },
-              { name: 'Our Impact Stories', id: 'impact' },
+              // DISABLED: { name: 'Research & Deliverables', id: 'research' },
+              // DISABLED: { name: 'Our Impact Stories', id: 'impact' },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact', id: 'contact' }
             ].map((link) => (
@@ -2997,9 +3002,9 @@ function App() {
               { name: 'About Us', id: 'about' },
               { name: 'What We Do', id: 'programs' },
               { name: 'Human Security Dashboard', id: 'dashboard', indent: true },
-              { name: 'Research Hub', id: 'research' },
-              { name: 'Our Impact Stories', id: 'impact' },
-              { name: 'Our Impact Map', id: 'impact-map', indent: true },
+              // DISABLED: { name: 'Research Hub', id: 'research' },
+              // DISABLED: { name: 'Our Impact Stories', id: 'impact' },
+              // DISABLED: { name: 'Our Impact Map', id: 'impact-map', indent: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact Us', id: 'contact' }
             ].map((link, idx) => (
@@ -3059,9 +3064,11 @@ function App() {
         <ProgramsPage />
       )}
 
+      {/* DISABLED: Impact Map page — uncomment to reactivate
       {currentPage === 'impact-map' && (
         <ImpactMapPage />
       )}
+      */}
 
       {currentPage === 'dashboard' && (
         <HumanSecurityDashboard 
@@ -3070,13 +3077,17 @@ function App() {
         />
       )}
 
+      {/* DISABLED: Research page — uncomment to reactivate
       {currentPage === 'research' && (
         <ResearchPage publications={sanityPublications} />
       )}
+      */}
 
+      {/* DISABLED: Our Impact page — uncomment to reactivate
       {currentPage === 'impact' && (
         <ImpactPage articles={sanityArticles} onArticleClick={setActiveArticle} />
       )}
+      */
 
       {currentPage === 'partnerships' && (
         <SupportPartnershipsPage />
