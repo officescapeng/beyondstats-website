@@ -24,7 +24,12 @@ from supabase import create_client
 
 # Ensure the module path includes the script's directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")))
+local_env = os.path.abspath(os.path.join(os.path.dirname(__file__), ".env"))
+parent_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+if os.path.exists(local_env):
+    load_dotenv(dotenv_path=local_env)
+else:
+    load_dotenv(dotenv_path=parent_env)
 
 # ---------------- LOGGING SETUP ---------------- #
 logging.basicConfig(
