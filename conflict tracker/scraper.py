@@ -40,8 +40,8 @@ logging.basicConfig(
 
 # ---------------- CONFIG & CLIENTS ---------------- #
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY")
 
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 
