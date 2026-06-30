@@ -71,9 +71,9 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
       { id: 'about', name: 'About Us' },
       { id: 'programs', name: 'Programs & What We Do' },
       { id: 'dashboard', name: 'HSRI Dashboard' },
-      // DISABLED: { id: 'research', name: 'Research Hub & Publications' },
-      // DISABLED: { id: 'impact', name: 'Impact Stories' },
-      // DISABLED: { id: 'impact-map', name: 'Impact Map' },
+      { id: 'research', name: 'Research Hub & Publications', disabled: true },
+      { id: 'impact', name: 'Impact Stories', disabled: true },
+      { id: 'impact-map', name: 'Impact Map', disabled: true },
       { id: 'partnerships', name: 'Support & Partnerships' },
       { id: 'contact', name: 'Contact Us' }
     ]
@@ -111,84 +111,88 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
         {links.map((link) => {
           const isPrograms = link.id === 'programs';
           const isImpact = link.id === 'impact';
-          
+          const isDisabled = link.disabled;
+
           if (isPrograms || isImpact) {
             return (
               <div key={link.id} className="relative group/nav">
                 <button
-                  className={`font-inter text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1 cursor-pointer outline-none transition-colors ${
-                    currentPage === link.id ||
-                    (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard')) ||
-                    (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
-                      ? 'text-secondary'
-                      : 'text-white/80 hover:text-secondary'
+                  disabled={isDisabled}
+                  className={`font-inter text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1 outline-none transition-colors ${
+                    isDisabled
+                      ? 'text-white/30 cursor-not-allowed'
+                      : currentPage === link.id ||
+                        (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard')) ||
+                        (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
+                        ? 'text-secondary cursor-pointer'
+                        : 'text-white/80 hover:text-secondary cursor-pointer'
                   }`}
                 >
                   {link.name}
-                  <ChevronDown className="w-3.5 h-3.5 opacity-60 group-hover/nav:rotate-180 transition-transform duration-300" />
+                  {isDisabled
+                    ? <span className="ml-1 text-[8px] font-bold bg-white/10 text-white/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+                    : <ChevronDown className="w-3.5 h-3.5 opacity-60 group-hover/nav:rotate-180 transition-transform duration-300" />
+                  }
                 </button>
 
-                {/* Dropdown Menu */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
-                  <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
-                    {isPrograms ? (
-                      <>
-                        <button
-                          onClick={() => setCurrentPage('programs')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                        >
-                          What We Do
-                        </button>
-                        <button
-                          onClick={() => setCurrentPage('dashboard')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                        >
-                          HSRI Dashboard
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between px-4 py-2.5 opacity-40 cursor-not-allowed">
-                          <span className="font-inter text-[10px] font-bold text-white uppercase tracking-wider">Our Impact Stories</span>
-                          <span className="text-[8px] font-bold text-secondary/70 bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                        </div>
-                        <div className="flex items-center justify-between px-4 py-2.5 opacity-40 cursor-not-allowed">
-                          <span className="font-inter text-[10px] font-bold text-white uppercase tracking-wider">Our Impact Map</span>
-                          <span className="text-[8px] font-bold text-secondary/70 bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                        </div>
-                      </>
-                    )}
+                {/* Dropdown Menu — only shown when not disabled */}
+                {!isDisabled && (
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
+                    <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
+                      {isPrograms ? (
+                        <>
+                          <button
+                            onClick={() => setCurrentPage('programs')}
+                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          >
+                            What We Do
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage('dashboard')}
+                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          >
+                            HSRI Dashboard
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setCurrentPage('impact')}
+                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          >
+                            Our Impact Stories
+                          </button>
+                          <button
+                            onClick={() => setCurrentPage('impact-map')}
+                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          >
+                            Our Impact Map
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )
           }
 
           return (
-            link.disabled ? (
-              <div
-                key={link.id}
-                className="flex items-center gap-1.5 opacity-40 cursor-not-allowed select-none"
-              >
-                <span className="font-inter text-[11px] font-semibold uppercase tracking-widest text-white/80">
-                  {link.name}
-                </span>
-                <span className="text-[8px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-              </div>
-            ) : (
-              <button
-                key={link.id}
-                onClick={() => setCurrentPage(link.id)}
-                className={`font-inter text-[11px] font-semibold uppercase tracking-widest cursor-pointer outline-none transition-colors ${
-                  currentPage === link.id
-                    ? 'text-secondary'
-                    : 'text-white/80 hover:text-secondary'
-                }`}
-              >
+            <button
+              key={link.id}
+              onClick={isDisabled ? undefined : () => setCurrentPage(link.id)}
+              disabled={isDisabled}
+              className={`font-inter text-[11px] font-semibold uppercase tracking-widest outline-none transition-colors flex items-center gap-1 ${
+                isDisabled
+                  ? 'text-white/30 cursor-not-allowed'
+                  : currentPage === link.id
+                  ? 'text-secondary cursor-pointer'
+                  : 'text-white/80 hover:text-secondary cursor-pointer'
+              }`}
+            >
               {link.name}
+              {isDisabled && <span className="text-[8px] font-bold bg-white/10 text-white/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
             </button>
-            )
-          )
           )
         })}
       </div>
@@ -240,14 +244,20 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                         <button
                           key={page.id}
                           type="button"
-                          onClick={() => {
+                          disabled={page.disabled}
+                          onClick={page.disabled ? undefined : () => {
                             setCurrentPage(page.id)
                             setSearchQuery('')
                             setShowSuggestions(false)
                           }}
-                          className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold hover:text-[#39B54A] hover:bg-white/5 cursor-pointer bg-transparent border-none outline-none text-white/80"
+                          className={`w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold bg-transparent border-none outline-none flex items-center justify-between ${
+                            page.disabled
+                              ? 'text-white/30 cursor-not-allowed'
+                              : 'hover:text-[#39B54A] hover:bg-white/5 cursor-pointer text-white/80'
+                          }`}
                         >
                           {page.name}
+                          {page.disabled && <span className="text-[8px] font-bold bg-white/10 text-white/25 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
                         </button>
                       ))}
                     </div>
@@ -410,23 +420,19 @@ function Footer({ setCurrentPage }) {
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact', id: 'contact' }
             ].map((link) => (
-              link.disabled ? (
-                <div
-                  key={link.id}
-                  className="flex items-center gap-2 opacity-40 cursor-not-allowed"
-                >
-                  <span className="font-inter text-[11px] text-white/60">{link.name}</span>
-                  <span className="text-[8px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                </div>
-              ) : (
-                <button
-                  key={link.id}
-                  onClick={() => setCurrentPage(link.id)}
-                  className="font-inter text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer text-left outline-none bg-transparent border-none"
-                >
-                  {link.name}
-                </button>
-              )
+              <button
+                key={link.id}
+                onClick={link.disabled ? undefined : () => setCurrentPage(link.id)}
+                disabled={link.disabled}
+                className={`font-inter text-[11px] transition-colors text-left outline-none bg-transparent border-none flex items-center gap-1.5 ${
+                  link.disabled
+                    ? 'text-white/25 cursor-not-allowed'
+                    : 'text-white/60 hover:text-white cursor-pointer'
+                }`}
+              >
+                {link.name}
+                {link.disabled && <span className="text-[8px] font-bold bg-white/10 text-white/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
+              </button>
             ))}
           </div>
         </div>
@@ -3022,38 +3028,23 @@ function App() {
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact Us', id: 'contact' }
             ].map((link, idx) => (
-              link.disabled ? (
-                <div
-                  key={link.id}
-                  className={`flex items-center gap-3 opacity-40 cursor-not-allowed ${
-                    link.indent ? 'pl-6' : ''
-                  }`}
-                  style={{ animationDelay: `${idx * 0.1}s` }}
-                >
-                  <span className={`font-poppins font-bold uppercase ${
-                    link.indent ? 'text-lg tracking-wider text-white/60' : 'text-2xl tracking-widest text-white'
-                  }`}>{link.name}</span>
-                  <span className="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                </div>
-              ) : (
-                <button
-                  key={link.id}
-                  onClick={() => {
-                    setCurrentPage(link.id)
-                    setIsMenuOpen(false)
-                  }}
-                  className={`transition-all duration-300 animate-fade-up block text-left outline-none border-none bg-transparent ${
-                    link.indent 
-                      ? 'pl-6 text-white/60 hover:text-[#39B54A] text-lg font-poppins font-semibold uppercase tracking-wider' 
-                      : 'text-white hover:text-secondary text-2xl font-poppins font-bold uppercase tracking-widest'
-                  } ${
-                    currentPage === link.id ? 'text-secondary' : ''
-                  }`}
-                  style={{ animationDelay: `${idx * 0.1}s` }}
-                >
-                  {link.name}
-                </button>
-              )
+              <button
+                key={link.id}
+                onClick={() => {
+                  setCurrentPage(link.id)
+                  setIsMenuOpen(false)
+                }}
+                className={`transition-all duration-300 animate-fade-up block text-left outline-none border-none bg-transparent ${
+                  link.indent 
+                    ? 'pl-6 text-white/60 hover:text-[#39B54A] text-lg font-poppins font-semibold uppercase tracking-wider' 
+                    : 'text-white hover:text-secondary text-2xl font-poppins font-bold uppercase tracking-widest'
+                } ${
+                  currentPage === link.id ? 'text-secondary' : ''
+                }`}
+                style={{ animationDelay: `${idx * 0.1}s` }}
+              >
+                {link.name}
+              </button>
             ))}
           </div>
 
