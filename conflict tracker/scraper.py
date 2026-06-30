@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+from dotenv import load_dotenv
 import random
 import hashlib
 import json
@@ -16,6 +17,7 @@ from supabase import create_client
 
 # Ensure the module path includes the script's directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
 
 # ---------------- LOGGING SETUP ---------------- #
 logging.basicConfig(
@@ -44,7 +46,7 @@ FEEDS = [
 ]
 
 # ---------------- CONCURRENCY LOCK ---------------- #
-LOCK_FILE = "/tmp/scraper.lock"
+LOCK_FILE = os.path.join(os.path.dirname(__file__), "scraper.lock")
 if os.path.exists(LOCK_FILE):
     logging.warning("SCRAPER ALREADY RUNNING. EXITING.")
     exit(0)
