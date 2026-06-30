@@ -3,6 +3,13 @@ import sys
 import time
 from dotenv import load_dotenv
 import random
+
+# Custom headers to avoid 403 blocks
+CUSTOM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 import hashlib
 import json
 import logging
@@ -17,7 +24,7 @@ from supabase import create_client
 
 # Ensure the module path includes the script's directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-load_dotenv()
+load_dotenv(dotenv_path=os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env")))
 
 # ---------------- LOGGING SETUP ---------------- #
 logging.basicConfig(
@@ -56,6 +63,8 @@ with open(LOCK_FILE, "w") as f:
 
 # ---------------- UTILITY FUNCTIONS ---------------- #
 def normalize_url(url):
+    if not url:
+        return ""
     parts = urlsplit(url.lower().strip())
     keep = {"id", "slug", "article"}
     q = [(k, v) for k, v in parse_qsl(parts.query) if k in keep]
@@ -81,7 +90,7 @@ def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
 def fetch_full_article(url):
     try:
         time.sleep(random.uniform(2, 5))
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        r = requests.get(url, headers=CUSTOM_HEADERS, timeout=10)
         r.raise_for_status()
         
         soup = BeautifulSoup(r.text, "html.parser")
@@ -207,21 +216,43 @@ def run():
         f = feedparser.parse(feed)
         
         # --- TECHNICAL URL DEDUPLICATION ---
-        current_urls = [e.link for e in f.entries]
+        current_urls = [normalize_url(e.link) for e in f.entries if e.get("link")]
         processed_batch = set()
         if current_urls:
-            try:
-                res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
-                processed_batch = set(x["source_url"] for x in res.data)
-            except Exception as e:
-                logging.error(f"Failed to fetch batch deduplication records: {e}")
+                # Retry up to 3 times to mitigate transient DNS/network errors
+                for attempt in range(3):
+                    try:
+                        res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
+                        processed_batch = set(normalize_url(x["source_url"]) for x in res.data if x.get("source_url"))
+                        break
+                    except Exception as e:
+                        logging.warning(f"Supabase batch dedup attempt {attempt+1} failed: {e}")
+                        if attempt == 2:
+                            raise
+                        time.sleep(2)
+                # If all attempts failed, log error
+                try:
+                    _ = processed_batch
+                except NameError:
+                    logging.error("Failed to fetch batch deduplication records after retries.")
 
         for e in f.entries:
             stats["entries"] += 1
-            url = e.link
+            url = normalize_url(e.link) if e.get("link") else ""
+            if not url:
+                continue
             
             if url in processed_batch:
                 continue
+
+            # Get article publication date
+            pub_date = current_date
+            t = e.get("published_parsed") or e.get("updated_parsed")
+            if t:
+                try:
+                    pub_date = time.strftime("%Y-%m-%d", t)
+                except Exception:
+                    pass
 
             text = fetch_full_article(url)
             if not text:
@@ -256,7 +287,7 @@ def run():
                 
                 # Generate Semantic Fingerprint
                 sem_fp = semantic_fp(
-                    current_date,
+                    pub_date,
                     incident.get("state"),
                     incident.get("lga"),
                     incident.get("incident_type"),
@@ -276,7 +307,7 @@ def run():
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
                 payload = {
-                    "date": current_date,
+                    "date": pub_date,
                     "state": incident.get("state"),
                     "lga": incident.get("lga"),
                     "incident_type": incident.get("incident_type"),
