@@ -3064,11 +3064,9 @@ function App() {
         <ProgramsPage />
       )}
 
-      {/* DISABLED: Impact Map page — uncomment to reactivate
       {currentPage === 'impact-map' && (
         <ImpactMapPage />
       )}
-      */}
 
       {currentPage === 'dashboard' && (
         <HumanSecurityDashboard 
@@ -3077,17 +3075,13 @@ function App() {
         />
       )}
 
-      {/* DISABLED: Research page — uncomment to reactivate
       {currentPage === 'research' && (
         <ResearchPage publications={sanityPublications} />
       )}
-      */}
 
-      {/* DISABLED: Our Impact page — uncomment to reactivate
       {currentPage === 'impact' && (
         <ImpactPage articles={sanityArticles} onArticleClick={setActiveArticle} />
       )}
-      */}
 
       {currentPage === 'partnerships' && (
         <SupportPartnershipsPage />
