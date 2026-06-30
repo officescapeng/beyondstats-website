@@ -90,8 +90,8 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   const links = [
     { name: 'About', id: 'about' },
     { name: 'Programs', id: 'programs', dropdown: true },
-    // DISABLED: { name: 'Research', id: 'research' },
-    // DISABLED: { name: 'Impact', id: 'impact', dropdown: true },
+    { name: 'Research', id: 'research', disabled: true },
+    { name: 'Impact', id: 'impact', dropdown: true, disabled: true },
     { name: 'Contact', id: 'contact' }
   ]
 
@@ -148,23 +148,14 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                       </>
                     ) : (
                       <>
-                        {/* DISABLED: Our Impact Stories
-                        <button
-                          onClick={() => setCurrentPage('impact')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                        >
-                          Our Impact Stories
-                        </button>
-                        */}
-                        {/* DISABLED: Our Impact Map
-                        <button
-                          onClick={() => setCurrentPage('impact-map')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                        >
-                          Our Impact Map
-                        </button>
-                        */}
-                        <span className="font-inter text-[10px] text-white/30 px-4 py-2.5 block">Coming Soon</span>
+                        <div className="flex items-center justify-between px-4 py-2.5 opacity-40 cursor-not-allowed">
+                          <span className="font-inter text-[10px] font-bold text-white uppercase tracking-wider">Our Impact Stories</span>
+                          <span className="text-[8px] font-bold text-secondary/70 bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+                        </div>
+                        <div className="flex items-center justify-between px-4 py-2.5 opacity-40 cursor-not-allowed">
+                          <span className="font-inter text-[10px] font-bold text-white uppercase tracking-wider">Our Impact Map</span>
+                          <span className="text-[8px] font-bold text-secondary/70 bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+                        </div>
                       </>
                     )}
                   </div>
@@ -174,17 +165,30 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
           }
 
           return (
-            <button
-              key={link.id}
-              onClick={() => setCurrentPage(link.id)}
-              className={`font-inter text-[11px] font-semibold uppercase tracking-widest cursor-pointer outline-none transition-colors ${
-                currentPage === link.id
-                  ? 'text-secondary'
-                  : 'text-white/80 hover:text-secondary'
-              }`}
-            >
+            link.disabled ? (
+              <div
+                key={link.id}
+                className="flex items-center gap-1.5 opacity-40 cursor-not-allowed select-none"
+              >
+                <span className="font-inter text-[11px] font-semibold uppercase tracking-widest text-white/80">
+                  {link.name}
+                </span>
+                <span className="text-[8px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+              </div>
+            ) : (
+              <button
+                key={link.id}
+                onClick={() => setCurrentPage(link.id)}
+                className={`font-inter text-[11px] font-semibold uppercase tracking-widest cursor-pointer outline-none transition-colors ${
+                  currentPage === link.id
+                    ? 'text-secondary'
+                    : 'text-white/80 hover:text-secondary'
+                }`}
+              >
               {link.name}
             </button>
+            )
+          )
           )
         })}
       </div>
@@ -399,20 +403,30 @@ function Footer({ setCurrentPage }) {
             {[
               { name: 'About', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              // DISABLED: { name: 'Our Impact Map', id: 'impact-map' },
+              { name: 'Our Impact Map', id: 'impact-map', disabled: true },
               { name: 'Human Security Dashboard', id: 'dashboard' },
-              // DISABLED: { name: 'Research & Deliverables', id: 'research' },
-              // DISABLED: { name: 'Our Impact Stories', id: 'impact' },
+              { name: 'Research & Deliverables', id: 'research', disabled: true },
+              { name: 'Our Impact Stories', id: 'impact', disabled: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact', id: 'contact' }
             ].map((link) => (
-              <button
-                key={link.id}
-                onClick={() => setCurrentPage(link.id)}
-                className="font-inter text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer text-left outline-none bg-transparent border-none"
-              >
-                {link.name}
-              </button>
+              link.disabled ? (
+                <div
+                  key={link.id}
+                  className="flex items-center gap-2 opacity-40 cursor-not-allowed"
+                >
+                  <span className="font-inter text-[11px] text-white/60">{link.name}</span>
+                  <span className="text-[8px] font-bold text-secondary bg-secondary/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+                </div>
+              ) : (
+                <button
+                  key={link.id}
+                  onClick={() => setCurrentPage(link.id)}
+                  className="font-inter text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer text-left outline-none bg-transparent border-none"
+                >
+                  {link.name}
+                </button>
+              )
             ))}
           </div>
         </div>
@@ -3002,29 +3016,44 @@ function App() {
               { name: 'About Us', id: 'about' },
               { name: 'What We Do', id: 'programs' },
               { name: 'Human Security Dashboard', id: 'dashboard', indent: true },
-              // DISABLED: { name: 'Research Hub', id: 'research' },
-              // DISABLED: { name: 'Our Impact Stories', id: 'impact' },
-              // DISABLED: { name: 'Our Impact Map', id: 'impact-map', indent: true },
+              { name: 'Research Hub', id: 'research', disabled: true },
+              { name: 'Our Impact Stories', id: 'impact', disabled: true },
+              { name: 'Our Impact Map', id: 'impact-map', indent: true, disabled: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact Us', id: 'contact' }
             ].map((link, idx) => (
-              <button
-                key={link.id}
-                onClick={() => {
-                  setCurrentPage(link.id)
-                  setIsMenuOpen(false)
-                }}
-                className={`transition-all duration-300 animate-fade-up block text-left outline-none border-none bg-transparent ${
-                  link.indent 
-                    ? 'pl-6 text-white/60 hover:text-[#39B54A] text-lg font-poppins font-semibold uppercase tracking-wider' 
-                    : 'text-white hover:text-secondary text-2xl font-poppins font-bold uppercase tracking-widest'
-                } ${
-                  currentPage === link.id ? 'text-secondary' : ''
-                }`}
-                style={{ animationDelay: `${idx * 0.1}s` }}
-              >
-                {link.name}
-              </button>
+              link.disabled ? (
+                <div
+                  key={link.id}
+                  className={`flex items-center gap-3 opacity-40 cursor-not-allowed ${
+                    link.indent ? 'pl-6' : ''
+                  }`}
+                  style={{ animationDelay: `${idx * 0.1}s` }}
+                >
+                  <span className={`font-poppins font-bold uppercase ${
+                    link.indent ? 'text-lg tracking-wider text-white/60' : 'text-2xl tracking-widest text-white'
+                  }`}>{link.name}</span>
+                  <span className="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
+                </div>
+              ) : (
+                <button
+                  key={link.id}
+                  onClick={() => {
+                    setCurrentPage(link.id)
+                    setIsMenuOpen(false)
+                  }}
+                  className={`transition-all duration-300 animate-fade-up block text-left outline-none border-none bg-transparent ${
+                    link.indent 
+                      ? 'pl-6 text-white/60 hover:text-[#39B54A] text-lg font-poppins font-semibold uppercase tracking-wider' 
+                      : 'text-white hover:text-secondary text-2xl font-poppins font-bold uppercase tracking-widest'
+                  } ${
+                    currentPage === link.id ? 'text-secondary' : ''
+                  }`}
+                  style={{ animationDelay: `${idx * 0.1}s` }}
+                >
+                  {link.name}
+                </button>
+              )
             ))}
           </div>
 
