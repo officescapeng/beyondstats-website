@@ -3,13 +3,6 @@ import sys
 import time
 from dotenv import load_dotenv
 import random
-
-# Custom headers to avoid 403 blocks
-CUSTOM_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
 import hashlib
 import json
 import logging
@@ -21,6 +14,13 @@ import requests
 from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
+
+# Custom headers to avoid 403 blocks
+CUSTOM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
 # Ensure the module path includes the script's directory
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -66,6 +66,15 @@ if os.path.exists(LOCK_FILE):
 with open(LOCK_FILE, "w") as f:
     f.write("running")
 
+# ---------------- NIGERIAN STATES VALIDATION MAP ---------------- #
+NIGERIAN_STATES = {
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
+    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
+    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
+}
+STATE_MAP = {s.lower(): s for s in NIGERIAN_STATES}
+
 # ---------------- UTILITY FUNCTIONS ---------------- #
 def normalize_url(url):
     if not url:
@@ -81,13 +90,17 @@ def content_fp(title, text):
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
-    # Normalize inputs to prevent hashing discrepancies from capitalization or missing data
+def semantic_fp(date_str, state, lga, incident_type):
+    """
+    STRICT MODE CRITERIA:
+    Drops casual numbers entirely. If an incident of the same type occurs in the 
+    same local geography on the same day, it is flagged as a duplicate.
+    """
     state = str(state).strip().lower() if state else "unknown"
     lga = str(lga).strip().lower() if lga else "unknown"
     inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
     
-    base = f"{date_str}|{state}|{lga}|{inc_type}|{fatalities}|{abductions}"
+    base = f"{date_str}|{state}|{lga}|{inc_type}"
     return hashlib.sha256(base.encode()).hexdigest()
 
 
@@ -108,14 +121,6 @@ def fetch_full_article(url):
         logging.error(f"Unexpected error parsing {url}: {e}")
         return ""
 
-
-# ---------------- NIGERIAN STATES VALIDATION LIST ---------------- #
-NIGERIAN_STATES = {
-    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
-    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
-    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
-    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
-}
 
 # ---------------- NIGERIA FILTER HEURISTIC ---------------- #
 NIGERIA_TERMS = [
@@ -192,7 +197,7 @@ def safe_store(payload):
 
     return supabase.table("incidents").upsert(
         payload,
-        on_conflict="content_fp"
+        on_conflict="semantic_fp"  # Enforce deduplication via the semantic hash fingerprint
     ).execute()
 
 
@@ -206,14 +211,13 @@ def cleanup_invalid_records():
             return
         
         to_delete = []
-        nigerian_states_lower = {s.lower() for s in NIGERIAN_STATES}
         for item in res.data:
-            state = item.get("state")
+            state = item.get("state", "").strip().lower()
             date_str = item.get("date")
             fp = item.get("content_fp")
             
             is_invalid = False
-            if not state or state.strip().lower() not in nigerian_states_lower:
+            if not state or state not in STATE_MAP:
                 is_invalid = True
             if not date_str or date_str < "2026-01-01":
                 is_invalid = True
@@ -222,7 +226,7 @@ def cleanup_invalid_records():
                 to_delete.append(fp)
                 
         if to_delete:
-            logging.info(f"Found {len(to_delete)} invalid records to delete from database.")
+            logging.info(f"Found {len(to_delete)} invalid records to clear.")
             for fp in to_delete:
                 try:
                     supabase.table("incidents").delete().eq("content_fp", fp).execute()
@@ -234,12 +238,12 @@ def cleanup_invalid_records():
     except Exception as e:
         logging.error(f"Error during database cleanup: {e}")
 
+
 # ---------------- CORE PIPELINE ---------------- #
 def run():
-    logging.info("STARTING SECURITY SCRAPER PIPELINE")
+    logging.info("STARTING STABILIZED SECURITY SCRAPER PIPELINE")
     logging.info(f"DRY_RUN status: {DRY_RUN}")
     
-    # Run active database validation & cleanup of old/bad data
     cleanup_invalid_records()
 
     stats = {
@@ -253,53 +257,41 @@ def run():
     
     current_date = datetime.today().strftime("%Y-%m-%d")
 
-    # --- SEMANTIC DEDUPLICATION (7-DAY LOOKBACK) ---
+    # --- AGGRESSIVE DEDUPLICATION: 14-DAY LOOKBACK WINDOW ---
     recent_semantic_fps = set()
     try:
-        seven_days_ago = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
-        res = supabase.table("incidents").select("semantic_fp").gte("date", seven_days_ago).execute()
+        fourteen_days_ago = (datetime.today() - timedelta(days=14)).strftime("%Y-%m-%d")
+        res = supabase.table("incidents").select("semantic_fp").gte("date", fourteen_days_ago).execute()
         recent_semantic_fps = set(x["semantic_fp"] for x in res.data if x.get("semantic_fp"))
-        logging.info(f"Loaded {len(recent_semantic_fps)} recent semantic fingerprints for deduplication.")
+        logging.info(f"Loaded {len(recent_semantic_fps)} historical semantic fingerprints to prevent duplicity.")
     except Exception as e:
         logging.error(f"Failed to fetch recent semantic_fps from Supabase: {e}")
 
     for feed in FEEDS:
         stats["feeds"] += 1
         logging.info(f"Parsing Feed Source: {feed}")
-
         f = feedparser.parse(feed)
         
-        # --- TECHNICAL URL DEDUPLICATION ---
+        # --- TECHNICAL URL DEDUPLICATION SYSTEM ---
         current_urls = [normalize_url(e.link) for e in f.entries if e.get("link")]
         processed_batch = set()
+        
         if current_urls:
-                # Retry up to 3 times to mitigate transient DNS/network errors
-                for attempt in range(3):
-                    try:
-                        res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
-                        processed_batch = set(normalize_url(x["source_url"]) for x in res.data if x.get("source_url"))
-                        break
-                    except Exception as e:
-                        logging.warning(f"Supabase batch dedup attempt {attempt+1} failed: {e}")
-                        if attempt == 2:
-                            raise
-                        time.sleep(2)
-                # If all attempts failed, log error
+            for attempt in range(3):
                 try:
-                    _ = processed_batch
-                except NameError:
-                    logging.error("Failed to fetch batch deduplication records after retries.")
+                    res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
+                    processed_batch = set(normalize_url(x["source_url"]) for x in res.data if x.get("source_url"))
+                    break
+                except Exception as e:
+                    logging.warning(f"Supabase batch dedup attempt {attempt+1} failed: {e}")
+                    time.sleep(2)
 
         for e in f.entries:
             stats["entries"] += 1
             url = normalize_url(e.link) if e.get("link") else ""
-            if not url:
-                continue
-            
-            if url in processed_batch:
+            if not url or url in processed_batch:
                 continue
 
-            # Get article publication date
             pub_date = current_date
             t = e.get("published_parsed") or e.get("updated_parsed")
             if t:
@@ -309,10 +301,7 @@ def run():
                     pass
 
             text = fetch_full_article(url)
-            if not text:
-                continue
-
-            if is_nigeria_related(e.title, text) is False:
+            if not text or is_nigeria_related(e.title, text) is False:
                 stats["skipped_nigeria"] += 1
                 continue
 
@@ -338,45 +327,39 @@ def run():
             base_article_fp = content_fp(e.title, text)
 
             for idx, incident in enumerate(incidents_list):
-                # Validate state is a valid Nigerian state
-                state_val = incident.get("state")
-                if not state_val or state_val.strip().lower() not in {s.lower() for s in NIGERIAN_STATES}:
-                    logging.info(f"Skipping incident with invalid state: {state_val}")
+                state_val = incident.get("state", "").strip().lower()
+                
+                # Enforce clean geographical mapping
+                if state_val not in STATE_MAP:
+                    logging.info(f"Skipping incident with unmapped state classification: {incident.get('state')}")
                     continue
 
-                # Validate date is from January 2026 onwards
                 if pub_date < "2026-01-01":
-                    logging.info(f"Skipping old incident from {pub_date}")
+                    logging.info(f"Skipping chronological historical exception: {pub_date}")
                     continue
                 
-                # Generate Semantic Fingerprint
-                sem_fp = semantic_fp(
-                    pub_date,
-                    incident.get("state"),
-                    incident.get("lga"),
-                    incident.get("incident_type"),
-                    incident.get("fatalities", 0),
-                    incident.get("abductions", 0)
-                )
+                clean_state = STATE_MAP[state_val]
+                clean_lga = incident.get("lga", "Unknown").strip()
+                clean_type = incident.get("incident_type", "other").strip().lower()
                 
-                # Check for Semantic Duplication
+                # Evaluate Strict Semantic Fingerprint
+                sem_fp = semantic_fp(pub_date, clean_state, clean_lga, clean_type)
+                
                 if sem_fp in recent_semantic_fps:
-                    logging.info(f"Semantic duplicate caught! Skipping incident in {incident.get('state')}.")
+                    logging.info(f"Duplicity Guard Triggered! Dropping matching incident matrix in {clean_state} ({clean_lga}).")
                     stats["semantic_duplicates"] += 1
                     continue
                 
-                # Add to local memory so we don't save it twice if it appears in the same run
                 recent_semantic_fps.add(sem_fp)
-
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
                 payload = {
                     "date": pub_date,
-                    "state": incident.get("state"),
-                    "lga": incident.get("lga"),
-                    "incident_type": incident.get("incident_type"),
-                    "fatalities": incident.get("fatalities", 0),
-                    "abductions": incident.get("abductions", 0),
+                    "state": clean_state,
+                    "lga": clean_lga,
+                    "incident_type": clean_type,
+                    "fatalities": int(incident.get("fatalities", 0)),
+                    "abductions": int(incident.get("abductions", 0)),
                     "summary": incident.get("summary"),
                     "source_url": url,
                     "content_fp": unique_content_fp,
@@ -387,7 +370,7 @@ def run():
                     safe_store(payload)
                     stats["saved_incidents"] += 1
                 except Exception as ex:
-                    logging.error(f"Database insertion exception on '{e.title}' (Index {idx}): {ex}")
+                    logging.error(f"Database sync exception dropped: {ex}")
 
     logging.info("\n===== PIPELINE FINAL EXECUTION REPORT =====")
     for key, value in stats.items():
