@@ -93,7 +93,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   }, []);
 
   const fetchConflictFeed = () => {
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fzwanxywyjoszbybtxyj.supabase.co";
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
     if (!supabaseUrl || !supabaseKey) return;
     setIsFeedSyncing(true);
@@ -131,7 +131,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       });
     }
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fzwanxywyjoszbybtxyj.supabase.co";
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
     
     if (supabaseUrl && supabaseKey) {
