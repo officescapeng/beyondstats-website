@@ -146,6 +146,10 @@ def is_nigeria_related(title, text):
 
 # ---------------- AI INCIDENT EXTRACTION ---------------- #
 def extract_incident(title, text, retries=3):
+    if not client:
+        logging.error("Groq API client is not initialized. Check your GROQ_API_KEY.")
+        return None
+        
     prompt = f"""
 Return strictly valid JSON only. Do not include markdown formatting.
 
