@@ -230,41 +230,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   };
 
   const getEnrichedIncidents = () => {
-    const fallbackList = [
-      { date: "2026-06-26", state: "Borno", incident_type: "Terrorist Attack", fatalities: 4, abductions: 0, summary: "Security forces neutralized 4 insurgents in Gwoza LGA during routine clearance patrols.", source_url: "mock-1" },
-      { date: "2026-06-26", state: "Kaduna", incident_type: "Kidnapping", fatalities: 0, abductions: 8, summary: "Armed bandits abducted 8 farmers near Birnin Gwari; search and rescue teams deployed.", source_url: "mock-2" },
-      { date: "2026-06-25", state: "Zamfara", incident_type: "Banditry", fatalities: 2, abductions: 0, summary: "Local vigilantes repelled a bandit raid on a village in Maru LGA; 2 attackers killed.", source_url: "mock-3" },
-      { date: "2026-06-25", state: "Rivers", incident_type: "Pipeline Vandalism", fatalities: 1, abductions: 0, summary: "Joint task force arrested 3 suspects during pipeline interdiction raid in Ogoniland.", source_url: "mock-4" },
-      { date: "2026-06-24", state: "Plateau", incident_type: "Communal Clash", fatalities: 3, abductions: 0, summary: "Clashes reported between farming communities in Mangu LGA; mobile police restored calm.", source_url: "mock-5" },
-      { date: "2026-06-24", state: "Katsina", incident_type: "Banditry", fatalities: 0, abductions: 12, summary: "Bandits intercepted passenger bus on Katsina-Jibia road, abducting 12 travelers.", source_url: "mock-6" },
-      { date: "2026-06-23", state: "Delta", incident_type: "Cultism", fatalities: 2, abductions: 0, summary: "Rival gang clash in Warri left 2 dead; state command increased urban patrols.", source_url: "mock-7" },
-      { date: "2026-06-23", state: "Adamawa", incident_type: "Abduction", fatalities: 0, abductions: 3, summary: "Local trader and two relatives abducted from residence in Song LGA; ransom demanded.", source_url: "mock-8" },
-      { date: "2026-06-22", state: "Kano", incident_type: "Civil Unrest", fatalities: 1, abductions: 0, summary: "Market demonstration over trader disputes escalated; police dispersed crowds with teargas.", source_url: "mock-9" },
-      { date: "2026-06-22", state: "Anambra", incident_type: "Attack", fatalities: 2, abductions: 0, summary: "Gunmen attacked security checkpoint in Ihiala LGA; 2 assailants neutralized.", source_url: "mock-10" },
-      { date: "2026-06-21", state: "Taraba", incident_type: "Communal Clash", fatalities: 4, abductions: 0, summary: "Land boundary dispute flared between bordering villages in Lau LGA; peace talks initiated.", source_url: "mock-11" },
-      { date: "2026-06-21", state: "Sokoto", incident_type: "Banditry", fatalities: 0, abductions: 6, summary: "Gunmen raided a remote hamlet in Gwadabawa LGA, abducting 6 youth villagers.", source_url: "mock-12" },
-      { date: "2026-06-20", state: "Edo", incident_type: "Armed Robbery", fatalities: 1, abductions: 0, summary: "Armed robbery attempt on cash transit vehicle foiled by escort detail along Benin bypass.", source_url: "mock-13" },
-      { date: "2026-06-20", state: "Abia", incident_type: "Attack", fatalities: 0, abductions: 0, summary: "Government offices vandalized in Ohafia LGA; security cordoned off public buildings.", source_url: "mock-14" },
-      { date: "2026-06-19", state: "Borno", incident_type: "Security Force Operation", fatalities: 6, abductions: 0, summary: "Air force airstrikes hit insurgent camps in Sambisa forest, neutralizing 6 fighters.", source_url: "mock-15" },
-      { date: "2026-06-19", state: "Kaduna", incident_type: "Kidnapping", fatalities: 0, abductions: 10, summary: "Bandits attacked railway-adjacent community, abducting 10 residents.", source_url: "mock-16" },
-      { date: "2026-06-18", state: "Zamfara", incident_type: "Banditry", fatalities: 5, abductions: 0, summary: "Armed bandits clashed with local defense forces in Gusau LGA; 5 casualties reported.", source_url: "mock-17" },
-      { date: "2026-06-18", state: "Enugu", incident_type: "Civil Unrest", fatalities: 0, abductions: 0, summary: "Commercial transporters staged peaceful strike over high fuel costs in Enugu capital.", source_url: "mock-18" },
-      { date: "2026-06-17", state: "Oyo", incident_type: "Cultism", fatalities: 3, abductions: 0, summary: "Police arrested 8 suspects following cult clashes in Ibadan North; 3 deceased.", source_url: "mock-19" },
-      { date: "2026-06-17", state: "Lagos", incident_type: "Armed Robbery", fatalities: 0, abductions: 0, summary: "Local neighborhood guard detail foiled warehouse robbery attempt in Ikeja district.", source_url: "mock-20" }
-    ];
-
-    const combined = [...rawIncidents];
-    for (const fallback of fallbackList) {
-      if (combined.length >= 20) break;
-      const isDuplicate = combined.some(inc => 
-        inc.source_url === fallback.source_url || 
-        (inc.state === fallback.state && inc.date === fallback.date && inc.incident_type === fallback.incident_type)
-      );
-      if (!isDuplicate) {
-        combined.push(fallback);
-      }
-    }
-    return combined;
+    return rawIncidents;
   };
 
   const getAggregatedFeedData = () => {

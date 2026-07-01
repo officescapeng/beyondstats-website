@@ -35,16 +35,7 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
         });
         if (res.ok) {
           const data = await res.json();
-          // Merge incoming with fallback mocks to keep UI rich during dev
-          setLiveIncidents(prev => {
-            const merged = [...data];
-            prev.forEach(p => {
-              if (String(p.source_url).startsWith('mock-') && !merged.some(m => m.source_url === p.source_url)) {
-                merged.push(p);
-              }
-            });
-            return merged.sort((a, b) => new Date(b.date) - new Date(a.date));
-          });
+          setLiveIncidents(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
         }
       } catch (err) {
         console.warn("Live feed polling failed. Using cache.", err);
