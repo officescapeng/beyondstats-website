@@ -93,9 +93,9 @@ def content_fp(title, text):
 def semantic_fp(date_str, state, lga, incident_type):
     """
     STRICT MODE CRITERIA:
-    Drops casual numeric counts entirely to target structural duplication. If an 
-    incident of the same type occurs in the same local geography on the same day, 
-    it is treated as a tracking match.
+    Drops numerical metrics entirely to resolve reporting divergence between outlets. 
+    If an incident of the same structural type occurs within the same local geography 
+    on the exact same date, it evaluates as a processing duplicate.
     """
     state = str(state).strip().lower() if state else "unknown"
     lga = str(lga).strip().lower() if lga else "unknown"
@@ -198,7 +198,7 @@ def safe_store(payload):
 
     return supabase.table("incidents").upsert(
         payload,
-        on_conflict="semantic_fp"  -- Enforce deduplication matching using our semantic schema constraint
+        on_conflict="semantic_fp"  # Enforce structural deduplication using semantic index constraint
     ).execute()
 
 
@@ -337,67 +337,4 @@ def run():
                     continue
 
                 if pub_date < "2026-01-01":
-                    logging.info(f"Skipping chronological historical exception: {pub_date}")
-                    continue
-                
-                # --- STRATEGIC INT COUNT IMPACT VALIDATION ---
-                try:
-                    fatalities = int(incident.get("fatalities", 0))
-                    abductions = int(incident.get("abductions", 0))
-                except (ValueError, TypeError):
-                    fatalities = 0
-                    abductions = 0
-
-                # Strict Verification Trigger Rule: Drop any item missing vital empirical data
-                if fatalities == 0 and abductions == 0:
-                    logging.info(f"Strict Filter Dropped Low-Impact Entity (0 Fatalities, 0 Abductions) in {state_val}.")
-                    stats["skipped_no_impact"] += 1
-                    continue
-
-                clean_state = STATE_MAP[state_val]
-                clean_lga = incident.get("lga", "Unknown").strip()
-                clean_type = incident.get("incident_type", "other").strip().lower()
-                
-                # Evaluate Strict Semantic Fingerprint
-                sem_fp = semantic_fp(pub_date, clean_state, clean_lga, clean_type)
-                
-                if sem_fp in recent_semantic_fps:
-                    logging.info(f"Duplicity Guard Triggered! Dropping matching incident matrix in {clean_state} ({clean_lga}).")
-                    stats["semantic_duplicates"] += 1
-                    continue
-                
-                recent_semantic_fps.add(sem_fp)
-                unique_content_fp = f"{base_article_fp}_{idx}"
-
-                payload = {
-                    "date": pub_date,
-                    "state": clean_state,
-                    "lga": clean_lga,
-                    "incident_type": clean_type,
-                    "fatalities": fatalities,
-                    "abductions": abductions,
-                    "summary": incident.get("summary"),
-                    "source_url": url,
-                    "content_fp": unique_content_fp,
-                    "semantic_fp": sem_fp
-                }
-
-                try:
-                    safe_store(payload)
-                    stats["saved_incidents"] += 1
-                except Exception as ex:
-                    logging.error(f"Database sync exception dropped: {ex}")
-
-    logging.info("\n===== PIPELINE FINAL EXECUTION REPORT =====")
-    for key, value in stats.items():
-        logging.info(f"{key.replace('_', ' ').title()}: {value}")
-    logging.info("===========================================")
-
-
-# ---------------- EXECUTION RUNNER ---------------- #
-if __name__ == "__main__":
-    try:
-        run()
-    finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+                    logging.info(f"Skipping chronological historical exception
