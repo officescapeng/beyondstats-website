@@ -37,7 +37,7 @@ export default function PrintOnlyBrief({ activeState }) {
           </li>
           <li className="flex justify-between border-b border-slate-100 py-2">
             <span>Public Security</span>
-            <span className="font-mono font-bold">{activeState.risks.security}/100</span>
+            <span className="font-mono font-bold">{activeState.risks.peaceSecurity}/100</span>
           </li>
         </ul>
       </section>
