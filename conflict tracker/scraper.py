@@ -153,16 +153,19 @@ The article was published on: {article_date}.
 
 Return strictly valid JSON only. Do not include markdown formatting.
 
+CRITICAL AGGREGATE EXCLUSION RULE:
+If this article is a military press briefing, a monthly/quarterly operational review, or an aggregate summary of multiple events over a long period (e.g., "troops neutralised 224 terrorists over the second quarter"), you MUST IGNORE IT. Return: {{"incidents": []}}. We only track discrete, individual, localized field incidents.
+
 If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions, return:
 {{"incidents": []}}
 
-If it is a confirmed incident, extract an array of distinct incidents under the key "incidents". 
+If it is a confirmed, discrete incident, extract an array of distinct incidents under the key "incidents". 
 Each incident object must contain: state, lga, incident_type, fatalities, abductions, occurrence_date, summary.
 
 CRITICAL RULES:
 1. "incident_type" MUST be exactly one of these words: ["kidnapping", "banditry", "terrorism", "clash", "other"]. Do not use any other words.
-2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Use the article date ({article_date}) to calculate relative days (e.g. if the text says "yesterday", subtract 1 day from the article date). 
-3. If the article is a follow-up about an old incident from months or years ago (e.g. September 2025), calculate that exact date.
+2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Use the article date ({article_date}) to calculate relative days.
+3. Specifically capture kidnapping/abduction tracking metrics as integers.
 
 EXAMPLE OUTPUT:
 {{
