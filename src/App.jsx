@@ -717,22 +717,6 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
     },
     {
       id: 5,
-      date: "2026-05-14",
-      title: "How Local Partnerships Are Transforming Evidence Into Action",
-      excerpt: "Highlighting collaborative efforts between local governance structures and community actors to address sanitation and secondary schooling bottlenecks.",
-      featured_media_url: "/hero_women.png",
-      category: "Community Solutions"
-    },
-    {
-      id: 6,
-      date: "2026-05-02",
-      title: "Building Resilient Urban Infrastructure against Climate Risks",
-      excerpt: "An assessment of urban flooding vulnerabilities and municipal drainage responses in coastal Nigerian cities using community-sourced flood mapping.",
-      featured_media_url: "/nigerian_stakeholders.png",
-      category: "Climate Vulnerability"
-    },
-    {
-      id: 7,
       date: "2026-04-18",
       title: "Analyzing Regional Health Care Access in Rural Settlements",
       excerpt: "A data-driven appraisal of secondary health care facilities, medical staffing levels, and referral networks across remote local government areas.",
@@ -744,9 +728,11 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
   // Get exactly 7 articles, padded by fallbackNews if needed (using unique fallbacks)
   const news = React.useMemo(() => {
     let list = [...(articles || [])];
-    if (list.length < 7) {
+    if (list.length < 7 && fallbackNews.length > 0) {
       const needed = 7 - list.length;
-      list = [...list, ...fallbackNews.slice(list.length, list.length + needed)];
+      for (let i = 0; i < needed; i++) {
+        list.push(fallbackNews[i % fallbackNews.length]);
+      }
     }
     return list.slice(0, 7);
   }, [articles]);
@@ -762,11 +748,12 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
 
   // Auto scroll enabled with manual interaction reset
   useEffect(() => {
+    if (news.length === 0) return;
     const timer = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % 7);
+      setCurrentIndex((prev) => (prev + 1) % news.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, [currentIndex]);
+  }, [currentIndex, news.length]);
 
   const getTranslateX = () => {
     if (windowWidth >= 1024) { // lg (4 items)
@@ -1478,14 +1465,6 @@ function ImpactPage({ articles: sanityArticles, onArticleClick }) {
       excerpt: "Analyzing the role of citizen scorecards in driving institutional reforms and responsive health and education service provision in local government areas.",
       featured_media_url: "/community_lab.png",
       category: "Policy Insight"
-    },
-    {
-      id: 5,
-      date: "2026-05-14",
-      title: "How Local Partnerships Are Transforming Evidence Into Action",
-      excerpt: "Highlighting collaborative efforts between local governance structures and community actors to address sanitation and secondary schooling bottlenecks.",
-      featured_media_url: "/hero_women.png",
-      category: "Community Solutions"
     }
   ]
 
