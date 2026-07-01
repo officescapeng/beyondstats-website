@@ -522,7 +522,7 @@ function HomePage({ setCurrentPage }) {
     setErrorMsg('')
     setLoading(true)
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://fzwanxywyjoszbybtxyj.supabase.co";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     
     let success = false
