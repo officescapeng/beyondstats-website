@@ -93,8 +93,9 @@ def content_fp(title, text):
 def semantic_fp(date_str, state, lga, incident_type):
     """
     STRICT MODE CRITERIA:
-    Drops casual numbers entirely. If an incident of the same type occurs in the 
-    same local geography on the same day, it is flagged as a duplicate.
+    Drops casual numeric counts entirely to target structural duplication. If an 
+    incident of the same type occurs in the same local geography on the same day, 
+    it is treated as a tracking match.
     """
     state = str(state).strip().lower() if state else "unknown"
     lga = str(lga).strip().lower() if lga else "unknown"
@@ -148,10 +149,10 @@ def extract_incident(title, text, retries=3):
     prompt = f"""
 Return strictly valid JSON only. Do not include markdown formatting.
 
-If the article is NOT related to a Nigerian security incident (including terrorism, banditry, clashes, or kidnapping/abductions), return:
+If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions (i.e., both are zero or unconfirmed), return:
 {{"incidents": []}}
 
-If it is related, extract an array of distinct incidents under the key "incidents". 
+If it is a confirmed incident with active casualties or abductions, extract an array of distinct incidents under the key "incidents". 
 Each incident object must contain: state, lga, incident_type, fatalities, abductions, summary.
 Ensure you specifically capture kidnapping/abduction tracking metrics.
 
@@ -197,7 +198,7 @@ def safe_store(payload):
 
     return supabase.table("incidents").upsert(
         payload,
-        on_conflict="semantic_fp"  # Enforce deduplication via the semantic hash fingerprint
+        on_conflict="semantic_fp"  -- Enforce deduplication matching using our semantic schema constraint
     ).execute()
 
 
@@ -241,7 +242,7 @@ def cleanup_invalid_records():
 
 # ---------------- CORE PIPELINE ---------------- #
 def run():
-    logging.info("STARTING STABILIZED SECURITY SCRAPER PIPELINE")
+    logging.info("STARTING ULTRA-STRICT SECURITY SCRAPER PIPELINE")
     logging.info(f"DRY_RUN status: {DRY_RUN}")
     
     cleanup_invalid_records()
@@ -251,6 +252,7 @@ def run():
         "entries": 0,
         "saved_incidents": 0,
         "skipped_nigeria": 0,
+        "skipped_no_impact": 0,
         "semantic_duplicates": 0,
         "ai_failed": 0
     }
@@ -338,6 +340,20 @@ def run():
                     logging.info(f"Skipping chronological historical exception: {pub_date}")
                     continue
                 
+                # --- STRATEGIC INT COUNT IMPACT VALIDATION ---
+                try:
+                    fatalities = int(incident.get("fatalities", 0))
+                    abductions = int(incident.get("abductions", 0))
+                except (ValueError, TypeError):
+                    fatalities = 0
+                    abductions = 0
+
+                # Strict Verification Trigger Rule: Drop any item missing vital empirical data
+                if fatalities == 0 and abductions == 0:
+                    logging.info(f"Strict Filter Dropped Low-Impact Entity (0 Fatalities, 0 Abductions) in {state_val}.")
+                    stats["skipped_no_impact"] += 1
+                    continue
+
                 clean_state = STATE_MAP[state_val]
                 clean_lga = incident.get("lga", "Unknown").strip()
                 clean_type = incident.get("incident_type", "other").strip().lower()
@@ -358,8 +374,8 @@ def run():
                     "state": clean_state,
                     "lga": clean_lga,
                     "incident_type": clean_type,
-                    "fatalities": int(incident.get("fatalities", 0)),
-                    "abductions": int(incident.get("abductions", 0)),
+                    "fatalities": fatalities,
+                    "abductions": abductions,
                     "summary": incident.get("summary"),
                     "source_url": url,
                     "content_fp": unique_content_fp,
