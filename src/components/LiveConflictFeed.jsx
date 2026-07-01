@@ -322,7 +322,18 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
                       <td className="py-3.5 px-2 text-center font-mono font-bold text-rose-500">{cluster.latest.fatalities || 0}</td>
                       <td className="py-3.5 px-2 text-center font-mono font-bold text-amber-500">{cluster.latest.abductions || 0}</td>
                       <td className={`py-3.5 px-2 max-w-xs md:max-w-sm truncate ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`} title={cluster.latest.summary}>
-                        {cluster.latest.summary}
+                        {cluster.latest.source_url && !String(cluster.latest.source_url).startsWith('mock-') ? (
+                          <a 
+                            href={cluster.latest.source_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="hover:text-[#39B54A] hover:underline transition-all cursor-pointer"
+                          >
+                            {cluster.latest.summary}
+                          </a>
+                        ) : (
+                          cluster.latest.summary
+                        )}
                       </td>
                     </tr>
 
@@ -346,7 +357,18 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
                                       <span className="opacity-50">• Source: {subEvent.source_url ? new URL(subEvent.source_url.startsWith('http') ? subEvent.source_url : 'http://' + subEvent.source_url).hostname : 'registry'}</span>
                                     </div>
                                     <p className={`leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                                      {subEvent.summary}
+                                      {subEvent.source_url && !String(subEvent.source_url).startsWith('mock-') ? (
+                                        <a 
+                                          href={subEvent.source_url} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer" 
+                                          className="hover:text-[#39B54A] hover:underline transition-all cursor-pointer"
+                                        >
+                                          {subEvent.summary}
+                                        </a>
+                                      ) : (
+                                        subEvent.summary
+                                      )}
                                     </p>
                                   </div>
                                 </div>

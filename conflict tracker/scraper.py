@@ -109,6 +109,14 @@ def fetch_full_article(url):
         return ""
 
 
+# ---------------- NIGERIAN STATES VALIDATION LIST ---------------- #
+NIGERIAN_STATES = {
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
+    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
+    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
+}
+
 # ---------------- NIGERIA FILTER HEURISTIC ---------------- #
 NIGERIA_TERMS = [
     "nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
@@ -188,10 +196,51 @@ def safe_store(payload):
     ).execute()
 
 
+def cleanup_invalid_records():
+    if DRY_RUN:
+        return
+    try:
+        logging.info("Running database cleanup for invalid/non-Nigerian states and old dates...")
+        res = supabase.table("incidents").select("content_fp, state, date").execute()
+        if not res.data:
+            return
+        
+        to_delete = []
+        nigerian_states_lower = {s.lower() for s in NIGERIAN_STATES}
+        for item in res.data:
+            state = item.get("state")
+            date_str = item.get("date")
+            fp = item.get("content_fp")
+            
+            is_invalid = False
+            if not state or state.strip().lower() not in nigerian_states_lower:
+                is_invalid = True
+            if not date_str or date_str < "2026-01-01":
+                is_invalid = True
+                
+            if is_invalid and fp:
+                to_delete.append(fp)
+                
+        if to_delete:
+            logging.info(f"Found {len(to_delete)} invalid records to delete from database.")
+            for fp in to_delete:
+                try:
+                    supabase.table("incidents").delete().eq("content_fp", fp).execute()
+                except Exception as ex:
+                    logging.error(f"Failed to delete bad record {fp}: {ex}")
+            logging.info("Database cleanup completed successfully.")
+        else:
+            logging.info("No invalid records found in the database.")
+    except Exception as e:
+        logging.error(f"Error during database cleanup: {e}")
+
 # ---------------- CORE PIPELINE ---------------- #
 def run():
     logging.info("STARTING SECURITY SCRAPER PIPELINE")
     logging.info(f"DRY_RUN status: {DRY_RUN}")
+    
+    # Run active database validation & cleanup of old/bad data
+    cleanup_invalid_records()
 
     stats = {
         "feeds": 0,
@@ -289,6 +338,16 @@ def run():
             base_article_fp = content_fp(e.title, text)
 
             for idx, incident in enumerate(incidents_list):
+                # Validate state is a valid Nigerian state
+                state_val = incident.get("state")
+                if not state_val or state_val.strip().lower() not in {s.lower() for s in NIGERIAN_STATES}:
+                    logging.info(f"Skipping incident with invalid state: {state_val}")
+                    continue
+
+                # Validate date is from January 2026 onwards
+                if pub_date < "2026-01-01":
+                    logging.info(f"Skipping old incident from {pub_date}")
+                    continue
                 
                 # Generate Semantic Fingerprint
                 sem_fp = semantic_fp(
