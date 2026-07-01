@@ -143,23 +143,26 @@ def is_nigeria_related(title, text):
 
 
 # ---------------- AI INCIDENT EXTRACTION ---------------- #
-def extract_incident(title, text, retries=3):
+def extract_incident(title, text, article_date, retries=3):
     if not client:
         logging.error("Groq API client is not initialized. Check your GROQ_API_KEY.")
         return None
         
     prompt = f"""
+The article was published on: {article_date}.
+
 Return strictly valid JSON only. Do not include markdown formatting.
 
 If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions, return:
 {{"incidents": []}}
 
 If it is a confirmed incident, extract an array of distinct incidents under the key "incidents". 
-Each incident object must contain: state, lga, incident_type, fatalities, abductions, summary.
+Each incident object must contain: state, lga, incident_type, fatalities, abductions, occurrence_date, summary.
 
 CRITICAL RULES:
 1. "incident_type" MUST be exactly one of these words: ["kidnapping", "banditry", "terrorism", "clash", "other"]. Do not use any other words.
-2. Specifically capture kidnapping/abduction tracking metrics as integers.
+2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Use the article date ({article_date}) to calculate relative days (e.g. if the text says "yesterday", subtract 1 day from the article date). 
+3. If the article is a follow-up about an old incident from months or years ago (e.g. September 2025), calculate that exact date.
 
 EXAMPLE OUTPUT:
 {{
@@ -170,6 +173,7 @@ EXAMPLE OUTPUT:
             "incident_type": "kidnapping",
             "fatalities": 1,
             "abductions": 14,
+            "occurrence_date": "2026-06-30",
             "summary": "Gunmen raided a village overnight, killing one community member and taking 14 hostages into the forest."
         }}
     ]
@@ -259,7 +263,7 @@ def run():
         "feeds": 0,
         "entries": 0,
         "saved_incidents": 0,
-        "skipped_nigeria": 0,
+        "skipped_historical_events": 0,
         "skipped_no_impact": 0,
         "semantic_duplicates": 0,
         "semantic_duplicates_overwritten": 0,
@@ -320,12 +324,12 @@ def run():
 
             text = fetch_full_article(url)
             if not text or is_nigeria_related(e.title, text) is False:
-                stats["skipped_nigeria"] += 1
                 continue
 
             logging.info(f"Processing candidate article: {e.title}")
 
-            ai_response = extract_incident(e.title, text)
+            # Pass the publish date to the LLM so it can calculate the actual event date
+            ai_response = extract_incident(e.title, text, pub_date)
             if not ai_response:
                 stats["ai_failed"] += 1
                 continue
@@ -339,7 +343,6 @@ def run():
                 continue
 
             if not incidents_list:
-                stats["skipped_nigeria"] += 1
                 continue
 
             base_article_fp = content_fp(e.title, text)
@@ -352,8 +355,14 @@ def run():
                     logging.info(f"Skipping incident with unmapped state classification: {incident.get('state')}")
                     continue
 
-                if pub_date < "2026-07-01":
-                    logging.info(f"Skipping chronological historical exception: {pub_date}")
+                # The LLM extracted the actual date the incident occurred. 
+                # Fallback to pub_date if LLM failed to return an occurrence_date.
+                occurrence_date = incident.get("occurrence_date", pub_date)
+                
+                # HARD EVENT FILTER: Drop anything that actually happened before July 1, 2026.
+                if occurrence_date < "2026-07-01":
+                    logging.info(f"Skipping historical incident (Occurred: {occurrence_date}) despite recent publication ({pub_date}).")
+                    stats["skipped_historical_events"] += 1
                     continue
                 
                 # --- STRATEGIC INT COUNT IMPACT VALIDATION ---
@@ -375,8 +384,8 @@ def run():
                 clean_type = incident.get("incident_type", "other").strip().lower()
                 current_total_casualties = fatalities + abductions
                 
-                # Evaluate Strict Semantic Fingerprint
-                sem_fp = semantic_fp(pub_date, clean_state, clean_type)
+                # Evaluate Strict Semantic Fingerprint using the actual OCCURRENCE date, not the pub date.
+                sem_fp = semantic_fp(occurrence_date, clean_state, clean_type)
                 
                 # ACTIVE COMPARISON ENGINE
                 if sem_fp in recent_semantic_map:
@@ -398,7 +407,7 @@ def run():
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
                 payload = {
-                    "date": pub_date,
+                    "date": occurrence_date,  # Save the ACTUAL occurrence date to the database
                     "state": clean_state,
                     "lga": clean_lga,
                     "incident_type": clean_type,
