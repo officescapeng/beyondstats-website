@@ -371,6 +371,7 @@ def run():
                     continue
 
                 clean_state = STATE_MAP[state_val]
+                clean_lga = incident.get("lga", "Unknown").strip()
                 clean_type = incident.get("incident_type", "other").strip().lower()
                 current_total_casualties = fatalities + abductions
                 
@@ -399,7 +400,7 @@ def run():
                 payload = {
                     "date": pub_date,
                     "state": clean_state,
-                    "lga": incident.get("lga", "Unknown").strip(),
+                    "lga": clean_lga,
                     "incident_type": clean_type,
                     "fatalities": fatalities,
                     "abductions": abductions,
