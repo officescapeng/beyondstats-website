@@ -90,18 +90,16 @@ def content_fp(title, text):
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-def semantic_fp(date_str, state, lga, incident_type):
+def semantic_fp(date_str, state, incident_type):
     """
-    STRICT MODE CRITERIA:
-    Drops numerical metrics entirely to resolve reporting divergence between outlets. 
-    If an incident of the same structural type occurs within the same local geography 
-    on the exact same date, it evaluates as a processing duplicate.
+    NUCLEAR MODE CRITERIA:
+    Drops LGA and numerical metrics. If an incident of the same category occurs 
+    ANYWHERE in the same state on the exact same date, it evaluates as a duplicate.
     """
     state = str(state).strip().lower() if state else "unknown"
-    lga = str(lga).strip().lower() if lga else "unknown"
     inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
     
-    base = f"{date_str}|{state}|{lga}|{inc_type}"
+    base = f"{date_str}|{state}|{inc_type}"
     return hashlib.sha256(base.encode()).hexdigest()
 
 
@@ -153,12 +151,15 @@ def extract_incident(title, text, retries=3):
     prompt = f"""
 Return strictly valid JSON only. Do not include markdown formatting.
 
-If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions (i.e., both are zero or unconfirmed), return:
+If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions, return:
 {{"incidents": []}}
 
-If it is a confirmed incident with active casualties or abductions, extract an array of distinct incidents under the key "incidents". 
+If it is a confirmed incident, extract an array of distinct incidents under the key "incidents". 
 Each incident object must contain: state, lga, incident_type, fatalities, abductions, summary.
-Ensure you specifically capture kidnapping/abduction tracking metrics.
+
+CRITICAL RULES:
+1. "incident_type" MUST be exactly one of these words: ["kidnapping", "banditry", "terrorism", "clash", "other"]. Do not use any other words.
+2. Specifically capture kidnapping/abduction tracking metrics as integers.
 
 EXAMPLE OUTPUT:
 {{
@@ -200,9 +201,11 @@ def safe_store(payload):
         logging.info(f"[DRY RUN] Target Payload Insert:\n{json.dumps(payload, indent=2)}")
         return {"dry_run": True}
 
+    # Because of the unique semantic_fp constraint, this upsert will automatically overwrite
+    # the higher-casualty record with our newer, lower-casualty record.
     return supabase.table("incidents").upsert(
         payload,
-        on_conflict="semantic_fp"  # Enforce structural deduplication using semantic index constraint
+        on_conflict="semantic_fp"
     ).execute()
 
 
@@ -224,7 +227,8 @@ def cleanup_invalid_records():
             is_invalid = False
             if not state or state not in STATE_MAP:
                 is_invalid = True
-            if not date_str or date_str < "2026-01-01":
+            
+            if not date_str or date_str < "2026-07-01":
                 is_invalid = True
                 
             if is_invalid and fp:
@@ -258,18 +262,26 @@ def run():
         "skipped_nigeria": 0,
         "skipped_no_impact": 0,
         "semantic_duplicates": 0,
+        "semantic_duplicates_overwritten": 0,
         "ai_failed": 0
     }
     
     current_date = datetime.today().strftime("%Y-%m-%d")
 
-    # --- AGGRESSIVE DEDUPLICATION: 14-DAY LOOKBACK WINDOW ---
-    recent_semantic_fps = set()
+    # --- MEMORY MAP FOR ACTIVE LOWEST-NUMBER COMPARISON ---
+    recent_semantic_map = {}
     try:
         fourteen_days_ago = (datetime.today() - timedelta(days=14)).strftime("%Y-%m-%d")
-        res = supabase.table("incidents").select("semantic_fp").gte("date", fourteen_days_ago).execute()
-        recent_semantic_fps = set(x["semantic_fp"] for x in res.data if x.get("semantic_fp"))
-        logging.info(f"Loaded {len(recent_semantic_fps)} historical semantic fingerprints to prevent duplicity.")
+        # Pull down existing casualty totals for historical comparison
+        res = supabase.table("incidents").select("semantic_fp, fatalities, abductions").gte("date", fourteen_days_ago).execute()
+        
+        for item in res.data:
+            fp = item.get("semantic_fp")
+            if fp:
+                total_casualties = item.get("fatalities", 0) + item.get("abductions", 0)
+                recent_semantic_map[fp] = total_casualties
+                
+        logging.info(f"Loaded {len(recent_semantic_map)} historical fingerprints for strict comparison.")
     except Exception as e:
         logging.error(f"Failed to fetch recent semantic_fps from Supabase: {e}")
 
@@ -340,7 +352,7 @@ def run():
                     logging.info(f"Skipping incident with unmapped state classification: {incident.get('state')}")
                     continue
 
-                if pub_date < "2026-01-01":
+                if pub_date < "2026-07-01":
                     logging.info(f"Skipping chronological historical exception: {pub_date}")
                     continue
                 
@@ -359,24 +371,35 @@ def run():
                     continue
 
                 clean_state = STATE_MAP[state_val]
-                clean_lga = incident.get("lga", "Unknown").strip()
                 clean_type = incident.get("incident_type", "other").strip().lower()
+                current_total_casualties = fatalities + abductions
                 
                 # Evaluate Strict Semantic Fingerprint
-                sem_fp = semantic_fp(pub_date, clean_state, clean_lga, clean_type)
+                sem_fp = semantic_fp(pub_date, clean_state, clean_type)
                 
-                if sem_fp in recent_semantic_fps:
-                    logging.info(f"Duplicity Guard Triggered! Dropping matching incident matrix in {clean_state} ({clean_lga}).")
-                    stats["semantic_duplicates"] += 1
-                    continue
+                # ACTIVE COMPARISON ENGINE
+                if sem_fp in recent_semantic_map:
+                    existing_casualties = recent_semantic_map[sem_fp]
+                    
+                    if current_total_casualties < existing_casualties:
+                        logging.info(f"Lower casualty count found ({current_total_casualties} vs {existing_casualties}). Overwriting {clean_state} record.")
+                        # Update the local map so subsequent loop evaluations use this new baseline
+                        recent_semantic_map[sem_fp] = current_total_casualties
+                        stats["semantic_duplicates_overwritten"] += 1
+                    else:
+                        logging.info(f"Higher/Equal casualty count detected ({current_total_casualties} vs {existing_casualties}). Discarding duplicate.")
+                        stats["semantic_duplicates"] += 1
+                        continue
+                else:
+                    # New event, add to map
+                    recent_semantic_map[sem_fp] = current_total_casualties
                 
-                recent_semantic_fps.add(sem_fp)
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
                 payload = {
                     "date": pub_date,
                     "state": clean_state,
-                    "lga": clean_lga,
+                    "lga": incident.get("lga", "Unknown").strip(),
                     "incident_type": clean_type,
                     "fatalities": fatalities,
                     "abductions": abductions,
