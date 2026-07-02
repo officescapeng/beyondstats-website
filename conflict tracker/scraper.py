@@ -91,10 +91,6 @@ def content_fp(title, text):
 
 
 def semantic_fp(date_str, state, lga, community, incident_type):
-    """
-    MODIFIED: Now includes LGA and Community in the hash. 
-    Two incidents in the same state/date but different communities will generate unique hashes.
-    """
     state = str(state).strip().lower() if state else "unknown"
     lga = str(lga).strip().lower() if lga else "unknown"
     community = str(community).strip().lower() if community else "unknown"
@@ -211,7 +207,6 @@ def safe_store(payload):
         logging.info(f"[DRY RUN] Target Payload Insert:\n{json.dumps(payload, indent=2)}")
         return {"dry_run": True}
 
-    # Upsert relies on the semantic_fp unique constraint in your Supabase table.
     return supabase.table("incidents").upsert(
         payload,
         on_conflict="semantic_fp"
@@ -237,7 +232,7 @@ def cleanup_invalid_records():
             if not state or state not in STATE_MAP:
                 is_invalid = True
             
-            if not date_str or date_str < "2026-07-01":
+            if not date_str or date_str < "2026-06-30":
                 is_invalid = True
                 
             if is_invalid and fp:
@@ -268,7 +263,6 @@ def run():
         "feeds": 0,
         "entries": 0,
         "saved_incidents": 0,
-        "skipped_historical_events": 0,
         "skipped_no_impact": 0,
         "semantic_duplicates": 0,
         "semantic_duplicates_overwritten": 0,
@@ -359,11 +353,6 @@ def run():
 
                 occurrence_date = incident.get("occurrence_date", pub_date)
                 
-                if occurrence_date < "2026-07-01":
-                    logging.info(f"Skipping historical incident (Occurred: {occurrence_date}) despite recent publication ({pub_date}).")
-                    stats["skipped_historical_events"] += 1
-                    continue
-                
                 try:
                     fatalities = int(incident.get("fatalities", 0))
                     abductions = int(incident.get("abductions", 0))
@@ -385,7 +374,7 @@ def run():
                 # Evaluate Strict Semantic Fingerprint using the granular location data
                 sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_community, clean_type)
                 
-                # ACTIVE COMPARISON ENGINE (MODIFIED LOGIC: Keep the higher casualty count)
+                # ACTIVE COMPARISON ENGINE (Strict deduplication active for ALL recovered incidents)
                 if sem_fp in recent_semantic_map:
                     existing_casualties = recent_semantic_map[sem_fp]
                     
@@ -402,7 +391,6 @@ def run():
                 
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
-                # MODIFIED: Payload now includes community
                 payload = {
                     "date": occurrence_date, 
                     "state": clean_state,
