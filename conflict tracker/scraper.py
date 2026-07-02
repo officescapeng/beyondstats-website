@@ -15,24 +15,20 @@ from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
 
-# Custom headers to avoid 403 blocks
+# ---------------- CONFIG & CLIENTS ---------------- #
+# Ensure module path includes the script's directory
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+load_dotenv()
+
 CUSTOM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-load_dotenv()
-
-# ---------------- LOGGING SETUP ---------------- #
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler(sys.stdout)])
-
-# ---------------- CONFIG & CLIENTS ---------------- #
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("VITE_SUPABASE_ANON_KEY")
-DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
 
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -62,12 +58,29 @@ INCIDENT_CATEGORIES = [
     "Urban gang and street thug violence (Area Boys / Yan Shara)", "Border clashes and transnational crime"
 ]
 
-# ---------------- UTILITY & AI ---------------- #
+# ---------------- UTILITY FUNCTIONS ---------------- #
 def normalize_url(url):
     parts = urlsplit(url.lower().strip())
     keep = {"id", "slug", "article"}
     q = [(k, v) for k, v in parse_qsl(parts.query) if k in keep]
     return parts._replace(query=urlencode(q)).geturl()
+
+def fetch_full_article(url):
+    try:
+        time.sleep(random.uniform(2, 5))
+        r = requests.get(url, headers=CUSTOM_HEADERS, timeout=10)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, "html.parser")
+        paras = soup.find_all("p")
+        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:3000]
+    except Exception as e:
+        logging.warning(f"Error fetching {url}: {e}")
+        return ""
+
+def is_nigeria_related(title, text):
+    terms = ["nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "bandits", "boko haram", "kidnap"]
+    score = sum(1 for t in terms if t in (title + text).lower())
+    return score >= 1
 
 def extract_incident(title, text, article_date):
     categories_str = '", "'.join(INCIDENT_CATEGORIES)
@@ -96,6 +109,8 @@ def run():
         f = feedparser.parse(feed)
         for e in f.entries:
             text = fetch_full_article(e.link)
+            if not is_nigeria_related(e.title, text): continue
+            
             ai_res = extract_incident(e.title, text, datetime.now().strftime("%Y-%m-%d"))
             incidents = json.loads(ai_res).get("incidents", [])
             
