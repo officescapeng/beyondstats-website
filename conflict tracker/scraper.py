@@ -90,16 +90,17 @@ def content_fp(title, text):
     return hashlib.sha256(base.encode()).hexdigest()
 
 
-def semantic_fp(date_str, state, incident_type):
+def semantic_fp(date_str, state, lga, community, incident_type):
     """
-    NUCLEAR MODE CRITERIA:
-    Drops LGA and numerical metrics. If an incident of the same category occurs 
-    ANYWHERE in the same state on the exact same date, it evaluates as a duplicate.
+    MODIFIED: Now includes LGA and Community in the hash. 
+    Two incidents in the same state/date but different communities will generate unique hashes.
     """
     state = str(state).strip().lower() if state else "unknown"
+    lga = str(lga).strip().lower() if lga else "unknown"
+    community = str(community).strip().lower() if community else "unknown"
     inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
     
-    base = f"{date_str}|{state}|{inc_type}"
+    base = f"{date_str}|{state}|{lga}|{community}|{inc_type}"
     return hashlib.sha256(base.encode()).hexdigest()
 
 
@@ -160,12 +161,13 @@ If the article is NOT related to a Nigerian security incident, or if the inciden
 {{"incidents": []}}
 
 If it is a confirmed, discrete incident, extract an array of distinct incidents under the key "incidents". 
-Each incident object must contain: state, lga, incident_type, fatalities, abductions, occurrence_date, summary.
+Each incident object must contain: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
 
 CRITICAL RULES:
 1. "incident_type" MUST be exactly one of these words: ["kidnapping", "banditry", "terrorism", "clash", "other"]. Do not use any other words.
 2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Use the article date ({article_date}) to calculate relative days.
 3. Specifically capture kidnapping/abduction tracking metrics as integers.
+4. "community" MUST be the specific village, town, neighborhood, or highway where the event occurred. If not mentioned, return "Unknown".
 
 EXAMPLE OUTPUT:
 {{
@@ -173,6 +175,7 @@ EXAMPLE OUTPUT:
         {{
             "state": "Kaduna",
             "lga": "Chikun",
+            "community": "Kujama",
             "incident_type": "kidnapping",
             "fatalities": 1,
             "abductions": 14,
@@ -208,8 +211,7 @@ def safe_store(payload):
         logging.info(f"[DRY RUN] Target Payload Insert:\n{json.dumps(payload, indent=2)}")
         return {"dry_run": True}
 
-    # Because of the unique semantic_fp constraint, this upsert will automatically overwrite
-    # the higher-casualty record with our newer, lower-casualty record.
+    # Upsert relies on the semantic_fp unique constraint in your Supabase table.
     return supabase.table("incidents").upsert(
         payload,
         on_conflict="semantic_fp"
@@ -275,11 +277,10 @@ def run():
     
     current_date = datetime.today().strftime("%Y-%m-%d")
 
-    # --- MEMORY MAP FOR ACTIVE LOWEST-NUMBER COMPARISON ---
+    # --- MEMORY MAP FOR ACTIVE HIGHEST-NUMBER COMPARISON ---
     recent_semantic_map = {}
     try:
         fourteen_days_ago = (datetime.today() - timedelta(days=14)).strftime("%Y-%m-%d")
-        # Pull down existing casualty totals for historical comparison
         res = supabase.table("incidents").select("semantic_fp, fatalities, abductions").gte("date", fourteen_days_ago).execute()
         
         for item in res.data:
@@ -331,7 +332,6 @@ def run():
 
             logging.info(f"Processing candidate article: {e.title}")
 
-            # Pass the publish date to the LLM so it can calculate the actual event date
             ai_response = extract_incident(e.title, text, pub_date)
             if not ai_response:
                 stats["ai_failed"] += 1
@@ -353,22 +353,17 @@ def run():
             for idx, incident in enumerate(incidents_list):
                 state_val = incident.get("state", "").strip().lower()
                 
-                # Enforce clean geographical mapping
                 if state_val not in STATE_MAP:
                     logging.info(f"Skipping incident with unmapped state classification: {incident.get('state')}")
                     continue
 
-                # The LLM extracted the actual date the incident occurred. 
-                # Fallback to pub_date if LLM failed to return an occurrence_date.
                 occurrence_date = incident.get("occurrence_date", pub_date)
                 
-                # HARD EVENT FILTER: Drop anything that actually happened before July 1, 2026.
                 if occurrence_date < "2026-07-01":
                     logging.info(f"Skipping historical incident (Occurred: {occurrence_date}) despite recent publication ({pub_date}).")
                     stats["skipped_historical_events"] += 1
                     continue
                 
-                # --- STRATEGIC INT COUNT IMPACT VALIDATION ---
                 try:
                     fatalities = int(incident.get("fatalities", 0))
                     abductions = int(incident.get("abductions", 0))
@@ -376,7 +371,6 @@ def run():
                     fatalities = 0
                     abductions = 0
 
-                # Strict Verification Trigger Rule: Drop any item missing vital empirical metrics
                 if fatalities == 0 and abductions == 0:
                     logging.info(f"Strict Filter Dropped Low-Impact Entity (0 Fatalities, 0 Abductions) in {state_val}.")
                     stats["skipped_no_impact"] += 1
@@ -384,35 +378,36 @@ def run():
 
                 clean_state = STATE_MAP[state_val]
                 clean_lga = incident.get("lga", "Unknown").strip()
+                clean_community = incident.get("community", "Unknown").strip()
                 clean_type = incident.get("incident_type", "other").strip().lower()
                 current_total_casualties = fatalities + abductions
                 
-                # Evaluate Strict Semantic Fingerprint using the actual OCCURRENCE date, not the pub date.
-                sem_fp = semantic_fp(occurrence_date, clean_state, clean_type)
+                # Evaluate Strict Semantic Fingerprint using the granular location data
+                sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_community, clean_type)
                 
-                # ACTIVE COMPARISON ENGINE
+                # ACTIVE COMPARISON ENGINE (MODIFIED LOGIC: Keep the higher casualty count)
                 if sem_fp in recent_semantic_map:
                     existing_casualties = recent_semantic_map[sem_fp]
                     
-                    if current_total_casualties < existing_casualties:
-                        logging.info(f"Lower casualty count found ({current_total_casualties} vs {existing_casualties}). Overwriting {clean_state} record.")
-                        # Update the local map so subsequent loop evaluations use this new baseline
+                    if current_total_casualties > existing_casualties:
+                        logging.info(f"Higher casualty count found ({current_total_casualties} vs {existing_casualties}). Overwriting {clean_state} record to retain maximum.")
                         recent_semantic_map[sem_fp] = current_total_casualties
                         stats["semantic_duplicates_overwritten"] += 1
                     else:
-                        logging.info(f"Higher/Equal casualty count detected ({current_total_casualties} vs {existing_casualties}). Discarding duplicate.")
+                        logging.info(f"Lower/Equal casualty count detected ({current_total_casualties} vs {existing_casualties}). Discarding duplicate.")
                         stats["semantic_duplicates"] += 1
                         continue
                 else:
-                    # New event, add to map
                     recent_semantic_map[sem_fp] = current_total_casualties
                 
                 unique_content_fp = f"{base_article_fp}_{idx}"
 
+                # MODIFIED: Payload now includes community
                 payload = {
-                    "date": occurrence_date,  # Save the ACTUAL occurrence date to the database
+                    "date": occurrence_date, 
                     "state": clean_state,
                     "lga": clean_lga,
+                    "community": clean_community,
                     "incident_type": clean_type,
                     "fatalities": fatalities,
                     "abductions": abductions,
