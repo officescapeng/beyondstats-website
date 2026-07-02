@@ -75,6 +75,16 @@ NIGERIAN_STATES = {
 }
 STATE_MAP = {s.lower(): s for s in NIGERIAN_STATES}
 
+INCIDENT_CATEGORIES = [
+    "Banditry", "Armed robbery", "Cult clashes", "Inter-communal clashes",
+    "Insurgency (Boko Haram / ISWAP)", "Separatist agitations (IPOB / ESN)",
+    "Farmer-herder conflicts", "Kidnapping for ransom", "Ethno-religious clashes",
+    "Electoral and political violence", "Extrajudicial killings and state security force enforcement",
+    "Mob violence and vigilantism (Jungle justice)", "Resource-control militancy (Oil bunkering and piracy)",
+    "Chieftaincy and traditional title tussles", "Boundary and land disputes",
+    "Urban gang and street thug violence (Area Boys / Yan Shara)", "Border clashes and transnational crime"
+]
+
 # ---------------- UTILITY FUNCTIONS ---------------- #
 def normalize_url(url):
     if not url:
@@ -84,21 +94,23 @@ def normalize_url(url):
     q = [(k, v) for k, v in parse_qsl(parts.query) if k in keep]
     return parts._replace(query=urlencode(q)).geturl()
 
-
 def content_fp(title, text):
     base = f"{title.lower()}::{text[:1000].lower()}"
     return hashlib.sha256(base.encode()).hexdigest()
 
-
-def semantic_fp(date_str, state, lga, community, incident_type):
+def semantic_fp(date_str, state, lga, incident_type):
+    """
+    MODIFIED TO FIX DUPLICATES: 
+    Removed 'community' from the hash. Now groups by Date + State + LGA + Type.
+    This ensures that if two newspapers spell a village name differently, 
+    they are still flagged as the same event and the duplicate is overwritten.
+    """
     state = str(state).strip().lower() if state else "unknown"
     lga = str(lga).strip().lower() if lga else "unknown"
-    community = str(community).strip().lower() if community else "unknown"
     inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
     
-    base = f"{date_str}|{state}|{lga}|{community}|{inc_type}"
+    base = f"{date_str}|{state}|{lga}|{inc_type}"
     return hashlib.sha256(base.encode()).hexdigest()
-
 
 # ---------------- WEB SCRAPING ---------------- #
 def fetch_full_article(url):
@@ -117,18 +129,16 @@ def fetch_full_article(url):
         logging.error(f"Unexpected error parsing {url}: {e}")
         return ""
 
-
 # ---------------- NIGERIA FILTER HEURISTIC ---------------- #
 NIGERIA_TERMS = [
     "nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
     "army", "police", "dss", "bandits", "boko haram", "herdsmen", 
-    "kidnap", "kidnapped", "abducted", "hostage", "ransom"
+    "kidnap", "kidnapped", "abducted", "hostage", "ransom", "cultists", "ipob"
 ]
 
 def nigeria_score(text):
     text = text.lower()
     return sum(1 for t in NIGERIA_TERMS if t in text)
-
 
 def is_nigeria_related(title, text):
     score = nigeria_score(title + " " + text)
@@ -138,12 +148,13 @@ def is_nigeria_related(title, text):
         return "borderline"
     return False
 
-
 # ---------------- AI INCIDENT EXTRACTION ---------------- #
 def extract_incident(title, text, article_date, retries=3):
     if not client:
         logging.error("Groq API client is not initialized. Check your GROQ_API_KEY.")
         return None
+        
+    categories_string = '", "'.join(INCIDENT_CATEGORIES)
         
     prompt = f"""
 The article was published on: {article_date}.
@@ -151,7 +162,7 @@ The article was published on: {article_date}.
 Return strictly valid JSON only. Do not include markdown formatting.
 
 CRITICAL AGGREGATE EXCLUSION RULE:
-If this article is a military press briefing, a monthly/quarterly operational review, or an aggregate summary of multiple events over a long period (e.g., "troops neutralised 224 terrorists over the second quarter"), you MUST IGNORE IT. Return: {{"incidents": []}}. We only track discrete, individual, localized field incidents.
+If this article is a military press briefing, a monthly/quarterly operational review, or an aggregate summary of multiple events over a long period, you MUST IGNORE IT. Return: {{"incidents": []}}. We only track discrete, individual, localized field incidents.
 
 If the article is NOT related to a Nigerian security incident, or if the incident reported does NOT contain any confirmed fatalities or abductions, return:
 {{"incidents": []}}
@@ -160,7 +171,7 @@ If it is a confirmed, discrete incident, extract an array of distinct incidents 
 Each incident object must contain: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
 
 CRITICAL RULES:
-1. "incident_type" MUST be exactly one of these words: ["kidnapping", "banditry", "terrorism", "clash", "other"]. Do not use any other words.
+1. "incident_type" MUST be exactly one of the following exact strings: ["{categories_string}"]. Do not use any other words.
 2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Use the article date ({article_date}) to calculate relative days.
 3. Specifically capture kidnapping/abduction tracking metrics as integers.
 4. "community" MUST be the specific village, town, neighborhood, or highway where the event occurred. If not mentioned, return "Unknown".
@@ -172,7 +183,7 @@ EXAMPLE OUTPUT:
             "state": "Kaduna",
             "lga": "Chikun",
             "community": "Kujama",
-            "incident_type": "kidnapping",
+            "incident_type": "Kidnapping for ransom",
             "fatalities": 1,
             "abductions": 14,
             "occurrence_date": "2026-06-30",
@@ -200,7 +211,6 @@ Text: {text}
     logging.error("Failed to extract context via AI after max retries.")
     return None
 
-
 # ---------------- SAFE STORAGE ---------------- #
 def safe_store(payload):
     if DRY_RUN:
@@ -211,7 +221,6 @@ def safe_store(payload):
         payload,
         on_conflict="semantic_fp"
     ).execute()
-
 
 def cleanup_invalid_records():
     if DRY_RUN:
@@ -250,7 +259,6 @@ def cleanup_invalid_records():
             logging.info("No invalid records found in the database.")
     except Exception as e:
         logging.error(f"Error during database cleanup: {e}")
-
 
 # ---------------- CORE PIPELINE ---------------- #
 def run():
@@ -292,7 +300,6 @@ def run():
         logging.info(f"Parsing Feed Source: {feed}")
         f = feedparser.parse(feed)
         
-        # --- TECHNICAL URL DEDUPLICATION SYSTEM ---
         current_urls = [normalize_url(e.link) for e in f.entries if e.get("link")]
         processed_batch = set()
         
@@ -368,11 +375,11 @@ def run():
                 clean_state = STATE_MAP[state_val]
                 clean_lga = incident.get("lga", "Unknown").strip()
                 clean_community = incident.get("community", "Unknown").strip()
-                clean_type = incident.get("incident_type", "other").strip().lower()
+                clean_type = incident.get("incident_type", "Other").strip()
                 current_total_casualties = fatalities + abductions
                 
-                # Evaluate Strict Semantic Fingerprint using the granular location data
-                sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_community, clean_type)
+                # Evaluate Strict Semantic Fingerprint (Community removed to merge duplicate newspaper reports)
+                sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_type)
                 
                 # ACTIVE COMPARISON ENGINE (Strict deduplication active for ALL recovered incidents)
                 if sem_fp in recent_semantic_map:
@@ -415,7 +422,6 @@ def run():
     for key, value in stats.items():
         logging.info(f"{key.replace('_', ' ').title()}: {value}")
     logging.info("===========================================")
-
 
 # ---------------- EXECUTION RUNNER ---------------- #
 if __name__ == "__main__":
