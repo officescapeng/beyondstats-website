@@ -763,3 +763,357 @@ def merge_duplicate_records():
             if len(records) > 1:
                 def score_record(r):
                     domain = extract_domain(r.get("source_url",
+              def merge_duplicate_records():
+    """Merge records with same semantic fingerprint keeping most reliable"""
+    if DRY_RUN:
+        return
+        
+    try:
+        all_records = supabase.table("incidents")\
+            .select("semantic_fp, content_fp, fatalities, abductions, source_url")\
+            .order("fatalities", desc=True)\
+            .execute()
+        
+        if not all_records.data:
+            return
+        
+        fp_groups = {}
+        for record in all_records.data:
+            fp = record.get("semantic_fp")
+            if fp:
+                if fp not in fp_groups:
+                    fp_groups[fp] = []
+                fp_groups[fp].append(record)
+        
+        merged = 0
+        for fp, records in fp_groups.items():
+            if len(records) > 1:
+                def score_record(r):
+                    domain = extract_domain(r.get("source_url", ""))
+                    reliability = SOURCE_RELIABILITY.get(domain, 0.5)
+                    casualties = (r.get("fatalities", 0) or 0) + (r.get("abductions", 0) or 0)
+                    return (reliability * 10) + casualties
+                
+                best = max(records, key=score_record)
+                for record in records:
+                    if record["content_fp"] != best["content_fp"]:
+                        try:
+                            supabase.table("incidents").delete().eq("content_fp", record["content_fp"]).execute()
+                            merged += 1
+                        except:
+                            pass
+        
+        if merged > 0:
+            logging.info(f"Merged {merged} duplicate records (kept most reliable)")
+    except Exception as e:
+        logging.error(f"Merge error: {e}")
+
+# ---------------- CORE PIPELINE ---------------- #
+def run():
+    logging.info("=" * 60)
+    logging.info("🚀 STARTING CONFLICT SCRAPER PIPELINE")
+    logging.info(f"DRY_RUN: {DRY_RUN} | Rate Limit: {groq_limiter.max_rpm} RPM")
+    logging.info("=" * 60)
+    
+    cleanup_invalid_records()
+    merge_duplicate_records()
+
+    stats = {
+        "feeds_processed": 0,
+        "entries_scanned": 0,
+        "articles_fetched": 0,
+        "prefiltered_non_conflict": 0,
+        "ai_processed": 0,
+        "incidents_extracted": 0,
+        "incidents_saved": 0,
+        "duplicates_detected": 0,
+        "duplicates_overwritten": 0,
+        "no_impact_skipped": 0,
+        "invalid_state_skipped": 0,
+        "ai_failed": 0,
+        "url_reprocessed": 0
+    }
+    
+    current_date = datetime.today().strftime("%Y-%m-%d")
+
+    # Load recent incidents for deduplication
+    recent_incidents_cache = {}
+    try:
+        thirty_days_ago = (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d")
+        res = supabase.table("incidents")\
+            .select("semantic_fp, content_fp, fatalities, abductions, state, lga, incident_type, date, source_url")\
+            .gte("date", thirty_days_ago)\
+            .execute()
+        
+        for item in res.data:
+            fp = item.get("semantic_fp")
+            if fp:
+                total_casualties = (item.get("fatalities", 0) or 0) + (item.get("abductions", 0) or 0)
+                recent_incidents_cache[fp] = {
+                    "total_casualties": total_casualties,
+                    "content_fp": item.get("content_fp"),
+                    "state": item.get("state"),
+                    "lga": item.get("lga"),
+                    "incident_type": item.get("incident_type"),
+                    "date": item.get("date"),
+                    "source_url": item.get("source_url")
+                }
+                
+        logging.info(f"📊 Loaded {len(recent_incidents_cache)} recent incidents")
+    except Exception as e:
+        logging.error(f"Failed to fetch recent incidents: {e}")
+
+    for feed_url in FEEDS:
+        stats["feeds_processed"] += 1
+        logging.info(f"\n{'='*40}")
+        logging.info(f"📡 Processing Feed: {feed_url}")
+        logging.info(f"{'='*40}")
+        
+        try:
+            feed = feedparser.parse(feed_url)
+            
+            if not feed.entries:
+                logging.warning(f"No entries in feed: {feed_url}")
+                continue
+            
+            current_urls = [normalize_url(e.link) for e in feed.entries if e.get("link")]
+            processed_url_map = {}
+            
+            if current_urls:
+                for attempt in range(3):
+                    try:
+                        res = supabase.table("incidents")\
+                            .select("source_url, content_fp, fatalities, abductions, date")\
+                            .in_("source_url", current_urls)\
+                            .execute()
+                        
+                        for x in res.data:
+                            url = normalize_url(x.get("source_url", ""))
+                            if url:
+                                processed_url_map[url] = {
+                                    "content_fp": x.get("content_fp"),
+                                    "fatalities": x.get("fatalities", 0) or 0,
+                                    "abductions": x.get("abductions", 0) or 0,
+                                    "date": x.get("date")
+                                }
+                        
+                        logging.info(f"📋 Found {len(processed_url_map)} processed URLs")
+                        break
+                    except Exception as e:
+                        logging.warning(f"Batch dedup attempt {attempt+1} failed: {e}")
+                        time.sleep(2)
+            
+            for entry in feed.entries:
+                stats["entries_scanned"] += 1
+                
+                url = normalize_url(entry.link) if entry.get("link") else ""
+                if not url:
+                    continue
+                
+                existing_record_fp = None
+                
+                if url in processed_url_map:
+                    existing = processed_url_map[url]
+                    existing_casualties = existing["fatalities"] + existing["abductions"]
+                    
+                    if existing_casualties == 0:
+                        logging.info(f"🔄 Re-processing URL with 0 casualties: {entry.title[:80]}")
+                        stats["url_reprocessed"] += 1
+                        existing_record_fp = existing["content_fp"]
+                    else:
+                        continue
+                
+                pub_date = current_date
+                t = entry.get("published_parsed") or entry.get("updated_parsed")
+                if t:
+                    try:
+                        pub_date = time.strftime("%Y-%m-%d", t)
+                    except:
+                        pass
+                
+                logging.info(f"📄 Fetching: {entry.title[:100]}...")
+                text = fetch_full_article(url)
+                
+                if not text:
+                    continue
+                
+                stats["articles_fetched"] += 1
+                
+                relevance = is_nigeria_related(entry.title, text)
+                if relevance is False:
+                    continue
+                
+                if not is_potential_conflict_article(entry.title, text):
+                    stats["prefiltered_non_conflict"] += 1
+                    continue
+                
+                if existing_record_fp:
+                    try:
+                        supabase.table("incidents").delete().eq("content_fp", existing_record_fp).execute()
+                        logging.info(f"🗑️ Deleted old zero-casualty record: {existing_record_fp}")
+                        for fp, data in list(recent_incidents_cache.items()):
+                            if data.get("content_fp") == existing_record_fp:
+                                del recent_incidents_cache[fp]
+                    except Exception as ex:
+                        logging.error(f"Failed to delete old record: {ex}")
+                
+                logging.info(f"🤖 AI processing: {entry.title[:100]}...")
+                stats["ai_processed"] += 1
+                
+                ai_response = extract_incident(entry.title, text, pub_date)
+                if not ai_response:
+                    stats["ai_failed"] += 1
+                    continue
+
+                try:
+                    data = json.loads(ai_response)
+                    incidents_list = data.get("incidents", [])
+                except json.JSONDecodeError as ex:
+                    logging.error(f"JSON parsing failed: {ex}")
+                    stats["ai_failed"] += 1
+                    continue
+
+                if not incidents_list:
+                    continue
+
+                base_article_fp = content_fp(entry.title, text)
+
+                for idx, incident in enumerate(incidents_list):
+                    stats["incidents_extracted"] += 1
+                    
+                    incident = normalize_incident_data(incident)
+                    
+                    state_val = incident.get("state", "").strip().lower()
+                    if state_val not in STATE_MAP:
+                        logging.info(f"Skipping invalid state: {incident.get('state')}")
+                        stats["invalid_state_skipped"] += 1
+                        continue
+                    
+                    clean_state = STATE_MAP[state_val]
+                    occurrence_date = incident.get("occurrence_date", pub_date)
+                    
+                    try:
+                        fatalities = int(incident.get("fatalities", 0) or 0)
+                        abductions = int(incident.get("abductions", 0) or 0)
+                    except (ValueError, TypeError):
+                        fatalities = 0
+                        abductions = 0
+
+                    if fatalities == 0 and abductions == 0:
+                        stats["no_impact_skipped"] += 1
+                        continue
+
+                    clean_lga = incident.get("lga", "Unknown").strip()
+                    clean_community = incident.get("community", "Unknown").strip()
+                    clean_type = incident.get("incident_type", "Other").strip()
+                    current_total = fatalities + abductions
+                    
+                    sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_type, fatalities, abductions)
+                    
+                    if sem_fp in recent_incidents_cache:
+                        existing = recent_incidents_cache[sem_fp]
+                        existing_total = existing["total_casualties"]
+                        
+                        should_replace = False
+                        
+                        if current_total > (existing_total * 1.3):
+                            should_replace = True
+                            logging.info(f"📈 Significantly higher casualties ({current_total} vs {existing_total})")
+                        else:
+                            existing_source = extract_domain(existing.get("source_url", ""))
+                            new_source = extract_domain(url)
+                            
+                            existing_reliability = SOURCE_RELIABILITY.get(existing_source, 0.5)
+                            new_reliability = calculate_report_reliability(url, text, fatalities, abductions)
+                            
+                            if new_reliability > (existing_reliability + 0.15):
+                                should_replace = True
+                                logging.info(f"✅ More reliable: {new_source}({new_reliability:.2f}) > {existing_source}({existing_reliability:.2f})")
+                            elif new_reliability >= 0.7 and existing_reliability >= 0.7 and current_total > existing_total:
+                                should_replace = True
+                                logging.info(f"✅ Higher casualties from reliable source")
+                        
+                        if should_replace:
+                            try:
+                                supabase.table("incidents").delete().eq("content_fp", existing["content_fp"]).execute()
+                            except:
+                                pass
+                            
+                            recent_incidents_cache[sem_fp] = {
+                                "total_casualties": current_total,
+                                "content_fp": f"{base_article_fp}_{idx}",
+                                "state": clean_state,
+                                "lga": clean_lga,
+                                "incident_type": clean_type,
+                                "date": occurrence_date,
+                                "source_url": url
+                            }
+                            stats["duplicates_overwritten"] += 1
+                        else:
+                            stats["duplicates_detected"] += 1
+                            continue
+                    else:
+                        reliability = calculate_report_reliability(url, text, fatalities, abductions)
+                        
+                        recent_incidents_cache[sem_fp] = {
+                            "total_casualties": current_total,
+                            "content_fp": f"{base_article_fp}_{idx}",
+                            "state": clean_state,
+                            "lga": clean_lga,
+                            "incident_type": clean_type,
+                            "date": occurrence_date,
+                            "source_url": url,
+                            "reliability": reliability
+                        }
+                        
+                        logging.info(f"📊 New incident reliability: {reliability:.2f}")
+                    
+                    unique_content_fp = f"{base_article_fp}_{idx}"
+
+                    payload = {
+                        "date": occurrence_date, 
+                        "state": clean_state,
+                        "lga": clean_lga,
+                        "community": clean_community,
+                        "incident_type": clean_type,
+                        "fatalities": fatalities,
+                        "abductions": abductions,
+                        "summary": incident.get("summary", f"{clean_type} in {clean_community}, {clean_lga} LGA, {clean_state}"),
+                        "source_url": url,
+                        "content_fp": unique_content_fp,
+                        "semantic_fp": sem_fp
+                    }
+
+                    try:
+                        safe_store(payload)
+                        stats["incidents_saved"] += 1
+                        logging.info(f"✓ SAVED: {clean_type} in {clean_community}, {clean_state} ({fatalities} dead, {abductions} abducted)")
+                    except Exception as ex:
+                        logging.error(f"Storage failed: {ex}")
+        
+        except Exception as e:
+            logging.error(f"Error processing feed {feed_url}: {e}")
+            continue
+
+    merge_duplicate_records()
+
+    logging.info("\n" + "=" * 60)
+    logging.info("✅ PIPELINE COMPLETE")
+    logging.info("=" * 60)
+    for key, value in stats.items():
+        logging.info(f"{key.replace('_', ' ').title()}: {value}")
+    logging.info("=" * 60)
+
+# ---------------- EXECUTION RUNNER ---------------- #
+if __name__ == "__main__":
+    try:
+        run()
+    except KeyboardInterrupt:
+        logging.info("Scraper interrupted by user")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
+        raise
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+            logging.info("Lock file removed")      
