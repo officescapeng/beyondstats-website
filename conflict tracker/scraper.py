@@ -70,8 +70,8 @@ with open(LOCK_FILE, "w") as f:
 class GroqRateLimiter:
     """Limits Groq API calls to stay within rate limits"""
     def __init__(self, max_rpm=25, max_tpm=6000):
-        self.max_rpm = max_rpm  # Requests per minute (conservative)
-        self.max_tpm = max_tpm  # Tokens per minute
+        self.max_rpm = max_rpm
+        self.max_tpm = max_tpm
         self.request_timestamps = []
         self.token_usage = []
     
@@ -79,16 +79,15 @@ class GroqRateLimiter:
         """Wait if we're approaching rate limits"""
         now = time.time()
         
-        # Clean old entries (older than 60 seconds)
+        # Clean old entries
         self.request_timestamps = [t for t in self.request_timestamps if now - t < 60]
         self.token_usage = [(t, tokens) for t, tokens in self.token_usage if now - t < 60]
         
         # Check RPM limit
         if len(self.request_timestamps) >= self.max_rpm:
-            wait_time = 60 - (now - self.request_timestamps[0]) + 2  # +2 second buffer
+            wait_time = 60 - (now - self.request_timestamps[0]) + 2
             logging.info(f"⏳ RPM limit ({self.max_rpm}/min) reached. Waiting {wait_time:.1f}s...")
             time.sleep(wait_time)
-            # Recursive check after waiting
             return self.wait_if_needed(estimated_tokens)
         
         # Check TPM limit
@@ -103,7 +102,7 @@ class GroqRateLimiter:
         self.request_timestamps.append(now)
         self.token_usage.append((now, estimated_tokens))
         
-        # Add small delay between requests to be safe
+        # Small delay between requests
         time.sleep(random.uniform(1.5, 3.0))
 
 # Initialize rate limiter
@@ -118,7 +117,7 @@ NIGERIAN_STATES = {
 }
 STATE_MAP = {s.lower(): s for s in NIGERIAN_STATES}
 
-# LGA name normalization map for common variations
+# LGA name normalization map
 LGA_NORMALIZATION = {
     "chikun": "Chikun",
     "chikkun": "Chikun",
@@ -157,30 +156,25 @@ def content_fp(title, text):
     return hashlib.sha256(base.encode()).hexdigest()
 
 def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
-    """
-    IMPROVED FINGERPRINT: Uses broader matching criteria
-    Groups by Date (within 2-day window) + State + Type + rounded casualty numbers
-    """
+    """Generate semantic fingerprint for deduplication"""
     state = str(state).strip().lower() if state else "unknown"
     inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
     
-    # Normalize date to handle +/- 1 day differences (round to nearest 2-day window)
+    # Normalize date to 2-day windows
     try:
         event_date = datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
-        # Create 2-day windows
         day_offset = event_date.day % 2
         normalized_date = (event_date - timedelta(days=day_offset)).strftime("%Y-%m-%d")
     except (ValueError, TypeError):
         normalized_date = str(date_str)[:10] if date_str else "unknown"
     
-    # Round casualty numbers to nearest 5 to group similar reports
+    # Round casualty numbers
     total_casualties = int(fatalities or 0) + int(abductions or 0)
     if total_casualties > 0:
         rounded_casualties = (total_casualties // 5) * 5
     else:
         rounded_casualties = 0
     
-    # Include LGA in the fingerprint if available
     lga_clean = str(lga).strip().lower() if lga and lga != "unknown" else ""
     
     if lga_clean:
@@ -191,8 +185,7 @@ def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
     return hashlib.sha256(base.encode()).hexdigest()
 
 def normalize_incident_data(incident):
-    """Normalize incident data to reduce duplicates from minor variations"""
-    # Normalize LGA names
+    """Normalize incident data to reduce duplicates"""
     lga = incident.get("lga", "").strip()
     lga_lower = lga.lower()
     if lga_lower in LGA_NORMALIZATION:
@@ -200,18 +193,15 @@ def normalize_incident_data(incident):
     elif lga:
         incident["lga"] = lga.title()
     
-    # Normalize community names (basic)
     community = incident.get("community", "").strip()
     if community:
-        # Remove common prefixes/suffixes
         community = community.replace("Village", "").replace("Town", "").strip()
         incident["community"] = community.title() if community else "Unknown"
     
-    # Round large casualty numbers to avoid minor variations
     for field in ["fatalities", "abductions"]:
         try:
             val = int(incident.get(field, 0))
-            if val > 20:  # Only round very large numbers
+            if val > 20:
                 incident[field] = round(val / 5) * 5
         except (ValueError, TypeError):
             incident[field] = 0
@@ -219,10 +209,9 @@ def normalize_incident_data(incident):
     return incident
 
 def is_potential_conflict_article(title, text):
-    """Quick pre-filter to catch obvious non-conflict articles before AI processing"""
+    """Pre-filter non-conflict articles before AI processing"""
     combined = (title + " " + text).lower()
     
-    # Keywords that suggest this is NOT a conflict incident
     non_conflict_keywords = [
         "suicide", "committed suicide", "took his own life", "hanged himself",
         "morning recap", "evening recap", "news roundup", "top stories",
@@ -234,7 +223,6 @@ def is_potential_conflict_article(title, text):
         "grammys", "award", "album", "movie", "film", "actor", "actress"
     ]
     
-    # Conflict keywords that override non-conflict classification
     conflict_keywords = [
         "killed", "attack", "gunmen", "bandits", "terrorists", 
         "kidnapped", "abducted", "clash", "militants", "insurgents",
@@ -242,14 +230,11 @@ def is_potential_conflict_article(title, text):
         "bomb", "explosion", "ambush", "raid", "assault"
     ]
     
-    # Check for non-conflict keywords
     for keyword in non_conflict_keywords:
         if keyword in combined:
-            # Count conflict signals to see if this is actually a conflict article
             conflict_score = sum(1 for kw in conflict_keywords if kw in combined)
-            
-            if conflict_score < 2:  # Not enough conflict signals
-                logging.info(f"🚫 Pre-filtered non-conflict: '{keyword}' found with low conflict score ({conflict_score})")
+            if conflict_score < 2:
+                logging.info(f"🚫 Pre-filtered non-conflict: '{keyword}' found")
                 return False
     
     return True
@@ -258,15 +243,12 @@ def calculate_similarity_score(existing, new_state, new_lga, new_date, new_fatal
     """Calculate similarity score between two incident reports"""
     score = 0.0
     
-    # State must match exactly
     if existing.get("state", "").lower() != new_state.lower():
         return 0.0
     
-    # Incident type must match
     if existing.get("incident_type", "").lower() != new_state.lower():
         return 0.0
     
-    # LGA similarity (fuzzy)
     existing_lga = existing.get("lga", "").lower()
     new_lga_clean = new_lga.lower() if new_lga else ""
     
@@ -276,7 +258,6 @@ def calculate_similarity_score(existing, new_state, new_lga, new_date, new_fatal
         elif existing_lga in new_lga_clean or new_lga_clean in existing_lga:
             score += 0.2
     
-    # Date proximity
     try:
         existing_date = datetime.strptime(str(existing.get("date", ""))[:10], "%Y-%m-%d")
         new_date_obj = datetime.strptime(str(new_date)[:10], "%Y-%m-%d")
@@ -293,7 +274,6 @@ def calculate_similarity_score(existing, new_state, new_lga, new_date, new_fatal
     except (ValueError, TypeError):
         pass
     
-    # Casualty similarity
     existing_total = int(existing.get("fatalities", 0) or 0) + int(existing.get("abductions", 0) or 0)
     new_total = int(new_fatalities or 0) + int(new_abductions or 0)
     
@@ -305,45 +285,6 @@ def calculate_similarity_score(existing, new_state, new_lga, new_date, new_fatal
     
     return score
 
-def find_potential_duplicate(state, lga, incident_type, occurrence_date, fatalities, abductions):
-    """Check database for potential duplicates using fuzzy matching"""
-    try:
-        event_date = datetime.strptime(str(occurrence_date)[:10], "%Y-%m-%d")
-        date_start = (event_date - timedelta(days=4)).strftime("%Y-%m-%d")
-        date_end = (event_date + timedelta(days=4)).strftime("%Y-%m-%d")
-        
-        query = supabase.table("incidents")\
-            .select("content_fp, semantic_fp, state, lga, incident_type, date, fatalities, abductions")\
-            .gte("date", date_start)\
-            .lte("date", date_end)\
-            .eq("state", STATE_MAP.get(state.lower(), state))
-        
-        results = query.execute()
-        
-        if not results.data:
-            return None
-        
-        best_match = None
-        best_score = 0.0
-        
-        for item in results.data:
-            if item.get("incident_type") != incident_type:
-                continue
-                
-            score = calculate_similarity_score(
-                item, state, lga, occurrence_date, fatalities, abductions
-            )
-            
-            if score > 0.65 and score > best_score:
-                best_score = score
-                best_match = item
-        
-        return best_match if best_score > 0.65 else None
-        
-    except Exception as e:
-        logging.error(f"Duplicate check failed: {e}")
-        return None
-
 # ---------------- WEB SCRAPING ---------------- #
 def fetch_full_article(url):
     try:
@@ -353,7 +294,6 @@ def fetch_full_article(url):
         
         soup = BeautifulSoup(r.text, "html.parser")
         
-        # Try multiple content extraction strategies
         article = soup.find("article")
         if article:
             paras = article.find_all("p")
@@ -373,7 +313,7 @@ def fetch_full_article(url):
         logging.error(f"Unexpected error parsing {url}: {e}")
         return ""
 
-# ---------------- NIGERIA FILTER HEURISTIC ---------------- #
+# ---------------- NIGERIA FILTER ---------------- #
 NIGERIA_TERMS = [
     "nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
     "army", "police", "dss", "bandits", "boko haram", "herdsmen", 
@@ -399,7 +339,7 @@ def is_nigeria_related(title, text):
 # ---------------- AI INCIDENT EXTRACTION ---------------- #
 def extract_incident(title, text, article_date, retries=3):
     if not client:
-        logging.error("Groq API client is not initialized. Check your GROQ_API_KEY.")
+        logging.error("Groq API client is not initialized.")
         return None
         
     categories_string = '", "'.join(INCIDENT_CATEGORIES)
@@ -410,24 +350,23 @@ The article was published on: {article_date}.
 Return strictly valid JSON only. Do not include markdown formatting.
 
 CRITICAL DEDUPLICATION RULES:
-1. If this article reports on an incident that has likely been reported by other news sources, still extract it. We have a database deduplication system.
-2. Only extract incidents that are NEW discrete events. Do NOT extract follow-up reports that simply recount previous incidents unless there are SIGNIFICANT new details (e.g., casualty count increased by 30% or more).
+1. Extract ALL valid security incidents even if similar to other reports.
+2. Only extract NEW discrete events with CONFIRMED details.
 
-CRITICAL EXCLUSION RULES - DO NOT EXTRACT THESE:
-- Suicide incidents, self-harm, or accidental deaths
-- Traffic accidents, road crashes, or transportation incidents (unless part of an attack)
-- Natural disasters (floods, fires, building collapses) unless caused by an attack
-- Disease outbreaks, health emergencies, or medical incidents
-- Domestic violence or family disputes (unless part of a larger conflict pattern)
-- Individual crimes without organized group involvement (e.g., personal disputes, bar fights)
-- Police arrests, court cases, or legal proceedings without current violence
+CRITICAL EXCLUSION RULES - DO NOT EXTRACT:
+- Suicide, self-harm, or accidental deaths
+- Traffic accidents or road crashes (unless part of an attack)
+- Natural disasters (floods, fires, building collapses)
+- Disease outbreaks or health emergencies
+- Domestic violence or family disputes
+- Individual crimes without organized group involvement
+- Police arrests or court cases without current violence
 - Crime statistics, security reports, or aggregate summaries
-- Political rhetoric, protests without violence, or peaceful demonstrations
-- International news not directly related to Nigerian security incidents
+- Political rhetoric or peaceful protests
 - Morning recaps, evening roundups, or "top stories" compilations
 
 ONLY EXTRACT incidents involving:
-- Organized armed groups (bandits, terrorists, cultists, militants, etc.)
+- Organized armed groups (bandits, terrorists, cultists, militants)
 - Communal/clan/ethnic group violence with weapons
 - Security force operations resulting in casualties
 - Kidnappings by armed groups
@@ -435,25 +374,23 @@ ONLY EXTRACT incidents involving:
 - Political/electoral violence by organized groups
 
 CRITICAL IMPACT RULE:
-Only extract incidents with CONFIRMED fatalities (deaths) OR abductions (kidnappings). 
+Only extract incidents with CONFIRMED fatalities OR abductions.
 Incidents with only "injuries" or "attacks" without confirmed casualties should return {{"incidents": []}}.
 
-If the article is NOT related to a Nigerian security incident as defined above, return:
-{{"incidents": []}}
+If the article is NOT related to a Nigerian security incident, return: {{"incidents": []}}
 
-If the article contains a valid discrete security incident, extract an array under the key "incidents". 
 Each incident object must contain: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
 
 CRITICAL RULES:
 1. "incident_type" MUST be exactly one of: ["{categories_string}"]
-2. "occurrence_date" MUST be the actual date the attack/incident happened in "YYYY-MM-DD" format. Calculate from the article date ({article_date}) using relative time references.
-3. "fatalities" and "abductions" must be integers. Report the ACTUAL CONFIRMED numbers from the article, not estimates or rounded figures.
-4. "state" must be a Nigerian state name.
-5. "lga" must be the Local Government Area (LGA) name.
-6. "community" must be the specific village, town, or neighborhood where the event occurred.
-7. "summary" should be a one-sentence factual description of the violent incident.
+2. "occurrence_date" MUST be in "YYYY-MM-DD" format
+3. "fatalities" and "abductions" must be integers (report ACTUAL confirmed numbers)
+4. "state" must be a Nigerian state name
+5. "lga" must be the Local Government Area name
+6. "community" must be the specific village, town, or neighborhood
+7. "summary" should be a one-sentence factual description
 
-EXAMPLE OF CORRECT EXTRACTION:
+EXAMPLE:
 {{
     "incidents": [
         {{
@@ -464,22 +401,20 @@ EXAMPLE OF CORRECT EXTRACTION:
             "fatalities": 1,
             "abductions": 14,
             "occurrence_date": "2026-06-30",
-            "summary": "Armed gunmen attacked Kujama village in Chikun LGA, killing one resident and kidnapping 14 others."
+            "summary": "Armed gunmen attacked Kujama village, killing one resident and kidnapping 14 others."
         }}
     ]
 }}
 
-EXAMPLE OF WHAT TO REJECT:
+REJECT EXAMPLES:
 - "Man commits suicide in Lagos" -> {{"incidents": []}}
-- "Morning recap: 10 stories you missed" -> {{"incidents": []}}
-- "Police arrest 5 suspects" -> {{"incidents": []}} (unless there was a violent confrontation with casualties)
+- "Morning recap: 10 stories" -> {{"incidents": []}}
 
 Title: {title}
 Text: {text}
 """
     for attempt in range(retries):
         try:
-            # Apply rate limiting before API call
             groq_limiter.wait_if_needed(estimated_tokens=1500)
             
             res = client.chat.completions.create(
@@ -493,18 +428,18 @@ Text: {text}
             
         except Exception as e:
             error_str = str(e)
-            if "429" in error_str or "rate_limit" in error_str.lower():
-                backoff_time = min(60, 10 * (2 ** attempt))  # Exponential backoff, max 60s
-                logging.warning(f"⚠️ Rate limited on attempt {attempt + 1}. Waiting {backoff_time}s...")
+            if "429" in error_str:
+                backoff_time = min(60, 10 * (2 ** attempt))
+                logging.warning(f"⚠️ Rate limited. Waiting {backoff_time}s...")
                 time.sleep(backoff_time)
             elif "401" in error_str:
-                logging.error(f"🔑 Invalid API key. Please check your GROQ_API_KEY in .env")
+                logging.error("🔑 Invalid API key. Check GROQ_API_KEY in .env")
                 return None
             else:
-                logging.warning(f"Groq API error on attempt {attempt + 1}: {e}")
+                logging.warning(f"API error attempt {attempt + 1}: {e}")
                 time.sleep(2)
             
-    logging.error("Failed to extract context via AI after max retries.")
+    logging.error("Failed to extract after max retries.")
     return None
 
 # ---------------- SAFE STORAGE ---------------- #
@@ -514,7 +449,6 @@ def safe_store(payload):
         return {"dry_run": True}
 
     try:
-        # Use ON CONFLICT to update if semantic_fp exists and new casualties are higher
         result = supabase.table("incidents").upsert(
             payload,
             on_conflict="semantic_fp"
@@ -525,69 +459,54 @@ def safe_store(payload):
         raise
 
 def cleanup_invalid_records():
-    """Remove records with invalid states or very old dates"""
+    """Remove records with invalid states or old dates"""
     if DRY_RUN:
         logging.info("[DRY RUN] Would run database cleanup")
         return
         
     try:
-        logging.info("Running database cleanup for invalid records...")
+        logging.info("Running database cleanup...")
         
-        # Delete records older than 2026-06-30
+        # Delete old records
         cutoff_date = "2026-06-30"
-        old_records = supabase.table("incidents")\
-            .select("content_fp")\
-            .lt("date", cutoff_date)\
-            .execute()
+        old_records = supabase.table("incidents").select("content_fp").lt("date", cutoff_date).execute()
         
         if old_records.data:
-            fps_to_delete = [r["content_fp"] for r in old_records.data if r.get("content_fp")]
-            logging.info(f"Removing {len(fps_to_delete)} records older than {cutoff_date}")
-            for fp in fps_to_delete:
+            for r in old_records.data:
                 try:
-                    supabase.table("incidents").delete().eq("content_fp", fp).execute()
-                except Exception as ex:
-                    logging.error(f"Failed to delete old record {fp}: {ex}")
+                    supabase.table("incidents").delete().eq("content_fp", r["content_fp"]).execute()
+                except:
+                    pass
         
-        # Delete records with invalid states
+        # Delete invalid state records
         all_records = supabase.table("incidents").select("content_fp, state").execute()
         if all_records.data:
-            invalid_fps = []
             for r in all_records.data:
                 state = (r.get("state") or "").strip().lower()
                 if state and state not in STATE_MAP:
-                    invalid_fps.append(r.get("content_fp"))
-            
-            if invalid_fps:
-                logging.info(f"Removing {len(invalid_fps)} records with invalid states")
-                for fp in invalid_fps:
                     try:
-                        supabase.table("incidents").delete().eq("content_fp", fp).execute()
-                    except Exception as ex:
-                        logging.error(f"Failed to delete invalid record {fp}: {ex}")
+                        supabase.table("incidents").delete().eq("content_fp", r["content_fp"]).execute()
+                    except:
+                        pass
         
-        logging.info("Database cleanup completed successfully")
+        logging.info("Database cleanup completed")
     except Exception as e:
-        logging.error(f"Error during database cleanup: {e}")
+        logging.error(f"Cleanup error: {e}")
 
 def merge_duplicate_records():
-    """Periodically merge duplicate records with same semantic fingerprint"""
+    """Merge records with same semantic fingerprint"""
     if DRY_RUN:
-        logging.info("[DRY RUN] Would run duplicate merge")
         return
         
     try:
-        logging.info("Running duplicate merge check...")
-        
         all_records = supabase.table("incidents")\
-            .select("semantic_fp, content_fp, fatalities, abductions, source_url, date")\
+            .select("semantic_fp, content_fp, fatalities, abductions")\
             .order("fatalities", desc=True)\
             .execute()
         
         if not all_records.data:
             return
         
-        # Group by semantic_fp
         fp_groups = {}
         for record in all_records.data:
             fp = record.get("semantic_fp")
@@ -596,24 +515,22 @@ def merge_duplicate_records():
                     fp_groups[fp] = []
                 fp_groups[fp].append(record)
         
-        duplicates_found = 0
+        merged = 0
         for fp, records in fp_groups.items():
             if len(records) > 1:
-                # Keep the record with highest casualties, delete others
-                best_record = max(records, key=lambda x: (x.get("fatalities", 0) or 0) + (x.get("abductions", 0) or 0))
-                
+                best = max(records, key=lambda x: (x.get("fatalities", 0) or 0) + (x.get("abductions", 0) or 0))
                 for record in records:
-                    if record["content_fp"] != best_record["content_fp"]:
+                    if record["content_fp"] != best["content_fp"]:
                         try:
                             supabase.table("incidents").delete().eq("content_fp", record["content_fp"]).execute()
-                            duplicates_found += 1
-                            logging.info(f"🗑️ Merged duplicate: {record.get('state')} - {record.get('incident_type')}")
-                        except Exception as ex:
-                            logging.error(f"Failed to merge duplicate {record['content_fp']}: {ex}")
+                            merged += 1
+                        except:
+                            pass
         
-        logging.info(f"Merged {duplicates_found} duplicate records")
+        if merged > 0:
+            logging.info(f"Merged {merged} duplicate records")
     except Exception as e:
-        logging.error(f"Error during duplicate merge: {e}")
+        logging.error(f"Merge error: {e}")
 
 # ---------------- CORE PIPELINE ---------------- #
 def run():
@@ -622,7 +539,6 @@ def run():
     logging.info(f"DRY_RUN: {DRY_RUN} | Rate Limit: {groq_limiter.max_rpm} RPM")
     logging.info("=" * 60)
     
-    # Run cleanup and merge before new scraping
     cleanup_invalid_records()
     merge_duplicate_records()
 
@@ -644,7 +560,7 @@ def run():
     
     current_date = datetime.today().strftime("%Y-%m-%d")
 
-    # Load existing fingerprints for recent incidents (last 30 days)
+    # Load recent incidents for deduplication
     recent_incidents_cache = {}
     try:
         thirty_days_ago = (datetime.today() - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -667,7 +583,7 @@ def run():
                     "source_url": item.get("source_url")
                 }
                 
-        logging.info(f"📊 Loaded {len(recent_incidents_cache)} recent incidents for deduplication")
+        logging.info(f"📊 Loaded {len(recent_incidents_cache)} recent incidents")
     except Exception as e:
         logging.error(f"Failed to fetch recent incidents: {e}")
 
@@ -681,12 +597,12 @@ def run():
             feed = feedparser.parse(feed_url)
             
             if not feed.entries:
-                logging.warning(f"No entries found in feed: {feed_url}")
+                logging.warning(f"No entries in feed: {feed_url}")
                 continue
             
-            # Batch URL deduplication - check which URLs are already processed
+            # Check which URLs are already processed
             current_urls = [normalize_url(e.link) for e in feed.entries if e.get("link")]
-            processed_url_map = {}  # url -> existing record data
+            processed_url_map = {}
             
             if current_urls:
                 for attempt in range(3):
@@ -706,10 +622,10 @@ def run():
                                     "date": x.get("date")
                                 }
                         
-                        logging.info(f"📋 Found {len(processed_url_map)} already processed URLs")
+                        logging.info(f"📋 Found {len(processed_url_map)} processed URLs")
                         break
                     except Exception as e:
-                        logging.warning(f"Supabase batch dedup attempt {attempt+1} failed: {e}")
+                        logging.warning(f"Batch dedup attempt {attempt+1} failed: {e}")
                         time.sleep(2)
             
             # Process each entry
@@ -720,47 +636,41 @@ def run():
                 if not url:
                     continue
                 
-                # Check if URL was already processed
+                # URL dedup with re-processing for zero-casualty articles
                 if url in processed_url_map:
                     existing = processed_url_map[url]
                     existing_casualties = existing["fatalities"] + existing["abductions"]
                     
-                    # If previously had 0 casualties, re-process (article might have been updated)
                     if existing_casualties == 0:
-                        logging.info(f"🔄 Re-processing URL with previously 0 casualties: {entry.title[:80]}")
+                        logging.info(f"🔄 Re-processing URL with 0 casualties: {entry.title[:80]}")
                         stats["url_reprocessed"] += 1
                     else:
-                        logging.debug(f"Skipping already processed URL with {existing_casualties} casualties")
                         continue
                 
-                # Determine publication date
+                # Get publication date
                 pub_date = current_date
                 t = entry.get("published_parsed") or entry.get("updated_parsed")
                 if t:
                     try:
                         pub_date = time.strftime("%Y-%m-%d", t)
-                    except Exception:
+                    except:
                         pass
                 
-                # Fetch and validate article
+                # Fetch article
                 logging.info(f"📄 Fetching: {entry.title[:100]}...")
                 text = fetch_full_article(url)
                 
                 if not text:
-                    logging.info(f"Skipping - empty article content")
                     continue
                 
                 stats["articles_fetched"] += 1
                 
-                # Check if Nigeria-related
+                # Nigeria relevance check
                 relevance = is_nigeria_related(entry.title, text)
                 if relevance is False:
-                    logging.info(f"Skipping - not Nigeria-related")
                     continue
-                elif relevance == "borderline":
-                    logging.info(f"Borderline Nigeria relevance, proceeding with caution")
                 
-                # Pre-filter non-conflict articles
+                # Pre-filter non-conflict
                 if not is_potential_conflict_article(entry.title, text):
                     stats["prefiltered_non_conflict"] += 1
                     continue
@@ -783,7 +693,6 @@ def run():
                     continue
 
                 if not incidents_list:
-                    logging.info(f"No incidents extracted")
                     continue
 
                 # Process each incident
@@ -792,5 +701,112 @@ def run():
                 for idx, incident in enumerate(incidents_list):
                     stats["incidents_extracted"] += 1
                     
-                    # Normalize incident data
-                    incident = normalize_
+                    # Normalize data
+                    incident = normalize_incident_data(incident)
+                    
+                    # Validate state
+                    state_val = incident.get("state", "").strip().lower()
+                    if state_val not in STATE_MAP:
+                        logging.info(f"Skipping invalid state: {incident.get('state')}")
+                        stats["invalid_state_skipped"] += 1
+                        continue
+                    
+                    clean_state = STATE_MAP[state_val]
+                    occurrence_date = incident.get("occurrence_date", pub_date)
+                    
+                    # Extract casualties
+                    try:
+                        fatalities = int(incident.get("fatalities", 0) or 0)
+                        abductions = int(incident.get("abductions", 0) or 0)
+                    except (ValueError, TypeError):
+                        fatalities = 0
+                        abductions = 0
+
+                    # Skip zero-impact
+                    if fatalities == 0 and abductions == 0:
+                        stats["no_impact_skipped"] += 1
+                        continue
+
+                    clean_lga = incident.get("lga", "Unknown").strip()
+                    clean_community = incident.get("community", "Unknown").strip()
+                    clean_type = incident.get("incident_type", "Other").strip()
+                    current_total = fatalities + abductions
+                    
+                    # Generate semantic fingerprint
+                    sem_fp = semantic_fp(occurrence_date, clean_state, clean_lga, clean_type, fatalities, abductions)
+                    
+                    # Check for duplicates
+                    if sem_fp in recent_incidents_cache:
+                        existing = recent_incidents_cache[sem_fp]
+                        existing_casualties = existing["total_casualties"]
+                        
+                        if current_total > existing_casualties:
+                            logging.info(f"📈 OVERWRITING: Higher casualties ({current_total} vs {existing_casualties})")
+                            recent_incidents_cache[sem_fp]["total_casualties"] = current_total
+                            stats["duplicates_overwritten"] += 1
+                        else:
+                            stats["duplicates_detected"] += 1
+                            continue
+                    else:
+                        recent_incidents_cache[sem_fp] = {
+                            "total_casualties": current_total,
+                            "content_fp": f"{base_article_fp}_{idx}",
+                            "state": clean_state,
+                            "lga": clean_lga,
+                            "incident_type": clean_type,
+                            "date": occurrence_date,
+                            "source_url": url
+                        }
+                    
+                    # Store incident
+                    unique_content_fp = f"{base_article_fp}_{idx}"
+
+                    payload = {
+                        "date": occurrence_date, 
+                        "state": clean_state,
+                        "lga": clean_lga,
+                        "community": clean_community,
+                        "incident_type": clean_type,
+                        "fatalities": fatalities,
+                        "abductions": abductions,
+                        "summary": incident.get("summary", f"{clean_type} in {clean_community}, {clean_lga} LGA, {clean_state}"),
+                        "source_url": url,
+                        "content_fp": unique_content_fp,
+                        "semantic_fp": sem_fp
+                    }
+
+                    try:
+                        safe_store(payload)
+                        stats["incidents_saved"] += 1
+                        logging.info(f"✓ SAVED: {clean_type} in {clean_community}, {clean_state} ({fatalities} dead, {abductions} abducted)")
+                    except Exception as ex:
+                        logging.error(f"Storage failed: {ex}")
+        
+        except Exception as e:
+            logging.error(f"Error processing feed {feed_url}: {e}")
+            continue
+
+    # Final merge
+    merge_duplicate_records()
+
+    # Print stats
+    logging.info("\n" + "=" * 60)
+    logging.info("✅ PIPELINE COMPLETE")
+    logging.info("=" * 60)
+    for key, value in stats.items():
+        logging.info(f"{key.replace('_', ' ').title()}: {value}")
+    logging.info("=" * 60)
+
+# ---------------- EXECUTION RUNNER ---------------- #
+if __name__ == "__main__":
+    try:
+        run()
+    except KeyboardInterrupt:
+        logging.info("Scraper interrupted by user")
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
+        raise
+    finally:
+        if os.path.exists(LOCK_FILE):
+            os.remove(LOCK_FILE)
+            logging.info("Lock file removed")
