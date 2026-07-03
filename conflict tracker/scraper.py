@@ -295,19 +295,6 @@ def is_rescue_operation(title, text):
     
     return False
 
-def has_new_kidnapping(text):
-    """Check if article reports a NEW kidnapping, not just a rescue"""
-    text_lower = text.lower()
-    
-    new_kidnap_patterns = [
-        "kidnapped on", "abducted on", "kidnapped yesterday", "abducted yesterday",
-        "kidnapped at", "abducted at", "kidnapped from", "abducted from",
-        "stormed the", "invaded the", "attacked the", "raided the",
-        "whisked away", "taken hostage", "taken to an unknown"
-    ]
-    
-    return any(pattern in text_lower for pattern in new_kidnap_patterns)
-
 def extract_rescue_casualties(title, text):
     """For rescue operations, extract only NEW casualties (deaths during the operation)"""
     combined = (title + " " + text).lower()
@@ -382,7 +369,6 @@ def is_potential_conflict_article(title, text):
     """Pre-filter non-conflict articles before AI processing"""
     combined = (title + " " + text).lower()
     
-    # Keywords that suggest this is a rescue/recovery operation
     rescue_operation_keywords = [
         "rescue", "rescued", "rescues", "free", "freed", "frees",
         "police rescue", "troops rescue", "army rescue", "security forces rescue",
@@ -420,7 +406,6 @@ def is_potential_conflict_article(title, text):
             kidnap_count = sum(1 for kw in new_kidnap_indicators if kw in combined)
             
             if kidnap_count == 0:
-                # Check if there are casualties during rescue
                 rescue_casualties = extract_rescue_casualties(title, text)
                 if not rescue_casualties:
                     logging.info(f"🚫 Pre-filtered rescue operation with no casualties")
@@ -431,7 +416,6 @@ def is_potential_conflict_article(title, text):
             elif kidnap_count < 3:
                 rescue_count = sum(1 for kw in rescue_operation_keywords if kw in combined)
                 if rescue_count > kidnap_count:
-                    # Still check for casualties
                     rescue_casualties = extract_rescue_casualties(title, text)
                     if not rescue_casualties:
                         logging.info(f"🚫 Pre-filtered rescue-focused article")
@@ -504,7 +488,6 @@ def extract_incident(title, text, article_date, retries=3):
         logging.error("Groq API client is not initialized.")
         return None
     
-    # Pre-check if this is a rescue operation
     is_rescue = is_rescue_operation(title, text)
         
     categories_string = '", "'.join(INCIDENT_CATEGORIES)
@@ -754,4 +737,29 @@ def cleanup_invalid_records():
         logging.error(f"Cleanup error: {e}")
 
 def merge_duplicate_records():
-    """Merge records with same semantic
+    """Merge records with same semantic fingerprint keeping most reliable"""
+    if DRY_RUN:
+        return
+        
+    try:
+        all_records = supabase.table("incidents")\
+            .select("semantic_fp, content_fp, fatalities, abductions, source_url")\
+            .order("fatalities", desc=True)\
+            .execute()
+        
+        if not all_records.data:
+            return
+        
+        fp_groups = {}
+        for record in all_records.data:
+            fp = record.get("semantic_fp")
+            if fp:
+                if fp not in fp_groups:
+                    fp_groups[fp] = []
+                fp_groups[fp].append(record)
+        
+        merged = 0
+        for fp, records in fp_groups.items():
+            if len(records) > 1:
+                def score_record(r):
+                    domain = extract_domain(r.get("source_url",
