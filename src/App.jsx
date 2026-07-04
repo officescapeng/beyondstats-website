@@ -70,7 +70,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
     const allPages = [
       { id: 'about', name: 'About Us' },
       { id: 'programs', name: 'Programs & What We Do' },
-      { id: 'dashboard', name: 'HSRI Dashboard' },
+      { id: 'dashboard', name: 'HSRI Dashboard', disabled: true },
       { id: 'research', name: 'Research Hub & Publications', disabled: true },
       { id: 'impact', name: 'Impact Stories', disabled: true },
       { id: 'impact-map', name: 'Impact Map', disabled: true },
@@ -148,10 +148,11 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                             What We Do
                           </button>
                           <button
-                            onClick={() => setCurrentPage('dashboard')}
-                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                            disabled
+                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/25 cursor-not-allowed outline-none uppercase tracking-wider flex items-center gap-2"
                           >
                             HSRI Dashboard
+                            <span className="text-[8px] font-bold bg-white/10 text-white/25 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
                           </button>
                         </>
                       ) : (
@@ -414,7 +415,7 @@ function Footer({ setCurrentPage }) {
               { name: 'About', id: 'about' },
               { name: 'What We Do', id: 'programs' },
               { name: 'Our Impact Map', id: 'impact-map', disabled: true },
-              { name: 'Human Security Dashboard', id: 'dashboard' },
+              { name: 'Human Security Dashboard', id: 'dashboard', disabled: true },
               { name: 'Research & Deliverables', id: 'research', disabled: true },
               { name: 'Our Impact Stories', id: 'impact', disabled: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
@@ -3000,7 +3001,7 @@ function App() {
             {[
               { name: 'About Us', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              { name: 'Human Security Dashboard', id: 'dashboard', indent: true },
+              { name: 'Human Security Dashboard', id: 'dashboard', indent: true, disabled: true },
               { name: 'Research Hub', id: 'research', disabled: true },
               { name: 'Our Impact Stories', id: 'impact', disabled: true },
               { name: 'Our Impact Map', id: 'impact-map', indent: true, disabled: true },
