@@ -2988,16 +2988,14 @@ function App() {
     <div className="relative min-h-screen w-full flex flex-col justify-between text-white font-sans bg-primary">
       
       {/* GLOBAL HEADER */}
-      {currentPage !== 'home' && (
-        <div className="w-full bg-[#051c44] border-b border-white/5 relative z-30">
-          <Header 
-            currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
-            setIsMenuOpen={setIsMenuOpen}
-            setSelectedStateId={setSelectedStateId}
-          />
-        </div>
-      )}
+      <div className={`w-full ${currentPage === 'home' ? 'absolute top-0 left-0 bg-transparent' : 'bg-[#051c44] border-b border-white/5 relative'} z-30`}>
+        <Header 
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          setIsMenuOpen={setIsMenuOpen}
+          setSelectedStateId={setSelectedStateId}
+        />
+      </div>
 
       {/* MOBILE MENU OVERLAY */}
       {isMenuOpen && (
