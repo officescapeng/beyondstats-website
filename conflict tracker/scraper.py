@@ -110,20 +110,29 @@ def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
 
 
 # ---------------- WEB SCRAPING ---------------- #
+CUSTOM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
 def fetch_full_article(url):
     try:
         time.sleep(random.uniform(2, 5))
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        r = requests.get(url, headers=CUSTOM_HEADERS, timeout=15)
         r.raise_for_status()
         
         soup = BeautifulSoup(r.text, "html.parser")
         paras = soup.find_all("p")
         return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:3000]
-    except requests.exceptions.RequestException as e:
-        logging.warning(f"Network error fetching {url}: {e}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 403:
+            logging.warning(f"403 Forbidden for {url[:80]}...")
+        else:
+            logging.warning(f"Network error fetching {url[:80]}: {e}")
         return ""
     except Exception as e:
-        logging.error(f"Unexpected error parsing {url}: {e}")
+        logging.warning(f"Error fetching {url[:80]}: {e}")
         return ""
 
 
@@ -242,22 +251,12 @@ def run():
         logging.info(f"Parsing Feed Source: {feed}")
 
         f = feedparser.parse(feed)
-        
-        # --- TECHNICAL URL DEDUPLICATION ---
-        current_urls = [normalize_url(e.link) for e in f.entries if e.get("link")]
-        processed_batch = set()
-        if current_urls:
-            try:
-                res = supabase.table("incidents").select("source_url").in_("source_url", current_urls).execute()
-                processed_batch = set(x["source_url"] for x in res.data)
-            except Exception as e:
-                logging.error(f"Failed to fetch batch deduplication records: {e}")
 
         for e in f.entries:
             stats["entries"] += 1
             url = normalize_url(e.link) if e.get("link") else ""
             
-            if not url or url in processed_batch:
+            if not url:
                 continue
 
             # Get publication date from feed
