@@ -65,6 +65,12 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const [rawIncidents, setRawIncidents] = useState([]);
   const [dashboardTab, setDashboardTab] = useState('profile');
 
+  // Both "Print Summary (PDF)" and "Download Brief" used to call the exact
+  // same window.print() with no way to differentiate output. printMode lets
+  // each button render a different Executive Brief before printing.
+  const [printMode, setPrintMode] = useState('profile'); // 'profile' | 'trend'
+  const [pendingPrint, setPendingPrint] = useState(false);
+
   const [isFeedSyncing, setIsFeedSyncing] = useState(false);
   const [feedLastSynced, setFeedLastSynced] = useState(null);
 
@@ -92,18 +98,17 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Recharts' ResponsiveContainer measures its parent element's size on mount
-  // and on window resize. Browsers do not reliably fire a resize event when
-  // the print stylesheet changes layout, so charts can render at 0 height
-  // the first time window.print() is triggered. Forcing a resize event right
-  // before printing makes charts remeasure against their printed dimensions.
+  // setPrintMode() is async, so calling window.print() in the same event
+  // handler would print the *previous* brief content. Wait a frame for React
+  // to commit the new PrintOnlyBrief render before opening the print dialog.
   useEffect(() => {
-    const handleBeforePrint = () => {
-      window.dispatchEvent(new Event('resize'));
-    };
-    window.addEventListener('beforeprint', handleBeforePrint);
-    return () => window.removeEventListener('beforeprint', handleBeforePrint);
-  }, []);
+    if (!pendingPrint) return;
+    const raf = requestAnimationFrame(() => {
+      window.print();
+      setPendingPrint(false);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingPrint, printMode]);
 
   const fetchConflictFeed = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
@@ -357,7 +362,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   };
 
   const handleDownloadPDF = () => {
-    window.print();
+    setPrintMode('profile');
+    setPendingPrint(true);
   };
 
   const handleMapMouseEnter = (locId, locName, event) => {
@@ -498,7 +504,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   };
 
   const handleDownloadTrendBrief = () => {
-    window.print();
+    setPrintMode('trend');
+    setPendingPrint(true);
   };
 
   const getAggregateSummaryStats = () => {
@@ -528,24 +535,16 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             margin: 1.5cm;
           }
 
-          /* Hide interactive chrome only — NOT the whole dashboard layout.
-             Previously ".interactive-dashboard-layout" was force-hidden here,
-             which also hid every ".print-card" nested inside it (map, pillar
-             charts, comparison table, etc). That made those classes dead code
-             and meant only the generic PrintOnlyBrief cover page ever printed. */
-          nav, footer, button, .no-print, select, .theme-toggle {
+          /* The printed output is the standalone Executive Brief
+             (PrintOnlyBrief), not the live dashboard. Everything in the
+             interactive layout -- map, charts, tabs, cards -- is hidden. */
+          .interactive-dashboard-layout {
             display: none !important;
           }
 
-          .interactive-dashboard-layout {
+          body, html {
             background: white !important;
             color: black !important;
-          }
-
-          .print-card {
-            break-inside: avoid;
-            box-shadow: none !important;
-            border-color: #e2e8f0 !important;
           }
 
           .print-only-brief {
@@ -556,13 +555,6 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             margin: 0 !important;
             color: black !important;
             background: white !important;
-          }
-
-          /* Cover page (PrintOnlyBrief) always ends with a page break before
-             whichever dashboard tab content follows it. */
-          .print-only-brief {
-            page-break-after: always;
-            break-after: page;
           }
 
           .page-break {
@@ -631,7 +623,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                     onClick={() => { handleDownloadPDF(); setDownloadDropdownOpen(false); }}
                     className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
                   >
-                    Print / Save as PDF
+                    Print Executive Brief (PDF)
                   </button>
                 </div>
               )}
@@ -1407,7 +1399,13 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         />
       )}
 
-      <PrintOnlyBrief activeState={activeState} policyBrief={getStatePolicyBrief(activeState)} />
+      <PrintOnlyBrief
+        mode={printMode}
+        activeState={activeState}
+        policyBrief={getStatePolicyBrief(activeState)}
+        forecastData={getForecastChartData(activeState)}
+        outlook={getForecastOutlook(activeState)}
+      />
 
       {/* Weekly Update Sync Toast */}
       {updateNotification && (
