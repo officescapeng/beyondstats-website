@@ -167,7 +167,11 @@ _NIGERIA_PATTERNS = [
     ]
 ]
 
-MIN_TEXT_LENGTH = 150
+MIN_TEXT_LENGTH  = 150
+# ~375 tokens at 4 chars/token — keeps each prompt well under 600 tokens,
+# leaving comfortable headroom inside Groq's 6000 TPM limit even with
+# multiple concurrent threads.
+MAX_ARTICLE_CHARS = 1500
 
 
 def nigeria_score(text: str) -> int:
@@ -283,7 +287,7 @@ def fetch_full_article(url: str) -> str:
         if HAS_TRAFILATURA:
             extracted = trafilatura.extract(r.text, include_comments=False, include_tables=False)
             if extracted and len(extracted) >= MIN_TEXT_LENGTH:
-                return extracted[:4000]
+                return extracted[:MAX_ARTICLE_CHARS]
 
         soup = BeautifulSoup(r.text, "html.parser")
         for selector in ("article", "main", '[class*="article"]', '[class*="content"]'):
@@ -292,10 +296,10 @@ def fetch_full_article(url: str) -> str:
                 paras = container.find_all("p")
                 text  = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)
                 if len(text) >= MIN_TEXT_LENGTH:
-                    return text[:4000]
+                    return text[:MAX_ARTICLE_CHARS]
 
         paras = soup.find_all("p")
-        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:4000]
+        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:MAX_ARTICLE_CHARS]
 
     except requests.exceptions.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
@@ -333,29 +337,64 @@ Text: {text}
 """
 
 
+# Global lock so concurrent threads don't all fire Groq calls simultaneously.
+# At ~500 tokens/call and 6000 TPM limit, we can safely do 1 call every ~5s.
+_groq_lock = _threading.Lock()
+_GROQ_MIN_INTERVAL = 5.0   # seconds between Groq calls (across all threads)
+_groq_last_call: list[float] = [0.0]  # mutable container so threads share state
+
+_RETRY_AFTER_RE = re.compile(r"try again in\s+([\d.]+)s", re.IGNORECASE)
+
+
+def _parse_retry_after(err_str: str) -> float | None:
+    """Extract the 'try again in Xs' hint from a Groq 429 error message."""
+    m = _RETRY_AFTER_RE.search(err_str)
+    if m:
+        return float(m.group(1)) + 1.0   # add 1s buffer
+    return None
+
+
 def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict]:
     prompt  = _PROMPT_TEMPLATE.format(article_date=article_date, title=title, text=text)
     backoff = 2.0
 
     for attempt in range(retries):
+        # Throttle: enforce minimum interval between Groq calls globally
+        with _groq_lock:
+            elapsed = time.monotonic() - _groq_last_call[0]
+            gap     = _GROQ_MIN_INTERVAL - elapsed
+            if gap > 0:
+                time.sleep(gap)
+
+            try:
+                res = groq_client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    temperature=0.1,
+                )
+                _groq_last_call[0] = time.monotonic()
+            except Exception as exc:
+                _groq_last_call[0] = time.monotonic()
+                err_str       = str(exc)
+                is_rate_limit = "rate" in err_str.lower() or "429" in err_str
+                if is_rate_limit:
+                    retry_after = _parse_retry_after(err_str) or (backoff * 4)
+                    log.warning(f"Groq 429 rate limit (attempt {attempt + 1}). "
+                                f"Waiting {retry_after:.1f}s as instructed.")
+                    time.sleep(retry_after)
+                else:
+                    wait = backoff
+                    log.warning(f"Groq error (attempt {attempt + 1}, wait {wait:.1f}s): {exc}")
+                    time.sleep(wait)
+                backoff *= 2
+                continue
+
         try:
-            res  = groq_client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"},
-                temperature=0.1,
-            )
             data = json.loads(res.choices[0].message.content)
             return data.get("incidents", [])
-
         except json.JSONDecodeError as exc:
             log.error(f"JSON decode error (attempt {attempt + 1}): {exc}")
-        except Exception as exc:
-            is_rate_limit = "rate" in str(exc).lower() or "429" in str(exc)
-            wait = backoff * (4 if is_rate_limit else 1)
-            log.warning(f"Groq error (attempt {attempt + 1}, wait {wait:.1f}s): {exc}")
-            time.sleep(wait)
-            backoff *= 2
 
     log.error(f"AI extraction failed after {retries} attempts: {title[:60]}")
     return []
