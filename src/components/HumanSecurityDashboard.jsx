@@ -92,6 +92,19 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Recharts' ResponsiveContainer measures its parent element's size on mount
+  // and on window resize. Browsers do not reliably fire a resize event when
+  // the print stylesheet changes layout, so charts can render at 0 height
+  // the first time window.print() is triggered. Forcing a resize event right
+  // before printing makes charts remeasure against their printed dimensions.
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      window.dispatchEvent(new Event('resize'));
+    };
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+  }, []);
+
   const fetchConflictFeed = () => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
@@ -511,13 +524,30 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           display: none;
         }
         @media print {
-          nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
+          @page {
+            margin: 1.5cm;
+          }
+
+          /* Hide interactive chrome only — NOT the whole dashboard layout.
+             Previously ".interactive-dashboard-layout" was force-hidden here,
+             which also hid every ".print-card" nested inside it (map, pillar
+             charts, comparison table, etc). That made those classes dead code
+             and meant only the generic PrintOnlyBrief cover page ever printed. */
+          nav, footer, button, .no-print, select, .theme-toggle {
             display: none !important;
           }
-          body, html, .w-full, .min-h-screen {
+
+          .interactive-dashboard-layout {
             background: white !important;
             color: black !important;
           }
+
+          .print-card {
+            break-inside: avoid;
+            box-shadow: none !important;
+            border-color: #e2e8f0 !important;
+          }
+
           .print-only-brief {
             display: block !important;
             width: 100% !important;
@@ -527,6 +557,14 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             color: black !important;
             background: white !important;
           }
+
+          /* Cover page (PrintOnlyBrief) always ends with a page break before
+             whichever dashboard tab content follows it. */
+          .print-only-brief {
+            page-break-after: always;
+            break-after: page;
+          }
+
           .page-break {
             page-break-before: always !important;
             break-before: page !important;
@@ -593,7 +631,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                     onClick={() => { handleDownloadPDF(); setDownloadDropdownOpen(false); }}
                     className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
                   >
-                    Print Summary (PDF)
+                    Print / Save as PDF
                   </button>
                 </div>
               )}
@@ -1117,7 +1155,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
         {/* TAB 2: PROJECTIONS */}
         {dashboardTab === 'projections' && (
-          <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card no-print`}>
+          <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card`}>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
@@ -1369,7 +1407,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         />
       )}
 
-      <PrintOnlyBrief activeState={activeState} />
+      <PrintOnlyBrief activeState={activeState} policyBrief={getStatePolicyBrief(activeState)} />
 
       {/* Weekly Update Sync Toast */}
       {updateNotification && (
