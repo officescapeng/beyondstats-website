@@ -532,7 +532,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </div>
 
       {/* Main Hero Content */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 py-12 flex-1 flex flex-col justify-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-24 pb-12 flex-1 flex flex-col justify-center">
         <div className="max-w-[700px] flex flex-col items-start text-left">
           
           {/* Intro Label */}
