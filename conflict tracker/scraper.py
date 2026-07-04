@@ -5,8 +5,12 @@ import random
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
+import re
+import signal
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit, parse_qsl, urlencode
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import defaultdict
 from dotenv import load_dotenv
 
 import feedparser
@@ -15,141 +19,165 @@ from bs4 import BeautifulSoup
 from groq import Groq
 from supabase import create_client
 
-# Ensure the module path includes the script's directory
+try:
+    import trafilatura
+    HAS_TRAFILATURA = True
+except ImportError:
+    HAS_TRAFILATURA = False
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Load .env file
-local_env = os.path.abspath(os.path.join(os.path.dirname(__file__), ".env"))
+local_env  = os.path.abspath(os.path.join(os.path.dirname(__file__), ".env"))
 parent_env = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
-if os.path.exists(local_env):
-    load_dotenv(dotenv_path=local_env)
-else:
-    load_dotenv(dotenv_path=parent_env)
+load_dotenv(dotenv_path=local_env if os.path.exists(local_env) else parent_env)
 
-# ---------------- LOGGING SETUP ---------------- #
+
+# ─────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
+log = logging.getLogger(__name__)
 
-# ---------------- CONFIG & CLIENTS ---------------- #
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-DRY_RUN = os.environ.get("DRY_RUN", "false").lower() == "true"
+# ─────────────────────────────────────────────────────────────
+# STARTUP VALIDATION
+# ─────────────────────────────────────────────────────────────
+REQUIRED_ENV = {
+    "GROQ_API_KEY": "Groq LLM extraction will not work.",
+    "SUPABASE_URL": "Cannot connect to database.",
+    "SUPABASE_KEY": "Cannot connect to database.",
+}
 
-client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+missing = [k for k in REQUIRED_ENV if not os.environ.get(k)]
+if missing:
+    for key in missing:
+        log.critical(f"Missing required env var: {key}  ->  {REQUIRED_ENV[key]}")
+    sys.exit(1)
 
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+DRY_RUN      = os.environ.get("DRY_RUN", "false").lower() == "true"
+
+groq_client = Groq(api_key=GROQ_API_KEY)
+supabase    = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# ─────────────────────────────────────────────────────────────
+# FEEDS
+# ─────────────────────────────────────────────────────────────
 FEEDS = [
     "https://www.premiumtimesng.com/feed",
     "https://punchng.com/feed/",
     "https://www.vanguardngr.com/feed/",
     "https://dailytrust.com/feed/",
     "https://www.thecable.ng/feed",
-    "https://www.channelstv.com/feed/"
+    "https://www.channelstv.com/feed/",
 ]
 
-# ---------------- CONCURRENCY LOCK ---------------- #
-LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scraper.lock")
-if os.path.exists(LOCK_FILE):
-    logging.warning("SCRAPER ALREADY RUNNING. EXITING.")
-    exit(0)
 
-with open(LOCK_FILE, "w") as f:
-    f.write("running")
+# ─────────────────────────────────────────────────────────────
+# LOCK FILE  (PID-aware, auto-clears stale locks)
+# ─────────────────────────────────────────────────────────────
+LOCK_FILE     = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scraper.lock")
+MAX_RUN_HOURS = 3
 
-# ---------------- NIGERIAN STATES VALIDATION ---------------- #
+
+def _acquire_lock() -> bool:
+    if os.path.exists(LOCK_FILE):
+        try:
+            with open(LOCK_FILE) as fh:
+                data = json.load(fh)
+            pid       = data.get("pid")
+            started   = datetime.fromisoformat(data.get("started", ""))
+            age_hours = (datetime.now(timezone.utc) - started).total_seconds() / 3600
+            if age_hours > MAX_RUN_HOURS:
+                log.warning(f"Stale lock (PID {pid}, {age_hours:.1f}h). Clearing.")
+            else:
+                try:
+                    os.kill(pid, 0)
+                    log.warning(f"Scraper already running (PID {pid}). Exiting.")
+                    return False
+                except (ProcessLookupError, PermissionError):
+                    log.warning(f"Lock PID {pid} is dead. Clearing.")
+        except Exception:
+            log.warning("Unreadable lock file. Clearing.")
+
+    with open(LOCK_FILE, "w") as fh:
+        json.dump({"pid": os.getpid(), "started": datetime.now(timezone.utc).isoformat()}, fh)
+    return True
+
+
+def _release_lock():
+    if os.path.exists(LOCK_FILE):
+        os.remove(LOCK_FILE)
+
+
+def _handle_signal(sig, frame):
+    log.warning(f"Signal {sig} received. Releasing lock.")
+    _release_lock()
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, _handle_signal)
+signal.signal(signal.SIGINT,  _handle_signal)
+
+
+# ─────────────────────────────────────────────────────────────
+# NIGERIAN STATES + ALIASES
+# ─────────────────────────────────────────────────────────────
 NIGERIAN_STATES = {
     "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
     "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
     "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
-    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
+    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe",
+    "Zamfara", "FCT",
 }
 STATE_MAP = {s.lower(): s for s in NIGERIAN_STATES}
 
-# ---------------- UTILITY FUNCTIONS ---------------- #
-def normalize_url(url):
-    if not url:
-        return ""
-    parts = urlsplit(url.lower().strip())
-    keep = {"id", "slug", "article", "p"}
-    q = [(k, v) for k, v in parse_qsl(parts.query) if k in keep]
-    return parts._replace(query=urlencode(q), fragment="").geturl().rstrip("/")
-
-
-def content_fp(title, text):
-    base = f"{title.lower()}::{text[:1000].lower()}"
-    return hashlib.sha256(base.encode()).hexdigest()
-
-
-def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions):
-    state = str(state).strip().lower() if state else "unknown"
-    lga = str(lga).strip().lower() if lga else "unknown"
-    inc_type = str(incident_type).strip().lower() if incident_type else "unknown"
-    
-    # Normalize date to 2-day windows to catch same event on consecutive days
-    try:
-        event_date = datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
-        day_offset = event_date.day % 2
-        normalized_date = (event_date - timedelta(days=day_offset)).strftime("%Y-%m-%d")
-    except:
-        normalized_date = str(date_str)[:10] if date_str else "unknown"
-    
-    # Round casualties to nearest 5 to group similar reports
-    total_casualties = int(fatalities or 0) + int(abductions or 0)
-    rounded_casualties = (total_casualties // 5) * 5 if total_casualties > 0 else 0
-    
-    base = f"{normalized_date}|{state}|{inc_type}|{rounded_casualties}"
-    if lga and lga != "unknown":
-        base += f"|{lga}"
-    
-    return hashlib.sha256(base.encode()).hexdigest()
-
-
-# ---------------- WEB SCRAPING ---------------- #
-CUSTOM_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9",
+STATE_ALIASES = {
+    "abuja":             "FCT",
+    "federal capital":   "FCT",
+    "cross river state": "Cross River",
+    "akwa ibom state":   "Akwa Ibom",
 }
 
-def fetch_full_article(url):
-    try:
-        time.sleep(random.uniform(2, 5))
-        r = requests.get(url, headers=CUSTOM_HEADERS, timeout=15)
-        r.raise_for_status()
-        
-        soup = BeautifulSoup(r.text, "html.parser")
-        paras = soup.find_all("p")
-        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:3000]
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 403:
-            logging.warning(f"403 Forbidden for {url[:80]}...")
-        else:
-            logging.warning(f"Network error fetching {url[:80]}: {e}")
-        return ""
-    except Exception as e:
-        logging.warning(f"Error fetching {url[:80]}: {e}")
-        return ""
+
+def resolve_state(raw: str):
+    val = raw.strip().lower()
+    if val in STATE_MAP:
+        return STATE_MAP[val]
+    for alias, canonical in STATE_ALIASES.items():
+        if alias in val:
+            return canonical
+    return None
 
 
-# ---------------- NIGERIA FILTER HEURISTIC ---------------- #
-NIGERIA_TERMS = [
-    "nigeria", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
-    "army", "police", "dss", "bandits", "boko haram", "herdsmen", 
-    "kidnap", "kidnapped", "abducted", "hostage", "ransom"
+# ─────────────────────────────────────────────────────────────
+# NIGERIA RELEVANCE FILTER  (word-boundary regex)
+# ─────────────────────────────────────────────────────────────
+_NIGERIA_PATTERNS = [
+    re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
+        "nigeria", "nigerian", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
+        "army", "police", "dss", "bandits", "banditry", "boko haram", "herdsmen",
+        "kidnap", "kidnapped", "kidnapping", "abducted", "abduction", "hostage", "ransom",
+    ]
 ]
 
-def nigeria_score(text):
-    text = text.lower()
-    return sum(1 for t in NIGERIA_TERMS if t in text)
+MIN_TEXT_LENGTH = 150
 
 
-def is_nigeria_related(title, text):
-    score = nigeria_score(title + " " + text)
+def nigeria_score(text: str) -> int:
+    return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
+
+
+def is_nigeria_relevant(title: str, text: str):
+    if len(text) < MIN_TEXT_LENGTH:
+        return False
+    score = nigeria_score(f"{title} {text}")
     if score >= 3:
         return True
     if 1 <= score < 3:
@@ -157,211 +185,424 @@ def is_nigeria_related(title, text):
     return False
 
 
-# ---------------- AI INCIDENT EXTRACTION ---------------- #
-def extract_incident(title, text, article_date, retries=3):
-    prompt = f"""
+# ─────────────────────────────────────────────────────────────
+# URL HELPERS
+# ─────────────────────────────────────────────────────────────
+def normalize_url(url: str) -> str:
+    if not url:
+        return ""
+    parts = urlsplit(url.strip())
+    keep  = {"id", "slug", "article", "p"}
+    q     = [(k, v) for k, v in parse_qsl(parts.query) if k in keep]
+    cleaned = parts._replace(
+        scheme=parts.scheme.lower(),
+        netloc=parts.netloc.lower(),
+        query=urlencode(q),
+        fragment="",
+    )
+    return cleaned.geturl().rstrip("/")
+
+
+def _domain_of(url: str) -> str:
+    return urlsplit(url).netloc.lower()
+
+
+# ─────────────────────────────────────────────────────────────
+# FINGERPRINTING
+# ─────────────────────────────────────────────────────────────
+def content_fp(url: str) -> str:
+    return hashlib.sha256(url.encode()).hexdigest()
+
+
+def _safe_int(val, default: int = 0) -> int:
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def semantic_fp(date_str, state, lga, incident_type, fatalities, abductions) -> str:
+    """
+    Fingerprint for deduplication across outlets reporting the same real-world event.
+
+    Key design decisions:
+    - Exact casualty counts (no rounding): prevents merging of distinct events
+      with coincidentally similar-but-different tolls.
+    - 3-day date bucket: consecutive-day reports of the same event collapse into
+      one bucket, catching the common pattern of outlets publishing a day apart.
+    - LGA included when present: increases precision, reducing false positives.
+    """
+    state_n = str(state).strip().lower()         if state         else "unknown"
+    lga_n   = str(lga).strip().lower()           if lga           else ""
+    inc_n   = str(incident_type).strip().lower() if incident_type else "unknown"
+    fat     = _safe_int(fatalities)
+    abd     = _safe_int(abductions)
+
+    try:
+        d      = datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
+        bucket = (d - timedelta(days=d.timetuple().tm_yday % 3)).strftime("%Y-%m-%d")
+    except Exception:
+        bucket = str(date_str)[:10] if date_str else "unknown"
+
+    base = f"{bucket}|{state_n}|{inc_n}|{fat}|{abd}"
+    if lga_n:
+        base += f"|{lga_n}"
+    return hashlib.sha256(base.encode()).hexdigest()
+
+
+# ─────────────────────────────────────────────────────────────
+# WEB SCRAPING
+# ─────────────────────────────────────────────────────────────
+CUSTOM_HEADERS = {
+    "User-Agent":      ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"),
+    "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+_domain_last_fetch: dict[str, float] = defaultdict(float)
+_MIN_DOMAIN_INTERVAL = 3.0
+
+import threading as _threading
+_domain_locks: dict[str, _threading.Lock] = defaultdict(_threading.Lock)
+
+
+def fetch_full_article(url: str) -> str:
+    domain = _domain_of(url)
+    with _domain_locks[domain]:
+        elapsed = time.monotonic() - _domain_last_fetch[domain]
+        wait    = max(0.0, _MIN_DOMAIN_INTERVAL - elapsed) + random.uniform(0.5, 1.5)
+        time.sleep(wait)
+
+    try:
+        r = requests.get(url, headers=CUSTOM_HEADERS, timeout=15)
+        r.raise_for_status()
+        _domain_last_fetch[domain] = time.monotonic()
+
+        if HAS_TRAFILATURA:
+            extracted = trafilatura.extract(r.text, include_comments=False, include_tables=False)
+            if extracted and len(extracted) >= MIN_TEXT_LENGTH:
+                return extracted[:4000]
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        for selector in ("article", "main", '[class*="article"]', '[class*="content"]'):
+            container = soup.select_one(selector)
+            if container:
+                paras = container.find_all("p")
+                text  = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)
+                if len(text) >= MIN_TEXT_LENGTH:
+                    return text[:4000]
+
+        paras = soup.find_all("p")
+        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:4000]
+
+    except requests.exceptions.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else "?"
+        log.warning(f"HTTP {status} fetching {url[:80]}")
+    except Exception as exc:
+        log.warning(f"Error fetching {url[:80]}: {exc}")
+    return ""
+
+
+# ─────────────────────────────────────────────────────────────
+# AI INCIDENT EXTRACTION
+# ─────────────────────────────────────────────────────────────
+_PROMPT_TEMPLATE = """\
 The article was published on: {article_date}.
 
-Return strictly valid JSON only. Do not include markdown formatting.
+Return ONLY strictly valid JSON. No markdown, no code fences, no preamble.
 
-If the article is NOT related to a Nigerian security incident (including terrorism, banditry, clashes, or kidnapping/abductions), return:
+If the article is NOT about a Nigerian security incident (terrorism, banditry,
+clashes, kidnapping, or abductions), return exactly:
 {{"incidents": []}}
 
-If it is related, extract an array of distinct incidents under the key "incidents". 
-Each incident object must contain: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
-Ensure you specifically capture kidnapping/abduction tracking metrics.
+Otherwise extract every distinct incident into the "incidents" array.
+Each incident MUST contain all of these keys (null if unknown):
+  state, lga, community, incident_type, fatalities, abductions,
+  occurrence_date (YYYY-MM-DD), summary
 
-EXAMPLE OUTPUT:
-{{
-    "incidents": [
-        {{
-            "state": "Kaduna",
-            "lga": "Chikun",
-            "community": "Kujama",
-            "incident_type": "kidnapping",
-            "fatalities": 1,
-            "abductions": 14,
-            "occurrence_date": "2026-07-01",
-            "summary": "Gunmen raided a village overnight, killing one community member and taking 14 hostages into the forest."
-        }}
-    ]
-}}
+Rules:
+- fatalities and abductions MUST be integers (0 if none; never words like "several").
+- occurrence_date is the actual event date, NOT the article publication date.
+- Separate incidents in the same article each get their own object.
+- Do not fabricate details absent from the article.
 
 Title: {title}
 Text: {text}
 """
+
+
+def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict]:
+    prompt  = _PROMPT_TEMPLATE.format(article_date=article_date, title=title, text=text)
+    backoff = 2.0
+
     for attempt in range(retries):
         try:
-            res = client.chat.completions.create(
+            res  = groq_client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
-                temperature=0.1
+                temperature=0.1,
             )
-            return res.choices[0].message.content
-        except Exception as e:
-            logging.warning(f"Groq API error on attempt {attempt + 1}: {e}")
-            time.sleep(2)
-            
-    logging.error("Failed to extract context via AI after max retries.")
-    return None
+            data = json.loads(res.choices[0].message.content)
+            return data.get("incidents", [])
+
+        except json.JSONDecodeError as exc:
+            log.error(f"JSON decode error (attempt {attempt + 1}): {exc}")
+        except Exception as exc:
+            is_rate_limit = "rate" in str(exc).lower() or "429" in str(exc)
+            wait = backoff * (4 if is_rate_limit else 1)
+            log.warning(f"Groq error (attempt {attempt + 1}, wait {wait:.1f}s): {exc}")
+            time.sleep(wait)
+            backoff *= 2
+
+    log.error(f"AI extraction failed after {retries} attempts: {title[:60]}")
+    return []
 
 
-# ---------------- SAFE STORAGE ---------------- #
-def safe_store(payload):
-    if DRY_RUN:
-        logging.info(f"[DRY RUN] Target Payload Insert:\n{json.dumps(payload, indent=2)}")
-        return {"dry_run": True}
-
-    return supabase.table("incidents").upsert(
-        payload,
-        on_conflict="semantic_fp"
-    ).execute()
-
-
-# ---------------- CORE PIPELINE ---------------- #
-def run():
-    logging.info("STARTING SECURITY SCRAPER PIPELINE")
-    logging.info(f"DRY_RUN status: {DRY_RUN}")
-
-    stats = {
-        "feeds": 0,
-        "entries": 0,
-        "saved_incidents": 0,
-        "skipped_nigeria": 0,
-        "invalid_state": 0,
-        "semantic_duplicates": 0,
-        "ai_failed": 0
-    }
-    
-    current_date = datetime.today().strftime("%Y-%m-%d")
-
-    # --- SEMANTIC DEDUPLICATION (7-DAY LOOKBACK) ---
-    recent_semantic_fps = set()
+# ─────────────────────────────────────────────────────────────
+# DATABASE HELPERS
+# ─────────────────────────────────────────────────────────────
+def load_processed_article_fps(lookback_days: int = 14) -> set[str]:
+    """
+    Article-level fingerprints already in DB.
+    Used to skip the fetch + LLM call entirely for known articles.
+    """
     try:
-        seven_days_ago = (datetime.today() - timedelta(days=7)).strftime("%Y-%m-%d")
-        res = supabase.table("incidents").select("semantic_fp").gte("date", seven_days_ago).execute()
-        recent_semantic_fps = set(x["semantic_fp"] for x in res.data if x.get("semantic_fp"))
-        logging.info(f"Loaded {len(recent_semantic_fps)} recent semantic fingerprints for deduplication.")
-    except Exception as e:
-        logging.error(f"Failed to fetch recent semantic_fps from Supabase: {e}")
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        res    = supabase.table("incidents").select("content_fp").gte("date", cutoff).execute()
+        fps    = set()
+        for row in res.data:
+            raw = row.get("content_fp", "")
+            fps.add(raw.split("_")[0] if "_" in raw else raw)
+        log.info(f"Loaded {len(fps)} processed article fingerprints (last {lookback_days}d).")
+        return fps
+    except Exception as exc:
+        log.error(f"Failed to load article FPs: {exc}")
+        return set()
 
-    for feed in FEEDS:
-        stats["feeds"] += 1
-        logging.info(f"Parsing Feed Source: {feed}")
 
-        f = feedparser.parse(feed)
+def load_recent_semantic_fps(lookback_days: int = 7) -> set[str]:
+    """Incident-level semantic fingerprints — used to catch cross-outlet duplicates."""
+    try:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        res    = supabase.table("incidents").select("semantic_fp").gte("date", cutoff).execute()
+        fps    = {x["semantic_fp"] for x in res.data if x.get("semantic_fp")}
+        log.info(f"Loaded {len(fps)} recent semantic fingerprints (last {lookback_days}d).")
+        return fps
+    except Exception as exc:
+        log.error(f"Failed to load semantic FPs: {exc}")
+        return set()
 
-        for e in f.entries:
-            stats["entries"] += 1
-            url = normalize_url(e.link) if e.get("link") else ""
-            
-            if not url:
-                continue
 
-            # Get publication date from feed
-            pub_date = current_date
-            t = e.get("published_parsed") or e.get("updated_parsed")
-            if t:
-                try:
-                    pub_date = time.strftime("%Y-%m-%d", t)
-                except:
-                    pass
+def safe_store(payload: dict):
+    if DRY_RUN:
+        log.info(f"[DRY RUN] Would insert:\n{json.dumps(payload, indent=2)}")
+        return
+    supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
 
-            text = fetch_full_article(url)
-            if not text:
-                continue
 
-            if is_nigeria_related(e.title, text) is False:
-                stats["skipped_nigeria"] += 1
-                continue
+# ─────────────────────────────────────────────────────────────
+# ARTICLE PROCESSOR
+# ─────────────────────────────────────────────────────────────
+def process_entry(entry, processed_article_fps: set, recent_semantic_fps: set, default_date: str) -> dict:
+    result = {
+        "skipped_already_seen": 0,
+        "skipped_nigeria":      0,
+        "skipped_too_short":    0,
+        "invalid_state":        0,
+        "semantic_duplicates":  0,
+        "ai_failed":            0,
+        "saved_incidents":      0,
+    }
 
-            logging.info(f"Processing candidate article: {e.title}")
+    try:
+        url = normalize_url(entry.get("link", ""))
+        if not url:
+            return result
 
-            ai_response = extract_incident(e.title, text, pub_date)
-            if not ai_response:
-                stats["ai_failed"] += 1
-                continue
+        title = (entry.get("title") or "").strip() or "(no title)"
 
+        pub_date = default_date
+        t = entry.get("published_parsed") or entry.get("updated_parsed")
+        if t:
             try:
-                data = json.loads(ai_response)
-                incidents_list = data.get("incidents", [])
-            except json.JSONDecodeError as ex:
-                logging.error(f"JSON parsing exception for entry {e.title}: {ex}")
-                stats["ai_failed"] += 1
-                continue
+                pub_date = time.strftime("%Y-%m-%d", t)
+            except Exception:
+                pass
 
-            if not incidents_list:
-                stats["skipped_nigeria"] += 1
-                continue
+        # Skip already-processed articles (saves fetch + LLM call)
+        art_fp = content_fp(url)
+        if art_fp in processed_article_fps:
+            log.debug(f"Already processed: {url[:70]}")
+            result["skipped_already_seen"] += 1
+            return result
 
-            base_article_fp = content_fp(e.title, text)
+        # Fetch article text
+        text = fetch_full_article(url)
+        if len(text) < MIN_TEXT_LENGTH:
+            log.debug(f"Too short ({len(text)} chars): {url[:70]}")
+            result["skipped_too_short"] += 1
+            return result
 
-            for idx, incident in enumerate(incidents_list):
-                
-                # Validate state
-                state_val = incident.get("state", "").strip()
-                if state_val.lower() not in STATE_MAP:
-                    logging.info(f"Skipping invalid state: {state_val}")
-                    stats["invalid_state"] += 1
+        # Nigeria relevance check
+        relevance = is_nigeria_relevant(title, text)
+        if relevance is False:
+            result["skipped_nigeria"] += 1
+            return result
+
+        log.info(f"Processing [{'borderline' if relevance == 'borderline' else 'relevant'}]: {title[:80]}")
+
+        # LLM extraction
+        incidents_list = extract_incidents(title, text, pub_date)
+        if not incidents_list:
+            result["ai_failed" if relevance is True else "skipped_nigeria"] += 1
+            return result
+
+        for idx, incident in enumerate(incidents_list):
+            try:
+                raw_state   = (incident.get("state") or "").strip()
+                clean_state = resolve_state(raw_state)
+                if not clean_state:
+                    log.info(f"  Unknown state '{raw_state}' — skipping.")
+                    result["invalid_state"] += 1
                     continue
-                
-                clean_state = STATE_MAP[state_val.lower()]
-                
-                # Get occurrence date from AI or use publication date
-                occurrence_date = incident.get("occurrence_date", pub_date)
-                
-                # Generate Semantic Fingerprint
+
+                fatalities = _safe_int(incident.get("fatalities", 0))
+                abductions = _safe_int(incident.get("abductions", 0))
+                lga        = (incident.get("lga") or "").strip() or None
+
+                raw_date = (incident.get("occurrence_date") or pub_date)[:10]
+                try:
+                    datetime.strptime(raw_date, "%Y-%m-%d")
+                    occurrence_date = raw_date
+                except ValueError:
+                    log.warning(f"  Bad date '{raw_date}' — using pub_date.")
+                    occurrence_date = pub_date
+
                 sem_fp = semantic_fp(
-                    occurrence_date,
-                    clean_state,
-                    incident.get("lga"),
-                    incident.get("incident_type"),
-                    incident.get("fatalities", 0),
-                    incident.get("abductions", 0)
+                    occurrence_date, clean_state, lga,
+                    incident.get("incident_type"), fatalities, abductions,
                 )
-                
-                # Check for Semantic Duplication
-                if sem_fp in recent_semantic_fps:
-                    logging.info(f"Semantic duplicate caught! Skipping incident in {clean_state}.")
-                    stats["semantic_duplicates"] += 1
-                    continue
-                
-                # Add to local memory
-                recent_semantic_fps.add(sem_fp)
 
-                unique_content_fp = f"{base_article_fp}_{idx}"
+                if sem_fp in recent_semantic_fps:
+                    log.info(f"  Semantic duplicate — {clean_state} / {occurrence_date}. Skipping.")
+                    result["semantic_duplicates"] += 1
+                    continue
+
+                # Register locally before the DB write so concurrent threads don't double-insert
+                recent_semantic_fps.add(sem_fp)
+                processed_article_fps.add(art_fp)
 
                 payload = {
-                    "date": occurrence_date,
-                    "state": clean_state,
-                    "lga": incident.get("lga"),
-                    "community": incident.get("community", "Unknown"),
-                    "incident_type": incident.get("incident_type"),
-                    "fatalities": incident.get("fatalities", 0),
-                    "abductions": incident.get("abductions", 0),
-                    "summary": incident.get("summary"),
-                    "source_url": url,
-                    "content_fp": unique_content_fp,
-                    "semantic_fp": sem_fp
+                    "date":          occurrence_date,
+                    "state":         clean_state,
+                    "lga":           lga,
+                    "community":     (incident.get("community") or "Unknown").strip(),
+                    "incident_type": ((incident.get("incident_type") or "").strip().lower()) or None,
+                    "fatalities":    fatalities,
+                    "abductions":    abductions,
+                    "summary":       (incident.get("summary") or "").strip() or None,
+                    "source_url":    url,
+                    "content_fp":    f"{art_fp}_{idx}",
+                    "semantic_fp":   sem_fp,
                 }
 
-                try:
-                    safe_store(payload)
-                    stats["saved_incidents"] += 1
-                except Exception as ex:
-                    logging.error(f"Database insertion exception on '{e.title}' (Index {idx}): {ex}")
+                safe_store(payload)
+                log.info(f"  Saved: {clean_state} | {occurrence_date} | "
+                         f"{incident.get('incident_type', '?')} | "
+                         f"{fatalities} killed / {abductions} abducted")
+                result["saved_incidents"] += 1
 
-    logging.info("\n===== PIPELINE FINAL EXECUTION REPORT =====")
-    for key, value in stats.items():
-        logging.info(f"{key.replace('_', ' ').title()}: {value}")
-    logging.info("===========================================")
+            except Exception as exc:
+                log.error(f"  Incident [{idx}] error from '{title[:60]}': {exc}", exc_info=True)
+
+    except Exception as exc:
+        log.error(f"process_entry unhandled error: {exc}", exc_info=True)
+
+    return result
 
 
-# ---------------- EXECUTION RUNNER ---------------- #
+# ─────────────────────────────────────────────────────────────
+# MAIN PIPELINE
+# ─────────────────────────────────────────────────────────────
+def run():
+    log.info("=" * 55)
+    log.info("STARTING SECURITY SCRAPER PIPELINE")
+    log.info(f"DRY_RUN: {DRY_RUN}  |  trafilatura: {HAS_TRAFILATURA}")
+    log.info("=" * 55)
+
+    stats = {
+        "feeds":                0,
+        "entries":              0,
+        "skipped_already_seen": 0,
+        "skipped_nigeria":      0,
+        "skipped_too_short":    0,
+        "invalid_state":        0,
+        "semantic_duplicates":  0,
+        "ai_failed":            0,
+        "saved_incidents":      0,
+    }
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    processed_article_fps = load_processed_article_fps(lookback_days=14)
+    recent_semantic_fps   = load_recent_semantic_fps(lookback_days=7)
+
+    all_entries = []
+    for feed_url in FEEDS:
+        stats["feeds"] += 1
+        log.info(f"Parsing feed: {feed_url}")
+        try:
+            f = feedparser.parse(feed_url)
+            if f.get("bozo") and f.get("bozo_exception"):
+                log.warning(f"Malformed feed ({feed_url}): {f.bozo_exception}")
+            for entry in f.entries:
+                stats["entries"] += 1
+                all_entries.append(entry)
+        except Exception as exc:
+            log.error(f"Feed parse error {feed_url}: {exc}")
+
+    log.info(f"Total entries to evaluate: {len(all_entries)}")
+
+    # Group by domain so per-domain locks provide natural rate limiting
+    by_domain: dict[str, list] = defaultdict(list)
+    for entry in all_entries:
+        domain = _domain_of(normalize_url(entry.get("link", "")))
+        by_domain[domain].append(entry)
+
+    max_workers = min(len(by_domain) or 1, 6)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(process_entry, entry, processed_article_fps, recent_semantic_fps, today)
+            for entries in by_domain.values()
+            for entry in entries
+        ]
+        for future in as_completed(futures):
+            try:
+                for k, v in future.result().items():
+                    stats[k] = stats.get(k, 0) + v
+            except Exception as exc:
+                log.error(f"Future error: {exc}", exc_info=True)
+
+    log.info("")
+    log.info("=" * 45)
+    log.info("  PIPELINE EXECUTION REPORT")
+    log.info("=" * 45)
+    pad = max(len(k) for k in stats) + 2
+    for key, val in stats.items():
+        log.info(f"  {key.replace('_', ' ').title():<{pad}} {val}")
+    log.info("=" * 45)
+
+
+# ─────────────────────────────────────────────────────────────
+# ENTRY POINT
+# ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    if not _acquire_lock():
+        sys.exit(0)
     try:
         run()
     finally:
-        if os.path.exists(LOCK_FILE):
-            os.remove(LOCK_FILE)
+        _release_lock()
