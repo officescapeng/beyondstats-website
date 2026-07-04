@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import re
+import warnings
 from dotenv import load_dotenv
 import random
 import hashlib
@@ -10,13 +11,15 @@ import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlsplit, parse_qsl, urlencode, urlparse
 from logging.handlers import RotatingFileHandler
-import pickle
 
 import feedparser
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, XMLParsedAsHTMLWarning
 from groq import Groq
 from supabase import create_client
+
+# Suppress XML parser warning
+warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 CUSTOM_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -128,7 +131,6 @@ LGA_NORMALIZATION = {
     "chikun": "Chikun", "chikkun": "Chikun",
     "birnin gwari": "Birnin Gwari", "birningwari": "Birnin Gwari",
     "sabon gari": "Sabon Gari", "sabongari": "Sabon Gari",
-    "jema'a": "Jema'a", "jemaa": "Jema'a",
 }
 
 INCIDENT_CATEGORIES = [
@@ -199,66 +201,26 @@ def normalize_incident_data(incident):
             incident[field] = 0
     return incident
 
-def is_rescue_operation(title, text):
-    combined = (title + " " + text).lower()
-    rescue_terms = [
-        "rescued by", "freed by", "released by police", "rescued the victims",
-        "successful rescue", "rescue operation", "police rescue", "troops rescue",
-        "rescued from", "freed from captivity", "reunited with families",
-        "regained their freedom", "victims rescued", "hostages freed", "captives freed"
-    ]
-    if sum(1 for t in rescue_terms if t in combined) >= 2:
-        return True
-    title_lower = title.lower()
-    if any(t in title_lower for t in ["rescue", "rescued", "freed"]):
-        if not any(t in title_lower for t in ["kidnapped", "abducted", "kidnap", "taken"]):
-            return True
-    return False
-
-def extract_rescue_casualties(title, text):
-    combined = (title + " " + text).lower()
-    result = {"fatalities": 0, "security_forces": 0, "criminals": 0, "civilians": 0}
-    patterns = [
-        (r"(\d+)\s*(?:soldiers|troops|policemen|operatives|personnel)\s*(?:killed|died|lost|dead|slain)", "security_forces"),
-        (r"lost\s*(\d+)\s*(?:soldiers|troops|policemen|operatives)", "security_forces"),
-        (r"(\d+)\s*(?:bandits|kidnappers|terrorists|gunmen|criminals)\s*(?:killed|neutralized|gunned|eliminated)", "criminals"),
-        (r"(?:killed|neutralized|gunned down|eliminated)\s*(\d+)\s*(?:bandits|kidnappers|terrorists|gunmen)", "criminals"),
-    ]
-    for pattern, category in patterns:
-        for match in re.findall(pattern, combined):
-            try: result[category] += int(match)
-            except: pass
-    result["fatalities"] = sum(result.values())
-    return result if result["fatalities"] > 0 else None
-
 def is_potential_conflict_article(title, text):
+    """Lenient pre-filter - let AI make final decision"""
     combined = (title + " " + text).lower()
-    conflict_indicators = [
-        "killed", "dead", "died", "slain", "massacre", "attack",
-        "gunmen", "bandits", "terrorists", "militants", "insurgents",
-        "kidnapped", "abducted", "clash", "violence",
-        "boko haram", "iswap", "herdsmen", "herders", "cultists", "farmers",
-        "bomb", "explosion", "ambush", "raid", "assault", "shot dead"
+    
+    # Quick reject obvious non-conflict
+    obvious_non_conflict = [
+        "morning recap", "evening recap", "news roundup", "top stories",
+        "fashion", "sports", "entertainment", "celebrity", "grammys",
+        "appointment", "promotion", "inauguration", "swearing in"
     ]
-    conflict_score = sum(1 for kw in conflict_indicators if kw in combined)
-    if conflict_score >= 2:
-        return True
-    if conflict_score < 2:
-        rescue_keywords = ["rescue", "rescued", "freed", "reunited with", "released by"]
-        for kw in rescue_keywords:
-            if kw in combined:
-                casualties = extract_rescue_casualties(title, text)
-                if not casualties:
-                    return False
-                return True
-    if conflict_score == 0:
-        non_conflict = ["suicide", "morning recap", "evening recap", "news roundup",
-            "traffic accident", "road crash", "fire outbreak", "building collapse",
-            "fashion", "sports", "entertainment", "celebrity", "grammys", "award",
-            "appointment", "promotion", "inauguration", "swearing in"]
-        for kw in non_conflict:
-            if kw in combined:
-                return False
+    for kw in obvious_non_conflict:
+        if kw in combined:
+            return False
+    
+    # Quick reject suicide without conflict terms
+    if "suicide" in combined or "took his own life" in combined:
+        conflict_terms = ["attack", "killed", "gunmen", "bandits", "boko haram"]
+        if not any(t in combined for t in conflict_terms):
+            return False
+    
     return True
 
 def fetch_full_article(url):
@@ -266,15 +228,21 @@ def fetch_full_article(url):
         time.sleep(random.uniform(1, 3))
         r = requests.get(url, headers=CUSTOM_HEADERS, timeout=10)
         r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
+        
+        try:
+            soup = BeautifulSoup(r.text, "lxml")
+        except:
+            soup = BeautifulSoup(r.text, "html.parser")
+        
         article = soup.find("article")
         if article:
             paras = article.find_all("p")
         else:
             content_div = soup.find("div", class_=["entry-content", "post-content", "article-content", "content"])
             paras = content_div.find_all("p") if content_div else soup.find_all("p")
+        
         text = "\n".join(p.get_text().strip() for p in paras if len(p.get_text().strip()) > 30)
-        return text[:2000]
+        return text[:3000]
     except Exception as e:
         logging.warning(f"Fetch error {url[:80]}: {e}")
         return ""
@@ -284,53 +252,62 @@ def nigeria_score(text):
 
 def is_nigeria_related(title, text):
     score = nigeria_score(title + " " + text)
-    if score >= 3: return True
-    if 1 <= score < 3:
+    if score >= 2: return True
+    if score >= 1:
         if sum(1 for s in STATE_MAP if s in (title + " " + text).lower()) >= 1:
             return True
-        return "borderline"
     return False
 
 def extract_incident(title, text, article_date, retries=2):
     if not client:
         logging.error("Groq client not initialized.")
         return None
-    is_rescue = is_rescue_operation(title, text)
+    
     categories_string = '", "'.join(INCIDENT_CATEGORIES)
+    
     prompt = f"""Article date: {article_date}.
-{"RESCUE OPERATION: Only extract NEW fatalities. Set abductions=0. Count security forces, criminals, or civilians killed. Return empty if no deaths." if is_rescue else ""}
 
+Extract security incidents from this Nigerian news article.
 Return valid JSON only. No markdown.
 
-CRITICAL: Only extract confirmed fatalities OR new abductions from armed attacks.
-Skip: suicide, accidents, arrests, recaps, rescue without casualties.
+For each incident, provide: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
 
-Each incident: state, lga, community, incident_type, fatalities, abductions, occurrence_date, summary.
-Type MUST be: ["{categories_string}"]. Date MUST be YYYY-MM-DD.
+INCIDENT TYPES (choose one): {categories_string}
+
+RULES:
+- Only extract if there are confirmed fatalities (deaths) OR abductions (kidnappings)
+- Report the EXACT numbers mentioned in the article
+- If no confirmed casualties, return {{"incidents":[]}}
+- For rescue operations, only count NEW deaths during the operation, set abductions=0
+- Ignore: suicide, accidents, arrests without casualties, news recaps
 
 EXAMPLES:
-NEW INCIDENT: {{"incidents":[{{"state":"Kaduna","lga":"Chikun","community":"Kujama","incident_type":"Kidnapping for ransom","fatalities":1,"abductions":14,"occurrence_date":"2026-07-01","summary":"Gunmen attacked, killing 1, kidnapping 14."}}]}}
-NO INCIDENT: {{"incidents":[]}}
+Article about attack: {{"incidents":[{{"state":"Kaduna","lga":"Chikun","community":"Kujama","incident_type":"Kidnapping for ransom","fatalities":1,"abductions":14,"occurrence_date":"2026-07-01","summary":"Gunmen attacked village, killing 1, kidnapping 14."}}]}}
+Article without casualties: {{"incidents":[]}}
 
 Title: {title}
-Text: {text[:1500]}"""
+Text: {text[:2000]}"""
+    
     for attempt in range(retries):
         try:
-            groq_limiter.wait_if_needed(estimated_tokens=800)
+            groq_limiter.wait_if_needed(estimated_tokens=1000)
             res = client.chat.completions.create(
                 model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
                 temperature=0.1,
-                max_tokens=400,
-                timeout=25
+                max_tokens=500,
+                timeout=30
             )
-            return res.choices[0].message.content
+            result = res.choices[0].message.content
+            if result and '"incidents":[]' not in result:
+                logging.debug(f"AI found incident: {result[:200]}")
+            return result
         except Exception as e:
             err = str(e)
             if "429" in err:
                 time.sleep(min(30, 5 * (2 ** attempt)))
-            elif "timeout" in err.lower() or "timed" in err.lower():
+            elif "timeout" in err.lower():
                 logging.warning(f"API timeout attempt {attempt+1}")
                 time.sleep(3)
             elif "401" in err:
@@ -381,8 +358,7 @@ def merge_duplicate_records():
         groups = {}
         for r in all_r.data:
             fp = r.get("semantic_fp")
-            if fp:
-                groups.setdefault(fp, []).append(r)
+            if fp: groups.setdefault(fp, []).append(r)
         merged = 0
         for fp, records in groups.items():
             if len(records) > 1:
@@ -429,7 +405,7 @@ def run():
         logging.info(f"\nFeed: {extract_domain(feed_url)}")
         try:
             feed = feedparser.parse(feed_url)
-            entries = feed.entries[:12] if feed.entries else []
+            entries = feed.entries[:15] if feed.entries else []
             if not entries:
                 logging.info("  No entries")
                 continue
@@ -457,6 +433,7 @@ def run():
                     try: pub_date = time.strftime("%Y-%m-%d", t)
                     except: pass
                 
+                # Quick title check
                 if not is_potential_conflict_article(entry.title, ""):
                     stats["prefiltered"] += 1
                     continue
@@ -465,12 +442,22 @@ def run():
                 if not text or len(text) < 100: continue
                 stats["fetched"] += 1
                 
-                if is_nigeria_related(entry.title, text) is False: continue
+                # Nigeria check - relaxed
+                if not is_nigeria_related(entry.title, text):
+                    continue
+                
+                # Full content check
                 if not is_potential_conflict_article(entry.title, text):
                     stats["prefiltered"] += 1
                     continue
                 
                 stats["ai"] += 1
+                
+                # Debug: log first 3 AI inputs
+                if stats["ai"] <= 3:
+                    logging.info(f"  AI input: {entry.title[:100]}...")
+                    logging.info(f"  Text length: {len(text)} chars")
+                
                 resp = extract_incident(entry.title, text, pub_date)
                 if not resp:
                     stats["ai_fail"] += 1
@@ -479,14 +466,20 @@ def run():
                 try: data = json.loads(resp)
                 except:
                     stats["ai_fail"] += 1
+                    logging.warning(f"  JSON parse failed: {resp[:100]}")
                     continue
                 
-                for inc in data.get("incidents", []):
+                incidents = data.get("incidents", [])
+                if not incidents:
+                    continue
+                
+                for inc in incidents:
                     stats["extracted"] += 1
                     inc = normalize_incident_data(inc)
                     sv = inc.get("state", "").strip().lower()
                     if sv not in STATE_MAP:
                         stats["bad_state"] += 1
+                        logging.info(f"  Bad state: {inc.get('state')}")
                         continue
                     cs = STATE_MAP[sv]
                     od = inc.get("occurrence_date", pub_date)
