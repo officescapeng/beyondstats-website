@@ -510,7 +510,7 @@ function Footer({ setCurrentPage }) {
 // ================= SUB-PAGE 1: HOME PAGE HERO =================
 function HomePage({ slides, currentSlide, setCurrentPage }) {
   return (
-    <div className="relative h-screen w-full flex flex-col justify-between">
+    <div className="relative min-h-screen w-full flex flex-col justify-between">
       
       {/* Background Hero Slider */}
       <div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
