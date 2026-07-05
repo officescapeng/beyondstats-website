@@ -536,9 +536,12 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           }
 
           /* The printed output is the standalone Executive Brief
-             (PrintOnlyBrief), not the live dashboard. Everything in the
-             interactive layout -- map, charts, tabs, cards -- is hidden. */
-          .interactive-dashboard-layout {
+             (PrintOnlyBrief), not the live dashboard. This hides both the
+             dashboard's own interactive layout AND the site-wide Header/
+             Footer/CTA banners defined in App.jsx -- those live outside
+             .interactive-dashboard-layout, so they need their own selectors
+             here or they print regardless of what this component does. */
+          nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
             display: none !important;
           }
 

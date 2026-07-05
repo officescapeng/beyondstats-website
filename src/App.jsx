@@ -2988,7 +2988,7 @@ function App() {
     <div className="relative min-h-screen w-full flex flex-col justify-between text-white font-sans bg-primary">
       
       {/* GLOBAL HEADER */}
-      <div className={`w-full ${currentPage === 'home' ? 'absolute top-0 left-0 bg-transparent' : 'bg-[#051c44] border-b border-white/5 relative'} z-30`}>
+      <div className={`w-full ${currentPage === 'home' ? 'absolute top-0 left-0 bg-transparent' : 'bg-[#051c44] border-b border-white/5 relative'} z-30 no-print`}>
         <Header 
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
@@ -2999,7 +2999,7 @@ function App() {
 
       {/* MOBILE MENU OVERLAY */}
       {isMenuOpen && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-8 animate-fade-in">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-8 animate-fade-in no-print">
           <div className="flex justify-between items-center w-full">
             <span className="font-poppins font-bold text-2xl tracking-tight">
               BEYOND<span className="text-secondary">#</span>
@@ -3129,7 +3129,7 @@ function App() {
 
       {/* Cookie Consent Banner */}
       {showCookieBanner && (
-        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-50 animate-fade-in">
+        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-50 animate-fade-in no-print">
           <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4 text-left">
             <h4 className="font-poppins font-bold text-sm text-white">Cookie Consent</h4>
             <p className="font-inter text-white/70 text-xs leading-relaxed">
