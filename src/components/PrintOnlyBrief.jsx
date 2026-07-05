@@ -11,11 +11,40 @@ function getBarColor(score) {
   return '#BE123C';
 }
 
+// One benchmarked metric: a label, then two proportional bars (State vs
+// National Average) scaled relative to each other so the comparison itself
+// is visual, not just two numbers sitting in table cells. stateVal/avgVal
+// are raw numbers; format() turns them back into display text (%, /10, etc).
+function MetricRow({ label, stateVal, avgVal, format }) {
+  const scale = Math.max(stateVal, avgVal, 0.0001) * 1.15;
+  const stateWidth = Math.max((stateVal / scale) * 100, 2);
+  const avgWidth = Math.max((avgVal / scale) * 100, 2);
+
+  return (
+    <div className="flex flex-col gap-1.5 py-2.5 border-t border-slate-100">
+      <span className="text-[10px] font-bold text-slate-700">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className="w-14 text-[8px] uppercase font-bold text-[#052353] shrink-0">State</span>
+        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-[#052353] rounded-full" style={{ width: `${stateWidth}%` }} />
+        </div>
+        <span className="w-16 text-right text-[9px] font-mono font-bold text-[#052353] shrink-0">{format(stateVal)}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="w-14 text-[8px] uppercase font-bold text-slate-400 shrink-0">Nat'l Avg</span>
+        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-slate-400 rounded-full" style={{ width: `${avgWidth}%` }} />
+        </div>
+        <span className="w-16 text-right text-[9px] font-mono text-slate-500 shrink-0">{format(avgVal)}</span>
+      </div>
+    </div>
+  );
+}
+
 // A single pillar block: title, composite pillar score with a visual bar,
-// and a 3-row State-vs-National-Average comparison table. The bar makes this
-// read as a visual brief rather than a plain data table -- matches the
-// letterhead-brief design (pre-componentization) so print output reads as a
-// real institutional report rather than a bare summary card.
+// and three benchmarked metrics rendered as visual bullet-bar comparisons
+// rather than a plain number table -- this is the "visual brief" for the
+// full HSRI summary, not just a data table with a score badge on top.
 function PillarTable({ number, title, score, rows }) {
   return (
     <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
@@ -33,26 +62,14 @@ function PillarTable({ number, title, score, rows }) {
           className="h-full rounded-full"
         />
       </div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="opacity-50 text-[10px] uppercase font-bold text-left">
-            <th className="pb-1.5">Indicator Metric</th>
-            <th className="pb-1.5 text-right">State</th>
-            <th className="pb-1.5 text-right">National Avg</th>
-          </tr>
-        </thead>
-        <tbody className="font-semibold text-slate-700">
-          {rows.map((r, i) => (
-            <tr key={i} className="border-t border-slate-150">
-              <td className="py-2">{r.label}</td>
-              <td className="py-2 text-right font-mono">{r.state}</td>
-              <td className="py-2 text-right font-mono">{r.avg}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="flex flex-col">
+        {rows.map((r, i) => (
+          <MetricRow key={i} label={r.label} stateVal={r.stateVal} avgVal={r.avgVal} format={r.format} />
+        ))}
+      </div>
     </div>
   );
+
 }
 
 const LetterheadRow = ({ subtitle }) => (
@@ -154,25 +171,25 @@ export default function PrintOnlyBrief({ mode = 'profile', activeState, policyBr
           <PillarTable
             number={1} title="Poverty & Livelihoods" score={activeState.risks.poverty}
             rows={[
-              { label: 'Multidimensional Poverty Index (%)', state: `${activeState.poverty.mpi}%`, avg: `${NATIONAL_AVERAGES.poverty.mpi}%` },
-              { label: 'Unemployment Rate (%)', state: `${activeState.poverty.unemployment}%`, avg: `${NATIONAL_AVERAGES.poverty.unemployment}%` },
-              { label: 'Inflation Impact Index (1-10)', state: `${activeState.poverty.inflationImpact}/10`, avg: `${NATIONAL_AVERAGES.poverty.inflationImpact}/10` }
+              { label: 'Multidimensional Poverty Index', stateVal: activeState.poverty.mpi, avgVal: NATIONAL_AVERAGES.poverty.mpi, format: (v) => `${v}%` },
+              { label: 'Unemployment Rate', stateVal: activeState.poverty.unemployment, avgVal: NATIONAL_AVERAGES.poverty.unemployment, format: (v) => `${v}%` },
+              { label: 'Inflation Impact Index', stateVal: activeState.poverty.inflationImpact, avgVal: NATIONAL_AVERAGES.poverty.inflationImpact, format: (v) => `${v}/10` }
             ]}
           />
           <PillarTable
             number={2} title="Education Systems" score={activeState.risks.education}
             rows={[
-              { label: 'Net School Attendance Rate (%)', state: `${activeState.education.attendance}%`, avg: `${NATIONAL_AVERAGES.education.attendance}%` },
-              { label: 'Out-of-School Children Rate (%)', state: `${activeState.education.outOfSchool}%`, avg: `${NATIONAL_AVERAGES.education.outOfSchool}%` },
-              { label: 'Youth Literacy Rate (%)', state: `${activeState.education.literacy}%`, avg: `${NATIONAL_AVERAGES.education.literacy}%` }
+              { label: 'Net School Attendance Rate', stateVal: activeState.education.attendance, avgVal: NATIONAL_AVERAGES.education.attendance, format: (v) => `${v}%` },
+              { label: 'Out-of-School Children Rate', stateVal: activeState.education.outOfSchool, avgVal: NATIONAL_AVERAGES.education.outOfSchool, format: (v) => `${v}%` },
+              { label: 'Youth Literacy Rate', stateVal: activeState.education.literacy, avgVal: NATIONAL_AVERAGES.education.literacy, format: (v) => `${v}%` }
             ]}
           />
           <PillarTable
             number={3} title="Health & Wellbeing" score={activeState.risks.health}
             rows={[
-              { label: 'Maternal Health Deprivation Index', state: `${activeState.health.maternalHealth}/100`, avg: `${NATIONAL_AVERAGES.health.maternalHealth}/100` },
-              { label: 'Basic Immunization Coverage (%)', state: `${activeState.health.childHealth}%`, avg: `${NATIONAL_AVERAGES.health.childHealth}%` },
-              { label: 'Access to Healthcare Facilities (%)', state: `${activeState.health.healthcareAccess}%`, avg: `${NATIONAL_AVERAGES.health.healthcareAccess}%` }
+              { label: 'Maternal Health Deprivation Index', stateVal: activeState.health.maternalHealth, avgVal: NATIONAL_AVERAGES.health.maternalHealth, format: (v) => `${v}/100` },
+              { label: 'Basic Immunization Coverage', stateVal: activeState.health.childHealth, avgVal: NATIONAL_AVERAGES.health.childHealth, format: (v) => `${v}%` },
+              { label: 'Access to Healthcare Facilities', stateVal: activeState.health.healthcareAccess, avgVal: NATIONAL_AVERAGES.health.healthcareAccess, format: (v) => `${v}%` }
             ]}
           />
         </div>
@@ -192,25 +209,25 @@ export default function PrintOnlyBrief({ mode = 'profile', activeState, policyBr
           <PillarTable
             number={4} title="Food Security & Nutrition" score={activeState.risks.foodSecurity}
             rows={[
-              { label: 'Acceptable Food Consumption Rate (%)', state: `${activeState.foodSecurity.foodConsumption}%`, avg: `${NATIONAL_AVERAGES.foodSecurity.foodConsumption}%` },
-              { label: 'Phase 3+ Acute Food Insecurity (%)', state: `${activeState.foodSecurity.acuteInsecurity}%`, avg: `${NATIONAL_AVERAGES.foodSecurity.acuteInsecurity}%` },
-              { label: 'Child Wasting & Nutrition Risk (1-10)', state: `${activeState.foodSecurity.nutritionRisk}/10`, avg: `${NATIONAL_AVERAGES.foodSecurity.nutritionRisk}/10` }
+              { label: 'Acceptable Food Consumption Rate', stateVal: activeState.foodSecurity.foodConsumption, avgVal: NATIONAL_AVERAGES.foodSecurity.foodConsumption, format: (v) => `${v}%` },
+              { label: 'Phase 3+ Acute Food Insecurity', stateVal: activeState.foodSecurity.acuteInsecurity, avgVal: NATIONAL_AVERAGES.foodSecurity.acuteInsecurity, format: (v) => `${v}%` },
+              { label: 'Child Wasting & Nutrition Risk', stateVal: activeState.foodSecurity.nutritionRisk, avgVal: NATIONAL_AVERAGES.foodSecurity.nutritionRisk, format: (v) => `${v}/10` }
             ]}
           />
           <PillarTable
             number={5} title="Displacement & Migration" score={activeState.risks.displacement}
             rows={[
-              { label: 'Active IDP Population', state: activeState.displacement.idps.toLocaleString(), avg: NATIONAL_AVERAGES.displacement.idps.toLocaleString() },
-              { label: 'Registered Returnees', state: activeState.displacement.returnees.toLocaleString(), avg: NATIONAL_AVERAGES.displacement.returnees.toLocaleString() },
-              { label: 'New Displacement Events (1 Year)', state: activeState.displacement.newEvents, avg: NATIONAL_AVERAGES.displacement.newEvents }
+              { label: 'Active IDP Population', stateVal: activeState.displacement.idps, avgVal: NATIONAL_AVERAGES.displacement.idps, format: (v) => v.toLocaleString() },
+              { label: 'Registered Returnees', stateVal: activeState.displacement.returnees, avgVal: NATIONAL_AVERAGES.displacement.returnees, format: (v) => v.toLocaleString() },
+              { label: 'New Displacement Events (1 Year)', stateVal: activeState.displacement.newEvents, avgVal: NATIONAL_AVERAGES.displacement.newEvents, format: (v) => v.toLocaleString() }
             ]}
           />
           <PillarTable
             number={6} title="Peace & Security" score={activeState.risks.peaceSecurity}
             rows={[
-              { label: 'Conflict Incidents (1 Year)', state: activeState.peaceSecurity.conflictIncidents, avg: NATIONAL_AVERAGES.peaceSecurity.conflictIncidents },
-              { label: 'Conflict-Related Fatalities (1 Year)', state: activeState.peaceSecurity.fatalities, avg: NATIONAL_AVERAGES.peaceSecurity.fatalities },
-              { label: 'Feelings of Safety in Neighborhood (%)', state: `${activeState.peaceSecurity.communitySecurity}%`, avg: `${NATIONAL_AVERAGES.peaceSecurity.communitySecurity}%` }
+              { label: 'Conflict Incidents (1 Year)', stateVal: activeState.peaceSecurity.conflictIncidents, avgVal: NATIONAL_AVERAGES.peaceSecurity.conflictIncidents, format: (v) => v.toLocaleString() },
+              { label: 'Conflict-Related Fatalities (1 Year)', stateVal: activeState.peaceSecurity.fatalities, avgVal: NATIONAL_AVERAGES.peaceSecurity.fatalities, format: (v) => v.toLocaleString() },
+              { label: 'Feelings of Safety in Neighborhood', stateVal: activeState.peaceSecurity.communitySecurity, avgVal: NATIONAL_AVERAGES.peaceSecurity.communitySecurity, format: (v) => `${v}%` }
             ]}
           />
         </div>
