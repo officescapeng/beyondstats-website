@@ -703,28 +703,12 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
 function InsightImpactNewsSection({ articles, onArticleClick }) {
   const fallbackNews = [
     {
-      id: 1,
-      date: "2026-06-24",
-      title: "Tracking Emerging Human Security Trends Across Northern Nigeria",
-      excerpt: "Through continuous monitoring and analysis, Beyond# identifies emerging challenges and opportunities for evidence-based interventions that improve community resilience and safety.",
-      featured_media_url: "/hero_research.png",
-      category: "Human Security Monitor"
-    },
-    {
       id: 2,
       date: "2026-06-18",
       title: "Strengthening Social Protection Through Evidence-Based Planning",
       excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
       featured_media_url: "/stakeholder_consultation.png",
       category: "Research Brief"
-    },
-    {
-      id: 3,
-      date: "2026-06-12",
-      title: "Quarterly Trends in Food Security and Community Resilience",
-      excerpt: "A comprehensive assessment of harvest yields, market price dynamics, and household resilience indices across Middle Belt agricultural belts.",
-      featured_media_url: "/hero_community.png",
-      category: "Human Security Monitor"
     },
     {
       id: 4,
@@ -1452,31 +1436,15 @@ function AnimatedCounter({ end, duration = 2000 }) {
 // ================= SUB-PAGE 5: IMPACT & VALUES PAGE =================
 function ImpactPage({ articles: sanityArticles, onArticleClick }) {
   const fallbackFeatured = {
-    title: "Tracking Emerging Human Security Trends Across Northern Nigeria",
-    excerpt: "This research appraisal assesses multidimensional security challenges across Kaduna, Kano, and Katsina states. Using structural field observations and data collected by our local observers, we analyze the intersecting risks of crop yields, food security fluctuations, displacement numbers, and community peace initiatives.",
-    date: "2026-06-24",
-    author: "Dr. Ngozi Balogun",
-    category: "Human Security Monitor",
-    featured_media_url: "/hero_research.png"
+    title: "Strengthening Social Protection Through Evidence-Based Planning",
+    excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
+    date: "2026-06-18",
+    author: "Beyond# Research Team",
+    category: "Research Brief",
+    featured_media_url: "/stakeholder_consultation.png"
   }
 
   const fallbackArticles = [
-    {
-      id: 2,
-      date: "2026-06-18",
-      title: "Strengthening Social Protection Through Evidence-Based Planning",
-      excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
-      featured_media_url: "/stakeholder_consultation.png",
-      category: "Research Brief"
-    },
-    {
-      id: 3,
-      date: "2026-06-12",
-      title: "Quarterly Trends in Food Security and Community Resilience",
-      excerpt: "A comprehensive assessment of harvest yields, market price dynamics, and household resilience indices across Middle Belt agricultural belts.",
-      featured_media_url: "/hero_community.png",
-      category: "Human Security Monitor"
-    },
     {
       id: 4,
       date: "2026-05-28",
