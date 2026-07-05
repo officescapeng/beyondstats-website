@@ -158,7 +158,7 @@ def resolve_state(raw: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# NIGERIA RELEVANCE FILTER (STRICTER)
+# NIGERIA RELEVANCE FILTER (LESS STRICT)
 # ─────────────────────────────────────────────────────────────
 _NIGERIA_PATTERNS = [
     re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
@@ -171,6 +171,12 @@ _NIGERIA_PATTERNS = [
 MIN_TEXT_LENGTH  = 150
 MAX_ARTICLE_CHARS = 1500
 
+# ─────────────────────────────────────────────────────────────
+# EVENT LOGGING START DATE
+# ─────────────────────────────────────────────────────────────
+# Only log incidents that occurred on or after this date
+EVENT_START_DATE = datetime(2026, 7, 1, tzinfo=timezone.utc)
+
 
 def nigeria_score(text: str) -> int:
     return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
@@ -178,13 +184,13 @@ def nigeria_score(text: str) -> int:
 
 def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    STRICTER: Require 3+ Nigeria markers for relevance.
-    Excludes borderline articles to reduce false positives.
+    Require 2+ Nigeria markers for relevance (less strict).
+    Catches more legitimate Nigerian security articles.
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
     score = nigeria_score(f"{title} {text}")
-    return score >= 3
+    return score >= 2  # Changed from 3 to 2
 
 
 # ─────────────────────────────────────────────────────────────
@@ -323,7 +329,7 @@ def casualty_band(n) -> str:
 
 def semantic_fp(date_str, state, lga, canonical_type, fatalities, abductions) -> str:
     """
-    IMPROVED: Creates a stable fingerprint for deduplication across sources.
+    Creates a stable fingerprint for deduplication across sources.
     
     Uses:
     - State (must match exactly)
@@ -444,7 +450,7 @@ def fetch_full_article(url: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 _AFTERMATH_KEYWORDS = (
-    # Rescue / release / recovery (incident already happened)
+    # Rescue / release / recovery (can indicate aftermath, but exception for casualties)
     "rescue", "rescued", "rescue operation",
     "release", "released", "freed", "regain freedom", "regained freedom",
     "recover", "recovered", "recovery",
@@ -727,6 +733,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         "skipped_nigeria":        0,
         "skipped_too_short":      0,
         "skipped_followup":       0,
+        "skipped_before_start_date": 0,  # incidents before 2026-07-01
         "invalid_state":          0,
         "skipped_no_casualties":  0,
         "semantic_duplicates":    0,
@@ -762,12 +769,12 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             result["skipped_too_short"] += 1
             return result
 
-        # Nigeria relevance check (STRICTER)
+        # Nigeria relevance check (score >= 2)
         if not is_nigeria_relevant(title, text):
             result["skipped_nigeria"] += 1
             return result
 
-        # Skip follow-up / aftermath articles
+        # Skip follow-up / aftermath articles (with rescue casualty exception)
         if is_followup_article(title, text):
             log.info(f"Skipping aftermath: {title[:80]}")
             with dedup["lock"]:
@@ -801,7 +808,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 canon_type  = canonical_incident_type(raw_type)
 
                 # ══ CONFLICT-CASUALTY GATE ══════════════════════════
-                # CORE FILTER: Only log if it's a real conflict casualty event
                 if not is_conflict_casualty(raw_type, fatalities, abductions):
                     log.debug(f"  Not conflict casualty: '{raw_type}', "
                              f"F:{fatalities} A:{abductions}")
@@ -817,6 +823,14 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     occurrence_date = raw_date
                 else:
                     occurrence_date = pub_date
+
+                # ── SKIP INCIDENTS BEFORE START DATE ────────────────
+                occurrence_dt = _parse_date(occurrence_date)
+                if occurrence_dt and occurrence_dt < EVENT_START_DATE:
+                    log.debug(f"  Skipping incident before start date "
+                              f"({occurrence_date} < {EVENT_START_DATE.strftime('%Y-%m-%d')})")
+                    result["skipped_before_start_date"] += 1
+                    continue
 
                 # Create fingerprints
                 sem_fp = semantic_fp(
@@ -887,20 +901,22 @@ def run():
     log.info("=" * 70)
     log.info("  NIGERIAN SECURITY INCIDENTS SCRAPER")
     log.info(f"  DRY_RUN: {DRY_RUN}  |  trafilatura: {HAS_TRAFILATURA}")
+    log.info(f"  Logging incidents from: {EVENT_START_DATE.strftime('%Y-%m-%d')}")
     log.info("=" * 70)
 
     stats = {
-        "feeds":                 0,
-        "entries":               0,
-        "skipped_already_seen":  0,
-        "skipped_nigeria":       0,
-        "skipped_too_short":     0,
-        "skipped_followup":      0,
-        "invalid_state":         0,
-        "skipped_no_casualties": 0,
-        "semantic_duplicates":   0,
-        "ai_failed":             0,
-        "saved_incidents":       0,
+        "feeds":                     0,
+        "entries":                   0,
+        "skipped_already_seen":      0,
+        "skipped_nigeria":           0,
+        "skipped_too_short":         0,
+        "skipped_followup":          0,
+        "skipped_before_start_date": 0,
+        "invalid_state":             0,
+        "skipped_no_casualties":     0,
+        "semantic_duplicates":       0,
+        "ai_failed":                 0,
+        "saved_incidents":           0,
     }
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
