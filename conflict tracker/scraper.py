@@ -37,7 +37,7 @@ load_dotenv(dotenv_path=local_env if os.path.exists(local_env) else parent_env)
 # LOGGING
 # ─────────────────────────────────────────────────────────────
 logging.basicConfig(
-    level=logging.DEBUG,  # Changed to DEBUG for verbose output
+    level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
@@ -174,7 +174,6 @@ MAX_ARTICLE_CHARS = 1500
 # ─────────────────────────────────────────────────────────────
 # EVENT LOGGING START DATE
 # ─────────────────────────────────────────────────────────────
-# Only log incidents that occurred on or after this date
 EVENT_START_DATE = datetime(2026, 7, 1, tzinfo=timezone.utc)
 
 
@@ -190,7 +189,7 @@ def is_nigeria_relevant(title: str, text: str) -> bool:
     if len(text) < MIN_TEXT_LENGTH:
         return False
     score = nigeria_score(f"{title} {text}")
-    return score >= 2  # Changed from 3 to 2
+    return score >= 2
 
 
 # ─────────────────────────────────────────────────────────────
@@ -314,7 +313,6 @@ def _parse_date(date_str) -> datetime | None:
     """
     try:
         dt = datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
-        # Make timezone-aware (UTC) to be compatible with EVENT_START_DATE
         return dt.replace(tzinfo=timezone.utc)
     except Exception:
         return None
@@ -543,38 +541,222 @@ def is_followup_article(title: str, text: str) -> bool:
 
 
 # ─────────────────────────────────────────────────────────────
-# AI INCIDENT EXTRACTION
+# POST-PROCESSING VALIDATION (Phase 2 - IMPROVED)
+# ─────────────────────────────────────────────────────────────
+
+def validate_and_fix_incident(incident: dict, article_text: str, article_date: str) -> dict | None:
+    """
+    Post-process LLM extraction to fix common errors:
+    - Missing casualty numbers (LLM says 0 when article clearly states deaths)
+    - Wrong dates (LLM extracts old years)
+    - Conflicting data
+    
+    Returns corrected incident dict or None if invalid.
+    """
+    if not incident:
+        return None
+    
+    text_lower = article_text.lower()
+    article_year = article_date[:4]
+    
+    # ── Fix 1A: Detect "at least X killed" pattern ────────────
+    current_fatalities = _safe_int(incident.get("fatalities"))
+    if current_fatalities == 0:
+        # Priority: "at least X killed" pattern
+        match = re.search(r'at least (\d+)\s+(killed|shot|slain|dead)', text_lower)
+        if match:
+            fixed_count = int(match.group(1))
+            log.debug(f"  [Fix] Detected {fixed_count} fatalities from 'at least'")
+            incident["fatalities"] = fixed_count
+        else:
+            # Fallback: other patterns
+            death_patterns = [
+                r'(\d+)\s+(killed|shot|slain|dead|murdered)',
+                r'(killed|shot|slain|dead|murdered)\s+(\d+)',
+                r'(\d+)\s+(people|residents|persons?|soldiers?|civilians?)\s+(killed|shot|dead)',
+            ]
+            
+            for pattern in death_patterns:
+                match = re.search(pattern, text_lower)
+                if match:
+                    numbers = [g for g in match.groups() if g and g.isdigit()]
+                    if numbers:
+                        fixed_count = int(numbers[0])
+                        log.debug(f"  [Fix] Detected {fixed_count} fatalities (LLM missed)")
+                        incident["fatalities"] = fixed_count
+                        break
+    
+    # ── Fix 1B: Detect "over X killed" pattern ────────────────
+    if current_fatalities == 0:
+        match = re.search(r'over (\d+)\s+(killed|shot|slain|dead)', text_lower)
+        if match:
+            fixed_count = int(match.group(1))
+            log.debug(f"  [Fix] Detected {fixed_count} fatalities from 'over'")
+            incident["fatalities"] = fixed_count
+    
+    # ── Fix 2A: Detect "at least X abducted" pattern ─────────
+    current_abductions = _safe_int(incident.get("abductions"))
+    if current_abductions == 0:
+        match = re.search(r'at least (\d+)\s+(abducted|kidnapped|missing)', text_lower)
+        if match:
+            fixed_count = int(match.group(1))
+            log.debug(f"  [Fix] Detected {fixed_count} abductions from 'at least'")
+            incident["abductions"] = fixed_count
+        else:
+            # Fallback: other patterns
+            abduction_patterns = [
+                r'(\d+)\s+(abducted|kidnapped|missing|taken)',
+                r'(abducted|kidnapped|missing|taken)\s+(\d+)',
+                r'(\d+)\s+(people|residents|persons?|civilians?)\s+(abducted|kidnapped)',
+            ]
+            
+            for pattern in abduction_patterns:
+                match = re.search(pattern, text_lower)
+                if match:
+                    numbers = [g for g in match.groups() if g and g.isdigit()]
+                    if numbers:
+                        fixed_count = int(numbers[0])
+                        log.debug(f"  [Fix] Detected {fixed_count} abductions (LLM missed)")
+                        incident["abductions"] = fixed_count
+                        break
+    
+    # ── Fix 3: Correct date year mismatches ────────────────────
+    occ_date = (incident.get("occurrence_date") or "")[:10]
+    if occ_date and len(occ_date) >= 4:
+        occ_year = occ_date[:4]
+        
+        if occ_year.isdigit():
+            occ_year_int = int(occ_year)
+            article_year_int = int(article_year)
+            
+            # If year is more than 1 year in past, correct it
+            if occ_year_int < article_year_int - 1:
+                corrected_date = f"{article_year}{occ_date[4:]}"
+                log.debug(f"  [Fix] Corrected date from {occ_date} to {corrected_date}")
+                incident["occurrence_date"] = corrected_date
+            
+            # If year is in future, correct it
+            elif occ_year_int > article_year_int + 1:
+                corrected_date = f"{article_year}{occ_date[4:]}"
+                log.debug(f"  [Fix] Corrected date from {occ_date} to {corrected_date}")
+                incident["occurrence_date"] = corrected_date
+    
+    # ── Fix 4: Reclassify "robbery" if it has violence context ──
+    incident_type = (incident.get("incident_type") or "").lower()
+    if incident_type == "robbery":
+        violence_markers = ["gun", "shot", "killed", "attack", "armed", "gunfire"]
+        if any(marker in text_lower for marker in violence_markers):
+            log.debug(f"  [Fix] Reclassified 'robbery' → 'armed attack'")
+            incident["incident_type"] = "armed attack"
+    
+    # ── Final validation ───────────────────────────────────────
+    fatalities = _safe_int(incident.get("fatalities"))
+    abductions = _safe_int(incident.get("abductions"))
+    
+    if fatalities <= 0 and abductions <= 0:
+        log.debug(f"  [Validation] Still no casualties after fixes - rejecting")
+        return None
+    
+    return incident
+
+
+# ─────────────────────────────────────────────────────────────
+# AI INCIDENT EXTRACTION (IMPROVED PROMPT - Phase 1 FIX)
 # ─────────────────────────────────────────────────────────────
 _PROMPT_TEMPLATE = """\
 The article was published on: {article_date}.
 
-Return ONLY strictly valid JSON. No markdown, no code fences, no preamble.
+CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no preamble.
 
-Extract ONLY conflict-related casualty incidents in Nigeria. A qualifying
-incident is an act of organised or armed violence (terrorism, banditry,
-insurgency, communal/ethnic/farmer-herder clashes, kidnapping/abduction,
-armed attacks, ambushes, bombings) in which people were KILLED or ABDUCTED.
+Extract ONLY conflict-related casualty incidents in Nigeria.
 
-DO NOT extract:
-- incidents with zero deaths and zero abductions,
-- arrests, rescues, troop deployments, policy/court news with no casualties,
-- non-conflict deaths (road accidents, floods, fires, building collapse,
-  disease, stampedes).
+A qualifying incident is:
+- Terrorist / bandit attacks
+- Kidnappings / abductions
+- Communal / farmer-herder clashes
+- Armed robberies with deaths
+- Bombings / explosions
 
-If the article contains no qualifying incident, return exactly:
+INCIDENTS MUST HAVE AT LEAST ONE CASUALTY.
+
+════════════════════════════════════════════════════════════════
+
+CASUALTY EXTRACTION RULES:
+
+1. FATALITIES (people killed):
+   - Look for: "killed", "shot dead", "slain", "murdered", "dead", "died"
+   - If it says "at least 12 killed" → fatalities = 12
+   - If it says "over 20 killed" → fatalities = 20
+   - If it says "many killed" and no number → fatalities = 1
+   ✅ EXTRACT NUMBERS EVEN IF THEY ARE APPROXIMATE
+   ❌ DO NOT REJECT INCIDENTS BECAUSE THE NUMBER IS APPROXIMATE
+
+2. ABDUCTIONS (people kidnapped):
+   - Look for: "kidnapped", "abducted", "hostage", "missing", "taken"
+   - Same rules as above.
+
+3. REJECTION GATE:
+   - If fatalities = 0 AND abductions = 0 → RETURN {{"incidents": []}}
+   - At least ONE must be > 0 to extract
+
+════════════════════════════════════════════════════════════════
+
+DATE EXTRACTION RULES:
+
+1. occurrence_date is when the INCIDENT happened
+2. Article date context: {article_date}
+3. Extract from phrases:
+   - "on Friday" → infer actual date from article context
+   - "yesterday" → day before article_date
+   - "last Sunday" → most recent Sunday before article_date
+   - "July 3" → use article year (2026)
+
+4. YEAR CORRECTION:
+   - If LLM extracts a year from 2022-2025 → CORRECT to 2026
+   - Default to {article_date} year if uncertain
+
+════════════════════════════════════════════════════════════════
+
+INCIDENT TYPE CLASSIFICATION:
+
+- "bandits attack" → "banditry"
+- "Boko Haram / ISWAP attack" → "terrorism"
+- "farmers herders clash" → "clash"
+- "communal clash" → "clash"
+- "armed robbery with deaths" → "armed attack"
+- "kidnapping" → "kidnapping"
+- "bombing/explosion" → "bombing"
+
+✅ ALL OF THESE ARE VALID CONFLICT INCIDENTS
+
+════════════════════════════════════════════════════════════════
+
+IF NO QUALIFYING INCIDENTS: Return exactly:
 {{"incidents": []}}
 
-Otherwise extract every distinct qualifying incident into "incidents".
-Each incident MUST contain all of these keys (null if unknown):
-  state, lga, community, incident_type, fatalities, abductions,
-  occurrence_date (YYYY-MM-DD), summary
+OTHERWISE: Extract every distinct incident with ALL these keys:
+{{
+  "state": "State Name" or null,
+  "lga": "LGA Name" or null,
+  "community": "Village/Community Name" or "Unknown",
+  "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, other],
+  "fatalities": integer >= 0 or null,
+  "abductions": integer >= 0 or null,
+  "occurrence_date": "YYYY-MM-DD" or null,
+  "summary": "Brief description of what happened"
+}}
 
-Rules:
-- fatalities and abductions MUST be integers (0 if none; never words like "several").
-- At least one of fatalities or abductions MUST be greater than 0.
-- occurrence_date is the actual event date, NOT the article publication date.
-- Separate incidents in the same article each get their own object.
-- Do not fabricate details absent from the article.
+VALID EXAMPLE:
+{{
+  "state": "Niger",
+  "lga": "Shiroro",
+  "community": "",
+  "incident_type": "clash",
+  "fatalities": 48,
+  "abductions": 0,
+  "occurrence_date": "2026-07-07",
+  "summary": "At least 48 people were killed in a farmer herder clash in Shiroro LGA, Niger State."
+}}
 
 Title: {title}
 Text: {text}
@@ -636,8 +818,21 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
             log.debug(f"  [LLM] Raw response: {raw_response[:300]}")
             data = json.loads(raw_response)
             incidents = data.get("incidents", [])
-            log.info(f"  [LLM] ✓ Extracted {len(incidents)} incident(s)")
-            return incidents
+            
+            # ── POST-PROCESS VALIDATION (Phase 2) ──────────────
+            validated_incidents = []
+            for idx, incident in enumerate(incidents):
+                fixed = validate_and_fix_incident(incident, text, article_date)
+                if fixed:
+                    validated_incidents.append(fixed)
+                else:
+                    log.debug(f"  [Validation] Rejected incident {idx} after fixes")
+            
+            log.info(f"  [LLM] ✓ Extracted {len(validated_incidents)} incident(s) "
+                     f"(after validation: {len(incidents)} raw → {len(validated_incidents)} valid)")
+            return validated_incidents
+            # ── END POST-PROCESSING ───────────────────────────
+            
         except json.JSONDecodeError as exc:
             log.error(f"  [LLM] JSON decode error (attempt {attempt + 1}): {exc}")
 
@@ -909,35 +1104,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────
-# DIAGNOSTIC TEST FUNCTION
-# ─────────────────────────────────────────────────────────────
-def test_feeds():
-    """Test mode: Show feed content."""
-    print("\n" + "=" * 80)
-    print("  FEED CONTENT TEST")
-    print("=" * 80 + "\n")
-    
-    for feed_url in FEEDS[:2]:
-        print(f"Feed: {feed_url}\n")
-        f = feedparser.parse(feed_url)
-        
-        if not f.entries:
-            print("  ❌ No entries\n")
-            continue
-        
-        print(f"  Total entries: {len(f.entries)}")
-        print(f"  Showing first 5:\n")
-        
-        for idx, entry in enumerate(f.entries[:5]):
-            title = entry.get("title", "?")[:60]
-            t = entry.get("published_parsed")
-            date_str = time.strftime("%Y-%m-%d", t) if t else "?"
-            print(f"    [{idx+1}] [{date_str}] {title}")
-        
-        print()
-
-
-# ─────────────────────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
 def run():
@@ -1031,10 +1197,6 @@ def run():
 # ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "test":
-        test_feeds()
-        sys.exit(0)
-    
     if not _acquire_lock():
         sys.exit(0)
     try:
