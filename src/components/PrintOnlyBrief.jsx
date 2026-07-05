@@ -1,8 +1,19 @@
 import React from 'react';
 import { NATIONAL_AVERAGES } from '../data/humanSecurityData';
 
-// A single pillar block: title, composite pillar score, and a 3-row
-// State-vs-National-Average comparison table. Matches the original
+// Matches the dashboard's own getSeverityColor() thresholds, so the visual
+// bars in the print brief use the same color language as the on-screen map
+// and pillar breakdowns.
+function getBarColor(score) {
+  if (score < 35) return '#10B981';
+  if (score < 55) return '#F59E0B';
+  if (score < 75) return '#EA580C';
+  return '#BE123C';
+}
+
+// A single pillar block: title, composite pillar score with a visual bar,
+// and a 3-row State-vs-National-Average comparison table. The bar makes this
+// read as a visual brief rather than a plain data table -- matches the
 // letterhead-brief design (pre-componentization) so print output reads as a
 // real institutional report rather than a bare summary card.
 function PillarTable({ number, title, score, rows }) {
@@ -15,6 +26,12 @@ function PillarTable({ number, title, score, rows }) {
         <span className="text-xs font-bold font-mono bg-slate-100 px-2 py-0.5 rounded">
           Index Score: {score}/100
         </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+        <div
+          style={{ width: `${score}%`, backgroundColor: getBarColor(score) }}
+          className="h-full rounded-full"
+        />
       </div>
       <table className="w-full text-xs">
         <thead>
@@ -105,6 +122,25 @@ export default function PrintOnlyBrief({ mode = 'profile', activeState, policyBr
             <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded mt-1 ${compositeBadgeClass}`}>
               {compositeLabel}
             </span>
+          </div>
+        </div>
+
+        {/* Visual gauge for the composite score -- gives the summary a
+            visual anchor instead of a bare number, mirroring the on-screen
+            RiskGauge component. */}
+        <div className="flex flex-col gap-1.5 px-1">
+          <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              style={{ width: `${activeState.risks.composite}%`, backgroundColor: getBarColor(activeState.risks.composite) }}
+              className="h-full rounded-full"
+            />
+          </div>
+          <div className="flex justify-between text-[8px] font-mono uppercase tracking-widest text-slate-400">
+            <span>0 (Secure)</span>
+            <span>35</span>
+            <span>55</span>
+            <span>75</span>
+            <span>100 (Critical)</span>
           </div>
         </div>
 
@@ -262,18 +298,33 @@ export default function PrintOnlyBrief({ mode = 'profile', activeState, policyBr
           </div>
 
           {policyBrief && (
-            <div className="mt-4 border-t border-slate-300 pt-6 grid grid-cols-2 gap-6">
+            <div className="mt-4 border-t border-slate-300 pt-6 flex flex-col gap-6">
               <div>
                 <h4 className="font-poppins font-bold text-xs uppercase text-[#052353] mb-2">Strategic Implications</h4>
                 <p className="text-[10px] text-slate-600 leading-relaxed">{policyBrief.implications}</p>
               </div>
               <div>
-                <h4 className="font-poppins font-bold text-xs uppercase text-[#052353] mb-2">Policy Recommendations</h4>
-                <ul className="list-disc pl-4 text-[10px] text-slate-600 leading-relaxed space-y-1">
-                  {policyBrief.recommendations.map((rec, idx) => (
-                    <li key={idx}>{rec}</li>
+                <h4 className="font-poppins font-bold text-xs uppercase text-[#052353] mb-3">
+                  Targeted Policy Recommendations
+                </h4>
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: 'State Government', items: policyBrief.recommendations.state },
+                    { label: 'NGOs & Development Partners', items: policyBrief.recommendations.ngo },
+                    { label: 'Multinationals & Private Sector', items: policyBrief.recommendations.private }
+                  ].map((group) => (
+                    <div key={group.label} className="flex flex-col gap-1.5">
+                      <span className="font-poppins font-bold text-[9px] uppercase tracking-wider text-[#39B54A]">
+                        {group.label}
+                      </span>
+                      <ul className="list-disc pl-3 text-[10px] text-slate-600 leading-relaxed space-y-1">
+                        {group.items.map((rec, idx) => (
+                          <li key={idx}>{rec}</li>
+                        ))}
+                      </ul>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             </div>
           )}
