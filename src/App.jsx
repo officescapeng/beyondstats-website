@@ -510,7 +510,7 @@ function Footer({ setCurrentPage }) {
 // ================= SUB-PAGE 1: HOME PAGE HERO =================
 function HomePage({ slides, currentSlide, setCurrentPage }) {
   return (
-    <div className="relative min-h-screen lg:h-screen w-full flex flex-col justify-between lg:overflow-hidden">
+    <div className="relative min-h-screen w-full flex flex-col justify-between">
       
       {/* Background Hero Slider */}
       <div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
@@ -532,11 +532,11 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </div>
 
       {/* Main Hero Content */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-24 pb-8 lg:pt-28 lg:pb-6 flex-1 flex flex-col justify-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-24 pb-6 lg:pt-24 lg:pb-4 flex-1 flex flex-col justify-center">
         <div className="max-w-[700px] flex flex-col items-start text-left">
           
           {/* Intro Label */}
-          <div className="flex items-center gap-2 mb-3 lg:mb-4 animate-fade-up">
+          <div className="flex items-center gap-2 mb-3 animate-fade-up">
             <BarChart3 className="w-4 h-4 text-secondary" />
             <span className="font-inter text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">
               EVIDENCE-DRIVEN DEVELOPMENT
@@ -544,7 +544,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </div>
 
           {/* Main Heading */}
-          <h1 className="font-poppins font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl tracking-tight leading-[0.95] text-white mb-4 lg:mb-6 uppercase animate-fade-up-delay-1 select-none">
+          <h1 className="font-poppins font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl tracking-tight leading-[0.95] text-white mb-4 uppercase animate-fade-up-delay-1 select-none">
             DATA.<br />
             INSIGHT.<br />
             ACTION.<br />
@@ -552,12 +552,12 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </h1>
 
           {/* Supporting Text */}
-          <p className="font-inter text-white/75 text-sm sm:text-base lg:text-lg leading-relaxed max-w-[650px] mb-6 lg:mb-8 animate-fade-up-delay-2">
+          <p className="font-inter text-white/75 text-sm sm:text-base lg:text-lg leading-relaxed max-w-[650px] mb-6 animate-fade-up-delay-2">
             We believe every statistic represents a human story. Beyond# transforms evidence into practical solutions that improve lives, strengthen communities, and promote human security.
           </p>
 
           {/* CTA Row */}
-          <div className="flex flex-wrap items-center gap-4 mb-8 lg:mb-12 animate-fade-up-delay-3">
+          <div className="flex flex-wrap items-center gap-4 mb-6 lg:mb-8 animate-fade-up-delay-3">
             <button 
               onClick={() => setCurrentPage('programs')}
               className="bg-secondary hover:bg-secondary/90 text-white font-inter font-bold text-xs uppercase tracking-widest px-8 py-4 rounded-full flex items-center gap-2 shadow-lg shadow-secondary/15 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none"
@@ -578,9 +578,9 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </div>
 
           {/* Impact Indicators Grid */}
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 animate-fade-up-delay-4">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-up-delay-4">
             
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 lg:p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <BarChart3 className="w-5 h-5 text-secondary" />
               </div>
@@ -594,7 +594,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 lg:p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <Lightbulb className="w-5 h-5 text-secondary" />
               </div>
@@ -608,7 +608,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 lg:p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <Target className="w-5 h-5 text-secondary" />
               </div>
@@ -622,7 +622,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 lg:p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <HeartHandshake className="w-5 h-5 text-secondary" />
               </div>
@@ -642,7 +642,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </main>
 
       {/* STATISTICS DRAWER FOOTER */}
-      <footer className="relative z-10 w-full bg-black/40 backdrop-blur-md border-t border-white/5 py-4 lg:py-6">
+      <footer className="relative z-10 w-full bg-black/40 backdrop-blur-md border-t border-white/5 py-3 lg:py-4">
         <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-6">
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12 w-full lg:w-auto text-left">
