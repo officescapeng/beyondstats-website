@@ -318,7 +318,7 @@ export default function PrintOnlyBrief({ mode = 'profile', activeState, policyBr
                         {group.label}
                       </span>
                       <ul className="list-disc pl-3 text-[10px] text-slate-600 leading-relaxed space-y-1">
-                        {group.items.map((rec, idx) => (
+                        {(group.items || []).map((rec, idx) => (
                           <li key={idx}>{rec}</li>
                         ))}
                       </ul>

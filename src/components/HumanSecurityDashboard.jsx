@@ -458,6 +458,44 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     };
   };
 
+  // Practicable, actor-specific interventions per vulnerability dimension.
+  // Each dimension maps to one concrete action per stakeholder type, since
+  // "recommendations" previously meant one generic bullet regardless of who
+  // was reading the brief -- a state ministry, an NGO, and a multinational
+  // funder each need a different kind of action, not the same sentence.
+  const INTERVENTION_LIBRARY = {
+    poverty: {
+      state: "Expand state-level cash transfer and micro-credit access programs targeting households identified as extreme-poor via NBS MPI data.",
+      ngo: "Deploy livelihood diversification and vocational skills training in the highest-MPI LGAs.",
+      private: "Fund local SME incubation and agro-value-chain investment to create formal employment pathways."
+    },
+    education: {
+      state: "Fund targeted enrollment subsidies and safe-schools infrastructure repair in LGAs with the highest out-of-school rates.",
+      ngo: "Run community-based non-formal education and back-to-school campaigns for out-of-school children.",
+      private: "Sponsor school infrastructure rehabilitation and digital-literacy programs through CSR partnerships."
+    },
+    health: {
+      state: "Expand primary healthcare clinic coverage and mobile immunization outreach in underserved LGAs.",
+      ngo: "Support maternal and child health outreach and community health worker training programs.",
+      private: "Invest in health supply-chain logistics and telemedicine infrastructure for remote communities."
+    },
+    food: {
+      state: "Release regional buffer grain reserves and subsidize agricultural inputs ahead of the lean season.",
+      ngo: "Implement emergency food assistance and cash-based transfer programs in Phase 3+ areas.",
+      private: "Invest in resilient agribusiness value chains and drought-resistant seed distribution."
+    },
+    displacement: {
+      state: "Partner with NEMA to expand temporary shelter infrastructure and improve IDP camp coordination.",
+      ngo: "Provide protection services, WASH facilities, and psychosocial support in displacement sites.",
+      private: "Fund durable housing and livelihood-reintegration programs for returnee populations."
+    },
+    security: {
+      state: "Deploy community-centric conflict mediation registries and increase security patrols in hotspot LGAs.",
+      ngo: "Facilitate community dialogue, peacebuilding initiatives, and early-warning conflict monitoring.",
+      private: "Support local economic stabilization initiatives that reduce resource-driven conflict incentives."
+    }
+  };
+
   const getStatePolicyBrief = (state) => {
     const pov = getForecastOutlook(state).poverty;
     const food = getForecastOutlook(state).food;
@@ -487,20 +525,23 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       implicationText += `Projections show stable or de-escalating trends across key security and food indices. `;
     }
 
-    implicationText += `The state's primary vulnerability remains in ${primaryVulnerability.name}.`;
+    implicationText += `The state's primary vulnerability remains in ${primaryVulnerability.name}, with ${secondaryVulnerability.name} as a secondary concern.`;
 
-    const recommendations = [];
-    if (primaryVulnerability.key === 'poverty') recommendations.push("Establish localized social safety net transfers and micro-credit access programs.");
-    else if (primaryVulnerability.key === 'education') recommendations.push("Launch targeted enrollment incentives and safe-schools initiatives.");
-    else if (primaryVulnerability.key === 'health') recommendations.push("Expand rural primary healthcare clinic reach and mobile immunization campaigns.");
-    else if (primaryVulnerability.key === 'food') recommendations.push("Release regional buffer grain reserves and subsidize inputs.");
-    else if (primaryVulnerability.key === 'displacement') recommendations.push("Partner with federal NEMA agencies to enhance temporary shelter infrastructure.");
-    else if (primaryVulnerability.key === 'security') recommendations.push("Deploy community-centric conflict mediation registries and increase safety patrols.");
+    const primaryActions = INTERVENTION_LIBRARY[primaryVulnerability.key];
+    const secondaryActions = INTERVENTION_LIBRARY[secondaryVulnerability.key];
 
-    if (sec.change > 0) recommendations.push("Incorporate seasonal conflict projections into state security coordination briefs.");
-    else recommendations.push("Maintain standard data tracking cycles to audit active policy buffer resilience.");
+    const recommendations = {
+      state: [primaryActions.state, secondaryActions.state],
+      ngo: [primaryActions.ngo, secondaryActions.ngo],
+      private: [primaryActions.private, secondaryActions.private]
+    };
 
-    return { implications: implicationText, recommendations };
+    return {
+      implications: implicationText,
+      primaryVulnerability: primaryVulnerability.name,
+      secondaryVulnerability: secondaryVulnerability.name,
+      recommendations
+    };
   };
 
   const handleDownloadTrendBrief = () => {
@@ -1263,16 +1304,25 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 </p>
               </div>
 
-              <div className={`p-5 rounded-2xl border text-xs flex flex-col gap-3 text-left ${isDarkMode ? 'bg-[#030e20] border-white/5 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+              <div className={`p-5 rounded-2xl border text-xs flex flex-col gap-4 text-left ${isDarkMode ? 'bg-[#030e20] border-white/5 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
                 <h4 className="font-poppins font-bold text-xs uppercase tracking-wider text-emerald-500 flex items-center gap-1.5 border-b border-slate-200/10 dark:border-white/5 pb-2">
                   <Shield className="w-3.5 h-3.5" />
                   Targeted Policy Recommendations
                 </h4>
-                <ul className="list-disc pl-4 flex flex-col gap-2.5 leading-relaxed opacity-95 text-xs">
-                  {getStatePolicyBrief(activeState).recommendations.map((rec, idx) => (
-                    <li key={idx}>{rec}</li>
-                  ))}
-                </ul>
+                {[
+                  { label: 'State Government', items: getStatePolicyBrief(activeState).recommendations.state },
+                  { label: 'NGOs & Development Partners', items: getStatePolicyBrief(activeState).recommendations.ngo },
+                  { label: 'Multinationals & Private Sector', items: getStatePolicyBrief(activeState).recommendations.private }
+                ].map((group) => (
+                  <div key={group.label} className="flex flex-col gap-1.5">
+                    <span className="font-poppins font-bold text-[10px] uppercase tracking-wider opacity-70">{group.label}</span>
+                    <ul className="list-disc pl-4 flex flex-col gap-1.5 leading-relaxed opacity-95 text-xs">
+                      {(group.items || []).map((rec, idx) => (
+                        <li key={idx}>{rec}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
