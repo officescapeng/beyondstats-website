@@ -158,7 +158,7 @@ def resolve_state(raw: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# NIGERIA RELEVANCE FILTER  (word-boundary regex)
+# NIGERIA RELEVANCE FILTER (STRICTER)
 # ─────────────────────────────────────────────────────────────
 _NIGERIA_PATTERNS = [
     re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
@@ -176,15 +176,14 @@ def nigeria_score(text: str) -> int:
     return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
 
 
-def is_nigeria_relevant(title: str, text: str):
+def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    STRICTER: Require 3+ Nigeria markers for definitive relevance.
-    1-2 markers = reject (too many false positives).
+    STRICTER: Require 3+ Nigeria markers for relevance.
+    Excludes borderline articles to reduce false positives.
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
     score = nigeria_score(f"{title} {text}")
-    # Changed: Now require score >= 3 to be relevant at all
     return score >= 3
 
 
@@ -209,7 +208,7 @@ _NON_CONFLICT_KEYWORDS = (
 
 
 def canonical_incident_type(raw: str) -> str:
-    """Collapse free-text incident types into a small, stable set."""
+    """Collapse free-text incident types into a stable set."""
     it = (raw or "").lower().strip()
     if not it:
         return "unknown"
@@ -236,8 +235,6 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int) -
     STRICTER: Only log if BOTH conditions hold:
       1. At least one casualty (someone killed OR abducted)
       2. Incident type matches a conflict keyword OR abductions > 0
-    
-    This prevents logging arrests, policy news, troop deployments with no deaths.
     """
     fatalities = _safe_int(fatalities)
     abductions = _safe_int(abductions)
@@ -248,7 +245,7 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int) -
 
     it = (incident_type or "").lower().strip()
 
-    # (2) Explicit non-conflict cause -> reject (accidents, disease, etc.)
+    # (2) Explicit non-conflict cause -> reject
     if any(k in it for k in _NON_CONFLICT_KEYWORDS):
         return False
 
@@ -256,7 +253,6 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int) -
     if abductions > 0:
         return True
     
-    # Must have a conflict keyword if only fatalities
     return any(k in it for k in _CONFLICT_KEYWORDS)
 
 
@@ -306,9 +302,9 @@ def _parse_date(date_str) -> datetime | None:
 # ─────────────────────────────────────────────────────────────
 # IMPROVED DEDUPLICATION
 # ─────────────────────────────────────────────────────────────
-DEDUP_WINDOW_DAYS   = 7     # Incidents within 7 days are likely the same
-FATALITY_TOLERANCE  = 5     # Casualty counts within +/- 5 are considered same
-ABDUCTION_TOLERANCE = 10    # Abduction counts within +/- 10 are considered same
+DEDUP_WINDOW_DAYS   = 7
+FATALITY_TOLERANCE  = 5
+ABDUCTION_TOLERANCE = 10
 
 
 def casualty_band(n) -> str:
@@ -327,8 +323,7 @@ def casualty_band(n) -> str:
 
 def semantic_fp(date_str, state, lga, canonical_type, fatalities, abductions) -> str:
     """
-    IMPROVED: Creates a stable fingerprint that catches same events 
-    reported by different sources.
+    IMPROVED: Creates a stable fingerprint for deduplication across sources.
     
     Uses:
     - State (must match exactly)
@@ -336,21 +331,17 @@ def semantic_fp(date_str, state, lga, canonical_type, fatalities, abductions) ->
     - Casualty BANDS (not exact counts)
     - Date RANGE (7-day window)
     - LGA if available
-    
-    This fingerprint MUST match for deduplication to work across sources.
     """
     state_n = str(state).strip().lower() if state else "unknown"
     lga_n   = str(lga).strip().lower() if lga else ""
     inc_n   = str(canonical_type).strip().lower() if canonical_type else "unknown"
 
-    # Use a 7-day bucket so same event reported over days has same FP
     d = _parse_date(date_str)
     if d:
         bucket = str(d.toordinal() // DEDUP_WINDOW_DAYS)
     else:
         bucket = "unknown"
 
-    # Build fingerprint: state + type + casualty bands + date bucket + LGA
     base = f"{state_n}|{inc_n}|{casualty_band(fatalities)}|{casualty_band(abductions)}|{bucket}"
     if lga_n:
         base += f"|{lga_n}"
@@ -361,24 +352,17 @@ def semantic_fp(date_str, state, lga, canonical_type, fatalities, abductions) ->
 def _is_duplicate(sig: dict, recent: list[dict]) -> bool:
     """
     Fuzzy duplicate detection: same real-world event reported by different sources.
-    
-    Match criteria (all must pass):
-    - Same state
-    - Same canonical incident type
-    - Same or compatible LGA (both null, or both match)
-    - Within 7 days
-    - Casualty counts within tolerance
     """
     for r in recent:
         # State must match exactly
         if r["state"] != sig["state"]:
             continue
         
-        # Incident type must match exactly (use canonical form)
+        # Incident type must match exactly
         if r["incident_type"] != sig["incident_type"]:
             continue
         
-        # LGA must be compatible (both unknown, or both the same)
+        # LGA must be compatible
         r_lga = (r.get("lga") or "").strip().lower() or None
         s_lga = (sig.get("lga") or "").strip().lower() or None
         if r_lga and s_lga and r_lga != s_lga:
@@ -397,7 +381,6 @@ def _is_duplicate(sig: dict, recent: list[dict]) -> bool:
         if abs(r.get("abductions", 0) - sig.get("abductions", 0)) > ABDUCTION_TOLERANCE:
             continue
         
-        # All criteria matched -> it's a duplicate
         return True
     
     return False
@@ -454,6 +437,110 @@ def fetch_full_article(url: str) -> str:
     except Exception as exc:
         log.debug(f"Error fetching {url[:80]}: {exc}")
     return ""
+
+
+# ─────────────────────────────────────────────────────────────
+# FOLLOW-UP / AFTERMATH / UPDATE DETECTION
+# ─────────────────────────────────────────────────────────────
+
+_AFTERMATH_KEYWORDS = (
+    # Rescue / release / recovery (incident already happened)
+    "rescue", "rescued", "rescue operation",
+    "release", "released", "freed", "regain freedom", "regained freedom",
+    "recover", "recovered", "recovery",
+    "escape", "escaped",
+    "reunite", "reunited", "reunion",
+    
+    # Official response / visits
+    "visit", "visits", "visited",
+    "condole", "condolence", "sympathize", "sympathy",
+    "commiserate", "commiseration",
+    
+    # Aid / relief / compensation
+    "relief", "aid", "donate", "donation",
+    "compensation", "compensate", "palliative",
+    
+    # Investigation / prosecution
+    "investigation", "investigate", "probe",
+    "arrest", "arrested", "apprehend", "apprehended",
+    "trial", "court", "prosecution", "prosecuted", "charged",
+    "sentenced", "convict", "convicted",
+    
+    # Memorial / burial
+    "memorial", "remember", "remembrance", "anniversary",
+    "buried", "funeral", "burial", "laid to rest",
+    "mass burial",
+    
+    # Victim / survivor focused
+    "widow", "widows", "survivor", "survivors",
+    "orphan", "orphans", "displaced",
+    
+    # Explicit update language
+    "update on", "update:", "latest on", "days after",
+    "weeks after", "months after", "one year after",
+    "still missing", "yet to be", "whereabouts",
+    
+    # Ransom negotiation aftermath
+    "ransom paid", "paid ransom", "ransom demand",
+)
+
+_FRESH_INCIDENT_KEYWORDS = (
+    "attack", "attacked", "attackers", "attacking",
+    "kill", "killed", "killing", "slain",
+    "kidnap", "kidnapped", "kidnapping",
+    "abduct", "abducted", "abduction",
+    "gunmen", "armed men", "assailants",
+    "bomb", "bombing", "explosion", "blast",
+    "clash", "clashed", "fighting",
+    "ambush", "ambushed",
+    "raid", "raided", "invasion", "invaded",
+    "storm", "stormed",
+    "massacre", "massacred",
+)
+
+
+def is_followup_article(title: str, text: str) -> bool:
+    """
+    Determine if an article is aftermath/follow-up coverage rather than a
+    fresh incident report.
+    
+    EXCEPTION: If the article describes casualties occurring during a rescue/
+    recovery operation, those are fresh incidents and should NOT be filtered.
+    Let the LLM and conflict-casualty gate determine if they're valid.
+    """
+    title_lower = (title or "").lower()
+    text_lower  = (text or "").lower()
+    
+    # ── Exception: Don't skip if casualties occurred during rescue ──
+    rescue_terms = ("rescue", "rescued", "rescue operation", "freed", "released")
+    casualty_indicators = ("kill", "killed", "death", "die", "died", 
+                          "wound", "wounded", "casualty", "casualties",
+                          "blast", "explosion", "shooting", "gunfire", "crossfire")
+    
+    has_rescue = any(term in text_lower for term in rescue_terms)
+    has_casualties = any(term in text_lower for term in casualty_indicators)
+    
+    if has_rescue and has_casualties:
+        # Could be a rescue operation that resulted in deaths.
+        # Let the LLM extract it and conflict-casualty gate validate it.
+        log.debug(f"  Potential rescue casualty incident; allowing LLM to evaluate")
+        return False  # Not filtering; pass to LLM
+    
+    # ── Rule 1: Aftermath keywords in title = skip ──────────────
+    for keyword in _AFTERMATH_KEYWORDS:
+        if keyword in title_lower:
+            log.debug(f"  Aftermath keyword in title: '{keyword}'")
+            return True
+    
+    # ── Rule 2: Aftermath signals dominate = skip ───────────────
+    aftermath_count = sum(1 for k in _AFTERMATH_KEYWORDS if k in text_lower)
+    fresh_count     = sum(1 for k in _FRESH_INCIDENT_KEYWORDS if k in text_lower)
+    
+    if aftermath_count >= 3 and aftermath_count > fresh_count:
+        log.debug(f"  Aftermath signals dominant: {aftermath_count} vs {fresh_count} fresh")
+        return True
+    
+    return False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -625,17 +712,26 @@ def process_entry(entry, dedup, default_date: str) -> dict:
     """
     Process a single feed entry.
     
+    `dedup` is a shared dict with:
+      {
+        "article_fps":  set,          # processed article fingerprints
+        "semantic_fps": set,          # exact semantic fingerprints
+        "sigs":         list[dict],   # normalized signatures for fuzzy match
+        "lock":         threading.Lock,
+      }
+    
     Returns statistics dict.
     """
     result = {
-        "skipped_already_seen": 0,
-        "skipped_nigeria":      0,
-        "skipped_too_short":    0,
-        "invalid_state":        0,
-        "skipped_no_casualties": 0,
-        "semantic_duplicates":  0,
-        "ai_failed":            0,
-        "saved_incidents":      0,
+        "skipped_already_seen":   0,
+        "skipped_nigeria":        0,
+        "skipped_too_short":      0,
+        "skipped_followup":       0,
+        "invalid_state":          0,
+        "skipped_no_casualties":  0,
+        "semantic_duplicates":    0,
+        "ai_failed":              0,
+        "saved_incidents":        0,
     }
 
     try:
@@ -666,9 +762,17 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             result["skipped_too_short"] += 1
             return result
 
-        # Nigeria relevance check (STRICTER now)
+        # Nigeria relevance check (STRICTER)
         if not is_nigeria_relevant(title, text):
             result["skipped_nigeria"] += 1
+            return result
+
+        # Skip follow-up / aftermath articles
+        if is_followup_article(title, text):
+            log.info(f"Skipping aftermath: {title[:80]}")
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+            result["skipped_followup"] += 1
             return result
 
         log.info(f"Processing: {title[:80]} ({len(text)} chars)")
@@ -743,7 +847,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                         continue
                     
                     # Mark as processed before DB write
-                    # (prevents concurrent threads from double-inserting)
                     dedup["semantic_fps"].add(sem_fp)
                     dedup["sigs"].append(sig)
                     dedup["article_fps"].add(art_fp)
@@ -765,7 +868,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
                 safe_store(payload)
                 log.info(f"  ✓ SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
-                         f"{fatalities}K / {abductions}A | {url[:60]}")
+                         f"{fatalities}K / {abductions}A")
                 result["saved_incidents"] += 1
 
             except Exception as exc:
@@ -781,10 +884,10 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
 def run():
-    log.info("=" * 60)
-    log.info("  SECURITY SCRAPER PIPELINE")
+    log.info("=" * 70)
+    log.info("  NIGERIAN SECURITY INCIDENTS SCRAPER")
     log.info(f"  DRY_RUN: {DRY_RUN}  |  trafilatura: {HAS_TRAFILATURA}")
-    log.info("=" * 60)
+    log.info("=" * 70)
 
     stats = {
         "feeds":                 0,
@@ -792,6 +895,7 @@ def run():
         "skipped_already_seen":  0,
         "skipped_nigeria":       0,
         "skipped_too_short":     0,
+        "skipped_followup":      0,
         "invalid_state":         0,
         "skipped_no_casualties": 0,
         "semantic_duplicates":   0,
@@ -837,6 +941,7 @@ def run():
         if domain:
             by_domain[domain].append(entry)
 
+    # Process entries concurrently (respecting per-domain rate limits)
     max_workers = min(len(by_domain) or 1, 6)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -853,14 +958,14 @@ def run():
 
     # Report
     log.info("")
-    log.info("=" * 60)
+    log.info("=" * 70)
     log.info("  EXECUTION REPORT")
-    log.info("=" * 60)
+    log.info("=" * 70)
     pad = max(len(k) for k in stats) + 2
     for key, val in stats.items():
         name = key.replace('_', ' ').title()
         log.info(f"  {name:<{pad}} {val:>6}")
-    log.info("=" * 60)
+    log.info("=" * 70)
 
 
 # ─────────────────────────────────────────────────────────────
