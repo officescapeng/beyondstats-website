@@ -37,7 +37,7 @@ load_dotenv(dotenv_path=local_env if os.path.exists(local_env) else parent_env)
 # LOGGING
 # ─────────────────────────────────────────────────────────────
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Changed to DEBUG for verbose output
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
@@ -247,19 +247,28 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int) -
 
     # (1) No casualties -> reject
     if fatalities <= 0 and abductions <= 0:
+        log.debug(f"    ❌ No casualties (F:{fatalities}, A:{abductions})")
         return False
 
     it = (incident_type or "").lower().strip()
 
     # (2) Explicit non-conflict cause -> reject
     if any(k in it for k in _NON_CONFLICT_KEYWORDS):
+        log.debug(f"    ❌ Non-conflict keyword found in: {incident_type}")
         return False
 
     # (3) Abduction is always conflict; otherwise require a conflict keyword
     if abductions > 0:
+        log.debug(f"    ✅ Has abductions ({abductions})")
         return True
     
-    return any(k in it for k in _CONFLICT_KEYWORDS)
+    has_conflict = any(k in it for k in _CONFLICT_KEYWORDS)
+    if has_conflict:
+        log.debug(f"    ✅ Has conflict keyword in: {incident_type}")
+        return True
+    
+    log.debug(f"    ❌ No conflict keyword in: {incident_type}")
+    return False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -299,8 +308,14 @@ def _safe_int(val, default: int = 0) -> int:
 
 
 def _parse_date(date_str) -> datetime | None:
+    """
+    Parse a date string (YYYY-MM-DD format) and return a timezone-aware datetime.
+    All datetimes are in UTC.
+    """
     try:
-        return datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
+        dt = datetime.strptime(str(date_str)[:10], "%Y-%m-%d")
+        # Make timezone-aware (UTC) to be compatible with EVENT_START_DATE
+        return dt.replace(tzinfo=timezone.utc)
     except Exception:
         return None
 
@@ -330,13 +345,6 @@ def casualty_band(n) -> str:
 def semantic_fp(date_str, state, lga, canonical_type, fatalities, abductions) -> str:
     """
     Creates a stable fingerprint for deduplication across sources.
-    
-    Uses:
-    - State (must match exactly)
-    - Canonical incident type (normalized)
-    - Casualty BANDS (not exact counts)
-    - Date RANGE (7-day window)
-    - LGA if available
     """
     state_n = str(state).strip().lower() if state else "unknown"
     lga_n   = str(lga).strip().lower() if lga else ""
@@ -423,6 +431,7 @@ def fetch_full_article(url: str) -> str:
         if HAS_TRAFILATURA:
             extracted = trafilatura.extract(r.text, include_comments=False, include_tables=False)
             if extracted and len(extracted) >= MIN_TEXT_LENGTH:
+                log.debug(f"  ✓ Trafilatura extracted {len(extracted)} chars")
                 return extracted[:MAX_ARTICLE_CHARS]
 
         soup = BeautifulSoup(r.text, "html.parser")
@@ -432,16 +441,19 @@ def fetch_full_article(url: str) -> str:
                 paras = container.find_all("p")
                 text  = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)
                 if len(text) >= MIN_TEXT_LENGTH:
+                    log.debug(f"  ✓ BeautifulSoup extracted {len(text)} chars from {selector}")
                     return text[:MAX_ARTICLE_CHARS]
 
         paras = soup.find_all("p")
-        return "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:MAX_ARTICLE_CHARS]
+        text = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:MAX_ARTICLE_CHARS]
+        log.debug(f"  ✓ BeautifulSoup extracted {len(text)} chars (fallback)")
+        return text
 
     except requests.exceptions.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
-        log.debug(f"HTTP {status} fetching {url[:80]}")
+        log.debug(f"  ❌ HTTP {status} fetching {url[:80]}")
     except Exception as exc:
-        log.debug(f"Error fetching {url[:80]}: {exc}")
+        log.debug(f"  ❌ Error fetching {url[:80]}: {exc}")
     return ""
 
 
@@ -450,43 +462,28 @@ def fetch_full_article(url: str) -> str:
 # ─────────────────────────────────────────────────────────────
 
 _AFTERMATH_KEYWORDS = (
-    # Rescue / release / recovery (can indicate aftermath, but exception for casualties)
     "rescue", "rescued", "rescue operation",
     "release", "released", "freed", "regain freedom", "regained freedom",
     "recover", "recovered", "recovery",
     "escape", "escaped",
     "reunite", "reunited", "reunion",
-    
-    # Official response / visits
     "visit", "visits", "visited",
     "condole", "condolence", "sympathize", "sympathy",
     "commiserate", "commiseration",
-    
-    # Aid / relief / compensation
     "relief", "aid", "donate", "donation",
     "compensation", "compensate", "palliative",
-    
-    # Investigation / prosecution
     "investigation", "investigate", "probe",
     "arrest", "arrested", "apprehend", "apprehended",
     "trial", "court", "prosecution", "prosecuted", "charged",
     "sentenced", "convict", "convicted",
-    
-    # Memorial / burial
     "memorial", "remember", "remembrance", "anniversary",
     "buried", "funeral", "burial", "laid to rest",
     "mass burial",
-    
-    # Victim / survivor focused
     "widow", "widows", "survivor", "survivors",
     "orphan", "orphans", "displaced",
-    
-    # Explicit update language
     "update on", "update:", "latest on", "days after",
     "weeks after", "months after", "one year after",
     "still missing", "yet to be", "whereabouts",
-    
-    # Ransom negotiation aftermath
     "ransom paid", "paid ransom", "ransom demand",
 )
 
@@ -509,10 +506,6 @@ def is_followup_article(title: str, text: str) -> bool:
     """
     Determine if an article is aftermath/follow-up coverage rather than a
     fresh incident report.
-    
-    EXCEPTION: If the article describes casualties occurring during a rescue/
-    recovery operation, those are fresh incidents and should NOT be filtered.
-    Let the LLM and conflict-casualty gate determine if they're valid.
     """
     title_lower = (title or "").lower()
     text_lower  = (text or "").lower()
@@ -527,23 +520,23 @@ def is_followup_article(title: str, text: str) -> bool:
     has_casualties = any(term in text_lower for term in casualty_indicators)
     
     if has_rescue and has_casualties:
-        # Could be a rescue operation that resulted in deaths.
-        # Let the LLM extract it and conflict-casualty gate validate it.
-        log.debug(f"  Potential rescue casualty incident; allowing LLM to evaluate")
-        return False  # Not filtering; pass to LLM
+        log.debug(f"  ✓ Rescue with casualties exception - allowing LLM to evaluate")
+        return False
     
     # ── Rule 1: Aftermath keywords in title = skip ──────────────
     for keyword in _AFTERMATH_KEYWORDS:
         if keyword in title_lower:
-            log.debug(f"  Aftermath keyword in title: '{keyword}'")
+            log.debug(f"  ❌ Aftermath keyword in title: '{keyword}'")
             return True
     
     # ── Rule 2: Aftermath signals dominate = skip ───────────────
     aftermath_count = sum(1 for k in _AFTERMATH_KEYWORDS if k in text_lower)
     fresh_count     = sum(1 for k in _FRESH_INCIDENT_KEYWORDS if k in text_lower)
     
+    log.debug(f"  Aftermath signals: {aftermath_count}, Fresh signals: {fresh_count}")
+    
     if aftermath_count >= 3 and aftermath_count > fresh_count:
-        log.debug(f"  Aftermath signals dominant: {aftermath_count} vs {fresh_count} fresh")
+        log.debug(f"  ❌ Aftermath signals dominant")
         return True
     
     return False
@@ -614,6 +607,7 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                 time.sleep(gap)
 
             try:
+                log.debug(f"  [LLM] Calling Groq API (attempt {attempt + 1})")
                 res = groq_client.chat.completions.create(
                     model="llama-3.1-8b-instant",
                     messages=[{"role": "user", "content": prompt}],
@@ -627,23 +621,27 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                 is_rate_limit = "rate" in err_str.lower() or "429" in err_str
                 if is_rate_limit:
                     retry_after = _parse_retry_after(err_str) or (backoff * 4)
-                    log.warning(f"Groq 429 rate limit (attempt {attempt + 1}). "
+                    log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
                                 f"Waiting {retry_after:.1f}s")
                     time.sleep(retry_after)
                 else:
                     wait = backoff
-                    log.warning(f"Groq error (attempt {attempt + 1}): {str(exc)[:100]}")
+                    log.warning(f"  [LLM] Error (attempt {attempt + 1}): {str(exc)[:100]}")
                     time.sleep(wait)
                 backoff *= 2
                 continue
 
         try:
-            data = json.loads(res.choices[0].message.content)
-            return data.get("incidents", [])
+            raw_response = res.choices[0].message.content
+            log.debug(f"  [LLM] Raw response: {raw_response[:300]}")
+            data = json.loads(raw_response)
+            incidents = data.get("incidents", [])
+            log.info(f"  [LLM] ✓ Extracted {len(incidents)} incident(s)")
+            return incidents
         except json.JSONDecodeError as exc:
-            log.error(f"JSON decode error (attempt {attempt + 1}): {exc}")
+            log.error(f"  [LLM] JSON decode error (attempt {attempt + 1}): {exc}")
 
-    log.error(f"AI extraction failed after {retries} attempts: {title[:60]}")
+    log.error(f"  [LLM] ❌ Extraction failed after {retries} attempts")
     return []
 
 
@@ -668,11 +666,7 @@ def load_processed_article_fps(lookback_days: int = 30) -> set[str]:
 
 
 def load_recent_incidents(lookback_days: int = 14) -> tuple[set[str], list[dict]]:
-    """
-    Load recent incidents for deduplication.
-    
-    Returns semantic FPs (exact match) and incident signatures (fuzzy match).
-    """
+    """Load recent incidents for deduplication."""
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         res    = supabase.table("incidents").select(
@@ -715,25 +709,13 @@ def safe_store(payload: dict):
 # ARTICLE PROCESSOR
 # ─────────────────────────────────────────────────────────────
 def process_entry(entry, dedup, default_date: str) -> dict:
-    """
-    Process a single feed entry.
-    
-    `dedup` is a shared dict with:
-      {
-        "article_fps":  set,          # processed article fingerprints
-        "semantic_fps": set,          # exact semantic fingerprints
-        "sigs":         list[dict],   # normalized signatures for fuzzy match
-        "lock":         threading.Lock,
-      }
-    
-    Returns statistics dict.
-    """
+    """Process a single feed entry."""
     result = {
         "skipped_already_seen":   0,
         "skipped_nigeria":        0,
         "skipped_too_short":      0,
         "skipped_followup":       0,
-        "skipped_before_start_date": 0,  # incidents before 2026-07-01
+        "skipped_before_start_date": 0,
         "invalid_state":          0,
         "skipped_no_casualties":  0,
         "semantic_duplicates":    0,
@@ -756,48 +738,72 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             except Exception:
                 pass
 
+        log.info(f"\n[Article] {title[:80]}")
+        log.debug(f"  URL: {url[:80]}")
+        log.debug(f"  Pub date: {pub_date}")
+
         # Skip already-processed articles
         art_fp = content_fp(url)
         with dedup["lock"]:
             if art_fp in dedup["article_fps"]:
+                log.debug(f"  ❌ Already seen")
                 result["skipped_already_seen"] += 1
                 return result
 
         # Fetch article text
+        log.debug(f"  Fetching article...")
         text = fetch_full_article(url)
+        log.debug(f"  Text length: {len(text)} chars")
+        
         if len(text) < MIN_TEXT_LENGTH:
+            log.debug(f"  ❌ Too short ({len(text)} < {MIN_TEXT_LENGTH})")
             result["skipped_too_short"] += 1
             return result
 
-        # Nigeria relevance check (score >= 2)
+        # Nigeria relevance check
+        score = nigeria_score(f"{title} {text}")
+        log.debug(f"  Nigeria score: {score}")
+        
         if not is_nigeria_relevant(title, text):
+            log.debug(f"  ❌ Not Nigeria relevant")
             result["skipped_nigeria"] += 1
             return result
 
-        # Skip follow-up / aftermath articles (with rescue casualty exception)
+        log.debug(f"  ✅ Nigeria relevant")
+
+        # Skip follow-up / aftermath articles
         if is_followup_article(title, text):
-            log.info(f"Skipping aftermath: {title[:80]}")
+            log.info(f"  ❌ Skipping aftermath")
             with dedup["lock"]:
                 dedup["article_fps"].add(art_fp)
             result["skipped_followup"] += 1
             return result
 
-        log.info(f"Processing: {title[:80]} ({len(text)} chars)")
+        log.debug(f"  ✅ Not aftermath")
+        log.info(f"  Processing...")
 
         # LLM extraction
         incidents_list = extract_incidents(title, text, pub_date)
         if not incidents_list:
+            log.info(f"  ❌ LLM extraction returned no incidents")
             result["ai_failed"] += 1
             return result
+
+        log.info(f"  ✅ LLM extracted {len(incidents_list)} incidents")
 
         # Process each extracted incident
         for idx, incident in enumerate(incidents_list):
             try:
+                log.debug(f"  [Incident {idx}]")
+                log.debug(f"    Raw incident: {json.dumps(incident, indent=6)}")
+                
                 # Validate state
                 raw_state   = (incident.get("state") or "").strip()
                 clean_state = resolve_state(raw_state)
+                log.debug(f"    State: {raw_state} → {clean_state}")
+                
                 if not clean_state:
-                    log.debug(f"  Invalid state: '{raw_state}'")
+                    log.debug(f"    ❌ Invalid state")
                     result["invalid_state"] += 1
                     continue
 
@@ -806,13 +812,17 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 abductions  = _safe_int(incident.get("abductions", 0))
                 raw_type    = (incident.get("incident_type") or "").strip()
                 canon_type  = canonical_incident_type(raw_type)
+                
+                log.debug(f"    Type: {raw_type} → {canon_type}")
+                log.debug(f"    Casualties: {fatalities}K / {abductions}A")
 
                 # ══ CONFLICT-CASUALTY GATE ══════════════════════════
                 if not is_conflict_casualty(raw_type, fatalities, abductions):
-                    log.debug(f"  Not conflict casualty: '{raw_type}', "
-                             f"F:{fatalities} A:{abductions}")
+                    log.debug(f"    ❌ Rejected by conflict-casualty gate")
                     result["skipped_no_casualties"] += 1
                     continue
+
+                log.debug(f"    ✅ Passed conflict-casualty gate")
 
                 # Extract location details
                 lga = (incident.get("lga") or "").strip() or None
@@ -824,11 +834,12 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 else:
                     occurrence_date = pub_date
 
+                log.debug(f"    Date: {occurrence_date}")
+
                 # ── SKIP INCIDENTS BEFORE START DATE ────────────────
                 occurrence_dt = _parse_date(occurrence_date)
                 if occurrence_dt and occurrence_dt < EVENT_START_DATE:
-                    log.debug(f"  Skipping incident before start date "
-                              f"({occurrence_date} < {EVENT_START_DATE.strftime('%Y-%m-%d')})")
+                    log.debug(f"    ❌ Before start date ({occurrence_date} < {EVENT_START_DATE.strftime('%Y-%m-%d')})")
                     result["skipped_before_start_date"] += 1
                     continue
 
@@ -836,6 +847,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 sem_fp = semantic_fp(
                     occurrence_date, clean_state, lga, canon_type, fatalities, abductions,
                 )
+                log.debug(f"    Semantic FP: {sem_fp[:16]}...")
 
                 sig = {
                     "state":         clean_state,
@@ -850,15 +862,17 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 with dedup["lock"]:
                     # Check exact semantic match
                     if sem_fp in dedup["semantic_fps"]:
-                        log.debug(f"  Duplicate (exact FP): {clean_state} / {canon_type}")
+                        log.debug(f"    ❌ Duplicate (exact FP)")
                         result["semantic_duplicates"] += 1
                         continue
                     
                     # Check fuzzy match
                     if _is_duplicate(sig, dedup["sigs"]):
-                        log.debug(f"  Duplicate (fuzzy): {clean_state} / {canon_type} / {occurrence_date}")
+                        log.debug(f"    ❌ Duplicate (fuzzy)")
                         result["semantic_duplicates"] += 1
                         continue
+                    
+                    log.debug(f"    ✅ Unique incident")
                     
                     # Mark as processed before DB write
                     dedup["semantic_fps"].add(sem_fp)
@@ -881,17 +895,46 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 }
 
                 safe_store(payload)
-                log.info(f"  ✓ SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
+                log.info(f"  ✅ SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
                          f"{fatalities}K / {abductions}A")
                 result["saved_incidents"] += 1
 
             except Exception as exc:
-                log.error(f"  Incident [{idx}] error: {exc}", exc_info=False)
+                log.error(f"  ❌ Incident [{idx}] error: {exc}", exc_info=True)
 
     except Exception as exc:
-        log.error(f"process_entry unhandled: {exc}", exc_info=False)
+        log.error(f"process_entry unhandled: {exc}", exc_info=True)
 
     return result
+
+
+# ─────────────────────────────────────────────────────────────
+# DIAGNOSTIC TEST FUNCTION
+# ─────────────────────────────────────────────────────────────
+def test_feeds():
+    """Test mode: Show feed content."""
+    print("\n" + "=" * 80)
+    print("  FEED CONTENT TEST")
+    print("=" * 80 + "\n")
+    
+    for feed_url in FEEDS[:2]:
+        print(f"Feed: {feed_url}\n")
+        f = feedparser.parse(feed_url)
+        
+        if not f.entries:
+            print("  ❌ No entries\n")
+            continue
+        
+        print(f"  Total entries: {len(f.entries)}")
+        print(f"  Showing first 5:\n")
+        
+        for idx, entry in enumerate(f.entries[:5]):
+            title = entry.get("title", "?")[:60]
+            t = entry.get("published_parsed")
+            date_str = time.strftime("%Y-%m-%d", t) if t else "?"
+            print(f"    [{idx+1}] [{date_str}] {title}")
+        
+        print()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -957,7 +1000,7 @@ def run():
         if domain:
             by_domain[domain].append(entry)
 
-    # Process entries concurrently (respecting per-domain rate limits)
+    # Process entries concurrently
     max_workers = min(len(by_domain) or 1, 6)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -988,6 +1031,10 @@ def run():
 # ENTRY POINT
 # ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        test_feeds()
+        sys.exit(0)
+    
     if not _acquire_lock():
         sys.exit(0)
     try:
