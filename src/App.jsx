@@ -44,6 +44,7 @@ import {
 } from 'lucide-react'
 import HumanSecurityDashboard from './components/HumanSecurityDashboard'
 import ImpactMapPage from './components/ImpactMapPage'
+import ConflictTracker from './components/ConflictTracker'
 import { fetchArticles, fetchPublications } from './services/sanity'
 import { PROCESSED_STATE_DATA } from './data/humanSecurityData'
 
@@ -70,10 +71,11 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
     const allPages = [
       { id: 'about', name: 'About Us' },
       { id: 'programs', name: 'Programs & What We Do' },
-      { id: 'dashboard', name: 'HSRI Dashboard', disabled: true },
-      { id: 'research', name: 'Research Hub & Publications', disabled: true },
-      { id: 'impact', name: 'Impact Stories', disabled: true },
-      { id: 'impact-map', name: 'Impact Map', disabled: true },
+      { id: 'dashboard', name: 'HSRI Dashboard' },
+      { id: 'research', name: 'Research Hub & Publications' },
+      { id: 'impact', name: 'Impact Stories' },
+      { id: 'impact-map', name: 'Impact Map' },
+      { id: 'tracker', name: 'Conflict Tracker' },
       { id: 'partnerships', name: 'Support & Partnerships' },
       { id: 'contact', name: 'Contact Us' }
     ]
@@ -90,8 +92,8 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   const links = [
     { name: 'About', id: 'about' },
     { name: 'Programs', id: 'programs', dropdown: true },
-    { name: 'Research', id: 'research', disabled: true },
-    { name: 'Impact', id: 'impact', dropdown: true, disabled: true },
+    { name: 'Research', id: 'research' },
+    { name: 'Impact', id: 'impact', dropdown: true },
     { name: 'Contact', id: 'contact' }
   ]
 
@@ -111,69 +113,65 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
         {links.map((link) => {
           const isPrograms = link.id === 'programs';
           const isImpact = link.id === 'impact';
-          const isDisabled = link.disabled;
-
+          
           if (isPrograms || isImpact) {
             return (
               <div key={link.id} className="relative group/nav">
                 <button
-                  disabled={isDisabled}
-                  className={`font-inter text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1 outline-none transition-colors ${
-                    isDisabled
-                      ? 'text-white/30 cursor-not-allowed'
-                      : currentPage === link.id ||
-                        (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard')) ||
-                        (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
-                        ? 'text-secondary cursor-pointer'
-                        : 'text-white/80 hover:text-secondary cursor-pointer'
+                  className={`font-inter text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1 cursor-pointer outline-none transition-colors ${
+                    currentPage === link.id ||
+                    (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard' || currentPage === 'tracker')) ||
+                    (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
+                      ? 'text-secondary'
+                      : 'text-white/80 hover:text-secondary'
                   }`}
                 >
                   {link.name}
-                  {isDisabled
-                    ? <span className="ml-1 text-[8px] font-bold bg-white/10 text-white/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                    : <ChevronDown className="w-3.5 h-3.5 opacity-60 group-hover/nav:rotate-180 transition-transform duration-300" />
-                  }
+                  <ChevronDown className="w-3.5 h-3.5 opacity-60 group-hover/nav:rotate-180 transition-transform duration-300" />
                 </button>
 
-                {/* Dropdown Menu — only shown when not disabled */}
-                {!isDisabled && (
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
-                    <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
-                      {isPrograms ? (
-                        <>
-                          <button
-                            onClick={() => setCurrentPage('programs')}
-                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                          >
-                            What We Do
-                          </button>
-                          <button
-                            disabled
-                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/25 cursor-not-allowed outline-none uppercase tracking-wider flex items-center gap-2"
-                          >
-                            HSRI Dashboard
-                            <span className="text-[8px] font-bold bg-white/10 text-white/25 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => setCurrentPage('impact')}
-                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                          >
-                            Our Impact Stories
-                          </button>
-                          <button
-                            onClick={() => setCurrentPage('impact-map')}
-                            className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
-                          >
-                            Our Impact Map
-                          </button>
-                        </>
-                      )}
-                    </div>
+                {/* Dropdown Menu */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
+                  <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
+                    {isPrograms ? (
+                      <>
+                        <button
+                          onClick={() => setCurrentPage('programs')}
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                        >
+                          What We Do
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage('dashboard')}
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                        >
+                          HSRI Dashboard
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage('tracker')}
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                        >
+                          Conflict Tracker
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setCurrentPage('impact')}
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                        >
+                          Our Impact Stories
+                        </button>
+                        <button
+                          onClick={() => setCurrentPage('impact-map')}
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                        >
+                          Our Impact Map
+                        </button>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             )
           }
@@ -181,18 +179,14 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
           return (
             <button
               key={link.id}
-              onClick={isDisabled ? undefined : () => setCurrentPage(link.id)}
-              disabled={isDisabled}
-              className={`font-inter text-[11px] font-semibold uppercase tracking-widest outline-none transition-colors flex items-center gap-1 ${
-                isDisabled
-                  ? 'text-white/30 cursor-not-allowed'
-                  : currentPage === link.id
-                  ? 'text-secondary cursor-pointer'
-                  : 'text-white/80 hover:text-secondary cursor-pointer'
+              onClick={() => setCurrentPage(link.id)}
+              className={`font-inter text-[11px] font-semibold uppercase tracking-widest cursor-pointer outline-none transition-colors ${
+                currentPage === link.id
+                  ? 'text-secondary'
+                  : 'text-white/80 hover:text-secondary'
               }`}
             >
               {link.name}
-              {isDisabled && <span className="text-[8px] font-bold bg-white/10 text-white/30 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
             </button>
           )
         })}
@@ -245,20 +239,14 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                         <button
                           key={page.id}
                           type="button"
-                          disabled={page.disabled}
-                          onClick={page.disabled ? undefined : () => {
+                          onClick={() => {
                             setCurrentPage(page.id)
                             setSearchQuery('')
                             setShowSuggestions(false)
                           }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold bg-transparent border-none outline-none flex items-center justify-between ${
-                            page.disabled
-                              ? 'text-white/30 cursor-not-allowed'
-                              : 'hover:text-[#39B54A] hover:bg-white/5 cursor-pointer text-white/80'
-                          }`}
+                          className="w-full text-left px-3 py-2 rounded-lg text-[10px] font-semibold hover:text-[#39B54A] hover:bg-white/5 cursor-pointer bg-transparent border-none outline-none text-white/80"
                         >
                           {page.name}
-                          {page.disabled && <span className="text-[8px] font-bold bg-white/10 text-white/25 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
                         </button>
                       ))}
                     </div>
@@ -414,25 +402,19 @@ function Footer({ setCurrentPage }) {
             {[
               { name: 'About', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              { name: 'Our Impact Map', id: 'impact-map', disabled: true },
-              { name: 'Human Security Dashboard', id: 'dashboard', disabled: true },
-              { name: 'Research & Deliverables', id: 'research', disabled: true },
-              { name: 'Our Impact Stories', id: 'impact', disabled: true },
+              { name: 'Our Impact Map', id: 'impact-map' },
+              { name: 'Human Security Dashboard', id: 'dashboard' },
+              { name: 'Research & Deliverables', id: 'research' },
+              { name: 'Our Impact Stories', id: 'impact' },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact', id: 'contact' }
             ].map((link) => (
               <button
                 key={link.id}
-                onClick={link.disabled ? undefined : () => setCurrentPage(link.id)}
-                disabled={link.disabled}
-                className={`font-inter text-[11px] transition-colors text-left outline-none bg-transparent border-none flex items-center gap-1.5 ${
-                  link.disabled
-                    ? 'text-white/25 cursor-not-allowed'
-                    : 'text-white/60 hover:text-white cursor-pointer'
-                }`}
+                onClick={() => setCurrentPage(link.id)}
+                className="font-inter text-[11px] text-white/60 hover:text-white transition-colors cursor-pointer text-left outline-none bg-transparent border-none"
               >
                 {link.name}
-                {link.disabled && <span className="text-[8px] font-bold bg-white/10 text-white/20 px-1.5 py-0.5 rounded-full uppercase tracking-wider">Soon</span>}
               </button>
             ))}
           </div>
@@ -510,7 +492,7 @@ function Footer({ setCurrentPage }) {
 // ================= SUB-PAGE 1: HOME PAGE HERO =================
 function HomePage({ slides, currentSlide, setCurrentPage }) {
   return (
-    <div className="relative min-h-screen w-full flex flex-col justify-between">
+    <div className="relative h-screen w-full flex flex-col justify-between">
       
       {/* Background Hero Slider */}
       <div className="absolute inset-0 w-full h-full z-0 overflow-hidden">
@@ -532,11 +514,11 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </div>
 
       {/* Main Hero Content */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-24 pb-6 lg:pt-24 lg:pb-4 flex-1 flex flex-col justify-center">
+      <main className="relative z-10 w-full max-w-7xl mx-auto px-6 py-12 flex-1 flex flex-col justify-center">
         <div className="max-w-[700px] flex flex-col items-start text-left">
           
           {/* Intro Label */}
-          <div className="flex items-center gap-2 mb-3 animate-fade-up">
+          <div className="flex items-center gap-2 mb-4 animate-fade-up">
             <BarChart3 className="w-4 h-4 text-secondary" />
             <span className="font-inter text-xs font-semibold tracking-[0.2em] text-white/70 uppercase">
               EVIDENCE-DRIVEN DEVELOPMENT
@@ -544,7 +526,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </div>
 
           {/* Main Heading */}
-          <h1 className="font-poppins font-bold text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl tracking-tight leading-[0.95] text-white mb-4 uppercase animate-fade-up-delay-1 select-none">
+          <h1 className="font-poppins font-bold text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-tight leading-[0.95] text-white mb-6 uppercase animate-fade-up-delay-1 select-none">
             DATA.<br />
             INSIGHT.<br />
             ACTION.<br />
@@ -552,12 +534,12 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </h1>
 
           {/* Supporting Text */}
-          <p className="font-inter text-white/75 text-sm sm:text-base lg:text-lg leading-relaxed max-w-[650px] mb-6 animate-fade-up-delay-2">
+          <p className="font-inter text-white/75 text-base sm:text-lg leading-relaxed max-w-[650px] mb-8 animate-fade-up-delay-2">
             We believe every statistic represents a human story. Beyond# transforms evidence into practical solutions that improve lives, strengthen communities, and promote human security.
           </p>
 
           {/* CTA Row */}
-          <div className="flex flex-wrap items-center gap-4 mb-6 lg:mb-8 animate-fade-up-delay-3">
+          <div className="flex flex-wrap items-center gap-4 mb-16 animate-fade-up-delay-3">
             <button 
               onClick={() => setCurrentPage('programs')}
               className="bg-secondary hover:bg-secondary/90 text-white font-inter font-bold text-xs uppercase tracking-widest px-8 py-4 rounded-full flex items-center gap-2 shadow-lg shadow-secondary/15 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer outline-none"
@@ -578,9 +560,9 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           </div>
 
           {/* Impact Indicators Grid */}
-          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-up-delay-4">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-up-delay-4">
             
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <BarChart3 className="w-5 h-5 text-secondary" />
               </div>
@@ -594,7 +576,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <Lightbulb className="w-5 h-5 text-secondary" />
               </div>
@@ -608,7 +590,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <Target className="w-5 h-5 text-secondary" />
               </div>
@@ -622,7 +604,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-4 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
+            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
               <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
                 <HeartHandshake className="w-5 h-5 text-secondary" />
               </div>
@@ -642,7 +624,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </main>
 
       {/* STATISTICS DRAWER FOOTER */}
-      <footer className="relative z-10 w-full bg-black/40 backdrop-blur-md border-t border-white/5 py-3 lg:py-4">
+      <footer className="relative z-10 w-full bg-black/40 backdrop-blur-md border-t border-white/5 py-6">
         <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-6">
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12 w-full lg:w-auto text-left">
@@ -696,12 +678,20 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
       </footer>
 
     </div>
-  );
+  )
 }
 
 // ================= SUB-PAGE 1B: NEWS CAROUSEL SECTION =================
 function InsightImpactNewsSection({ articles, onArticleClick }) {
   const fallbackNews = [
+    {
+      id: 1,
+      date: "2026-06-24",
+      title: "Tracking Emerging Human Security Trends Across Northern Nigeria",
+      excerpt: "Through continuous monitoring and analysis, Beyond# identifies emerging challenges and opportunities for evidence-based interventions that improve community resilience and safety.",
+      featured_media_url: "/hero_research.png",
+      category: "Human Security Monitor"
+    },
     {
       id: 2,
       date: "2026-06-18",
@@ -709,6 +699,14 @@ function InsightImpactNewsSection({ articles, onArticleClick }) {
       excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
       featured_media_url: "/stakeholder_consultation.png",
       category: "Research Brief"
+    },
+    {
+      id: 3,
+      date: "2026-06-12",
+      title: "Quarterly Trends in Food Security and Community Resilience",
+      excerpt: "A comprehensive assessment of harvest yields, market price dynamics, and household resilience indices across Middle Belt agricultural belts.",
+      featured_media_url: "/hero_community.png",
+      category: "Human Security Monitor"
     },
     {
       id: 4,
@@ -1436,15 +1434,31 @@ function AnimatedCounter({ end, duration = 2000 }) {
 // ================= SUB-PAGE 5: IMPACT & VALUES PAGE =================
 function ImpactPage({ articles: sanityArticles, onArticleClick }) {
   const fallbackFeatured = {
-    title: "Strengthening Social Protection Through Evidence-Based Planning",
-    excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
-    date: "2026-06-18",
-    author: "Beyond# Research Team",
-    category: "Research Brief",
-    featured_media_url: "/stakeholder_consultation.png"
+    title: "Tracking Emerging Human Security Trends Across Northern Nigeria",
+    excerpt: "This research appraisal assesses multidimensional security challenges across Kaduna, Kano, and Katsina states. Using structural field observations and data collected by our local observers, we analyze the intersecting risks of crop yields, food security fluctuations, displacement numbers, and community peace initiatives.",
+    date: "2026-06-24",
+    author: "Dr. Ngozi Balogun",
+    category: "Human Security Monitor",
+    featured_media_url: "/hero_research.png"
   }
 
   const fallbackArticles = [
+    {
+      id: 2,
+      date: "2026-06-18",
+      title: "Strengthening Social Protection Through Evidence-Based Planning",
+      excerpt: "Examining how targeting mechanisms in social registry frameworks can be calibrated using multidimensional indicators to minimize exclusion errors.",
+      featured_media_url: "/stakeholder_consultation.png",
+      category: "Research Brief"
+    },
+    {
+      id: 3,
+      date: "2026-06-12",
+      title: "Quarterly Trends in Food Security and Community Resilience",
+      excerpt: "A comprehensive assessment of harvest yields, market price dynamics, and household resilience indices across Middle Belt agricultural belts.",
+      featured_media_url: "/hero_community.png",
+      category: "Human Security Monitor"
+    },
     {
       id: 4,
       date: "2026-05-28",
@@ -2850,9 +2864,10 @@ function App() {
 
   // Handle initial page load from URL path (e.g. going directly to /about)
   useEffect(() => {
-    const path = window.location.pathname
+    let path = window.location.pathname
+    if (path.endsWith('/') && path !== '/') path = path.slice(0, -1)
     const pagePath = path.replace('/', '')
-    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy']
+    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker']
     if (validPages.includes(pagePath)) {
       _setCurrentPage(pagePath)
     } else {
@@ -2956,7 +2971,7 @@ function App() {
     <div className="relative min-h-screen w-full flex flex-col justify-between text-white font-sans bg-primary">
       
       {/* GLOBAL HEADER */}
-      <div className={`w-full ${currentPage === 'home' ? 'absolute top-0 left-0 bg-transparent' : 'bg-[#051c44] border-b border-white/5 relative'} z-30 no-print`}>
+      <div className="w-full bg-[#051c44] border-b border-white/5 relative z-30">
         <Header 
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
@@ -2967,7 +2982,7 @@ function App() {
 
       {/* MOBILE MENU OVERLAY */}
       {isMenuOpen && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-8 animate-fade-in no-print">
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex flex-col justify-between p-8 animate-fade-in">
           <div className="flex justify-between items-center w-full">
             <span className="font-poppins font-bold text-2xl tracking-tight">
               BEYOND<span className="text-secondary">#</span>
@@ -2985,10 +3000,11 @@ function App() {
             {[
               { name: 'About Us', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              { name: 'Human Security Dashboard', id: 'dashboard', indent: true, disabled: true },
-              { name: 'Research Hub', id: 'research', disabled: true },
-              { name: 'Our Impact Stories', id: 'impact', disabled: true },
-              { name: 'Our Impact Map', id: 'impact-map', indent: true, disabled: true },
+              { name: 'Human Security Dashboard', id: 'dashboard', indent: true },
+              { name: 'Conflict Tracker', id: 'tracker', indent: true },
+              { name: 'Research Hub', id: 'research' },
+              { name: 'Our Impact Stories', id: 'impact' },
+              { name: 'Our Impact Map', id: 'impact-map', indent: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
               { name: 'Contact Us', id: 'contact' }
             ].map((link, idx) => (
@@ -3059,6 +3075,10 @@ function App() {
         />
       )}
 
+      {currentPage === 'tracker' && (
+        <ConflictTracker />
+      )}
+
       {currentPage === 'research' && (
         <ResearchPage publications={sanityPublications} />
       )}
@@ -3085,7 +3105,7 @@ function App() {
       )}
 
       {/* GLOBAL FOOTER */}
-      {currentPage !== 'home' && <Footer setCurrentPage={setCurrentPage} />}
+      <Footer setCurrentPage={setCurrentPage} />
 
       {/* Reusable Global Modals */}
       {activeArticle && (
@@ -3097,7 +3117,7 @@ function App() {
 
       {/* Cookie Consent Banner */}
       {showCookieBanner && (
-        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-50 animate-fade-in no-print">
+        <div className="fixed bottom-6 right-6 left-6 md:left-auto md:max-w-md z-50 animate-fade-in">
           <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 p-6 rounded-[2rem] shadow-2xl flex flex-col gap-4 text-left">
             <h4 className="font-poppins font-bold text-sm text-white">Cookie Consent</h4>
             <p className="font-inter text-white/70 text-xs leading-relaxed">
