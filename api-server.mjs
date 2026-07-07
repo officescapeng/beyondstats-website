@@ -16,9 +16,6 @@ async function loadHsriData() {
     console.log('HSRI data load failed:', e?.message);
   }
 }
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const hsriData = require('./src/data/humanSecurityData.js');
 
 const STATE_LGAS = {
   Abia: ['Arochukwu','Bende','Ikwuano','Isiala Ngwa North','Isiala Ngwa South','Isuikwuato','Obi Ngwa','Ohafia','Osisioma','Ugwunagbo','Ukwa East','Ukwa West','Umuahia North','Umuahia South','Umunneochi'],
