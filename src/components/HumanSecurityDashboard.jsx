@@ -53,6 +53,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const [stateDataList, setStateDataList] = useState(STATIC_STATE_DATA);
   const [nationalAverages, setNationalAverages] = useState(STATIC_AVG_DATA);
   const [dataMetadata, setDataMetadata] = useState(STATIC_DATA_METADATA);
+  const [rawIncidents, setRawIncidents] = useState([]);
   const PROCESSED_STATE_DATA = stateDataList;
   const AVG_DATA = nationalAverages;
   const META_DATA = dataMetadata;
@@ -148,16 +149,17 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       });
     }
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
     if (supabaseUrl && supabaseKey) {
       // Fetch data from Supabase REST API
-      fetch(`${supabaseUrl}/rest/v1/incidents?select=state,fatalities,date,incident_type&order=date.desc`, {
+      fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
       })
       .then(res => res.json())
       .then(data => {
-        const dbIncidents = data;
+        setRawIncidents(data || []);
+        const dbIncidents = data || [];
         // Group incidents by state name (lowercase)
         const stateTotals = {};
         dbIncidents.forEach(inc => {

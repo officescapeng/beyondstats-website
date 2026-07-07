@@ -247,27 +247,27 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, i
 
     # (1) No casualties -> reject
     if fatalities <= 0 and abductions <= 0 and injuries <= 0:
-        log.debug(f"    ❌ No casualties (F:{fatalities}, A:{abductions}, I:{injuries})")
+        log.debug(f"    [SKIP] No casualties (F:{fatalities}, A:{abductions}, I:{injuries})")
         return False
 
     it = (incident_type or "").lower().strip()
 
     # (2) Explicit non-conflict cause -> reject
     if any(k in it for k in _NON_CONFLICT_KEYWORDS):
-        log.debug(f"    ❌ Non-conflict keyword found in: {incident_type}")
+        log.debug(f"    [SKIP] Non-conflict keyword found in: {incident_type}")
         return False
 
     # (3) Abduction is always conflict; otherwise require a conflict keyword
     if abductions > 0:
-        log.debug(f"    ✅ Has abductions ({abductions})")
+        log.debug(f"    [OK] Has abductions ({abductions})")
         return True
     
     has_conflict = any(k in it for k in _CONFLICT_KEYWORDS)
     if has_conflict:
-        log.debug(f"    ✅ Has conflict keyword in: {incident_type}")
+        log.debug(f"    [OK] Has conflict keyword in: {incident_type}")
         return True
     
-    log.debug(f"    ❌ No conflict keyword in: {incident_type}")
+    log.debug(f"    [SKIP] No conflict keyword in: {incident_type}")
     return False
 
 
@@ -443,7 +443,7 @@ def fetch_full_article(url: str) -> str:
         if HAS_TRAFILATURA:
             extracted = trafilatura.extract(r.text, include_comments=False, include_tables=False)
             if extracted and len(extracted) >= MIN_TEXT_LENGTH:
-                log.debug(f"  ✓ Trafilatura extracted {len(extracted)} chars")
+                log.debug(f"  [SUCCESS] Trafilatura extracted {len(extracted)} chars")
                 return extracted[:MAX_ARTICLE_CHARS]
 
         soup = BeautifulSoup(r.text, "html.parser")
@@ -453,19 +453,19 @@ def fetch_full_article(url: str) -> str:
                 paras = container.find_all("p")
                 text  = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)
                 if len(text) >= MIN_TEXT_LENGTH:
-                    log.debug(f"  ✓ BeautifulSoup extracted {len(text)} chars from {selector}")
+                    log.debug(f"  [SUCCESS] BeautifulSoup extracted {len(text)} chars from {selector}")
                     return text[:MAX_ARTICLE_CHARS]
 
         paras = soup.find_all("p")
         text = "\n".join(p.get_text() for p in paras if len(p.get_text()) > 30)[:MAX_ARTICLE_CHARS]
-        log.debug(f"  ✓ BeautifulSoup extracted {len(text)} chars (fallback)")
+        log.debug(f"  [SUCCESS] BeautifulSoup extracted {len(text)} chars (fallback)")
         return text
 
     except requests.exceptions.HTTPError as exc:
         status = exc.response.status_code if exc.response is not None else "?"
-        log.debug(f"  ❌ HTTP {status} fetching {url[:80]}")
+        log.debug(f"  [SKIP] HTTP {status} fetching {url[:80]}")
     except Exception as exc:
-        log.debug(f"  ❌ Error fetching {url[:80]}: {exc}")
+        log.debug(f"  [SKIP] Error fetching {url[:80]}: {exc}")
     return ""
 
 
@@ -532,13 +532,13 @@ def is_followup_article(title: str, text: str) -> bool:
     has_casualties = any(term in text_lower for term in casualty_indicators)
     
     if has_rescue and has_casualties:
-        log.debug(f"  ✓ Rescue with casualties exception - allowing LLM to evaluate")
+        log.debug(f"  [SUCCESS] Rescue with casualties exception - allowing LLM to evaluate")
         return False
     
     # ── Rule 1: Aftermath keywords in title = skip ──────────────
     for keyword in _AFTERMATH_KEYWORDS:
         if keyword in title_lower:
-            log.debug(f"  ❌ Aftermath keyword in title: '{keyword}'")
+            log.debug(f"  [SKIP] Aftermath keyword in title: '{keyword}'")
             return True
     
     # ── Rule 2: Aftermath signals dominate = skip ───────────────
@@ -548,7 +548,7 @@ def is_followup_article(title: str, text: str) -> bool:
     log.debug(f"  Aftermath signals: {aftermath_count}, Fresh signals: {fresh_count}")
     
     if aftermath_count >= 3 and aftermath_count > fresh_count:
-        log.debug(f"  ❌ Aftermath signals dominant")
+        log.debug(f"  [SKIP] Aftermath signals dominant")
         return True
     
     return False
@@ -721,8 +721,8 @@ CASUALTY EXTRACTION RULES:
    - If it says "at least 12 killed" → fatalities = 12
    - If it says "over 20 killed" → fatalities = 20
    - If it says "many killed" and no number → fatalities = 1
-   ✅ EXTRACT NUMBERS EVEN IF THEY ARE APPROXIMATE
-   ❌ DO NOT REJECT INCIDENTS BECAUSE THE NUMBER IS APPROXIMATE
+   [OK] EXTRACT NUMBERS EVEN IF THEY ARE APPROXIMATE
+   [SKIP] DO NOT REJECT INCIDENTS BECAUSE THE NUMBER IS APPROXIMATE
 
 2. ABDUCTIONS (people kidnapped):
    - Look for: "kidnapped", "abducted", "hostage", "missing", "taken"
@@ -765,7 +765,7 @@ INCIDENT TYPE CLASSIFICATION:
 - "kidnapping" → "kidnapping"
 - "bombing/explosion" → "bombing"
 
-✅ ALL OF THESE ARE VALID CONFLICT INCIDENTS
+[OK] ALL OF THESE ARE VALID CONFLICT INCIDENTS
 
 ════════════════════════════════════════════════════════════════
 
@@ -822,6 +822,10 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
     backoff = 2.0
 
     for attempt in range(retries):
+        success = False
+        res = None
+        exc_to_raise = None
+
         with _groq_lock:
             elapsed = time.monotonic() - _groq_last_call[0]
             gap     = _GROQ_MIN_INTERVAL - elapsed
@@ -837,67 +841,106 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                     temperature=0.1,
                 )
                 _groq_last_call[0] = time.monotonic()
+                success = True
             except Exception as exc:
                 _groq_last_call[0] = time.monotonic()
-                err_str       = str(exc)
-                is_rate_limit = "rate" in err_str.lower() or "429" in err_str
-                if is_rate_limit:
-                    retry_after = _parse_retry_after(err_str) or (backoff * 4)
-                    log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
-                                f"Waiting {retry_after:.1f}s")
-                    time.sleep(retry_after)
-                else:
-                    wait = backoff
-                    log.warning(f"  [LLM] Error (attempt {attempt + 1}): {str(exc)[:100]}")
-                    time.sleep(wait)
-                backoff *= 2
-                continue
+                exc_to_raise = exc
 
-        try:
-            raw_response = res.choices[0].message.content
-            log.debug(f"  [LLM] Raw response: {raw_response[:300]}")
-            data = json.loads(raw_response)
-            incidents = data.get("incidents", [])
-            
-            # ── POST-PROCESS VALIDATION (Phase 2) ──────────────
-            validated_incidents = []
-            for idx, incident in enumerate(incidents):
-                fixed = validate_and_fix_incident(incident, text, article_date)
-                if fixed:
-                    validated_incidents.append(fixed)
-                else:
-                    log.debug(f"  [Validation] Rejected incident {idx} after fixes")
-            
-            log.info(f"  [LLM] ✓ Extracted {len(validated_incidents)} incident(s) "
-                     f"(after validation: {len(incidents)} raw → {len(validated_incidents)} valid)")
-            return validated_incidents
-            # ── END POST-PROCESSING ───────────────────────────
-            
-        except json.JSONDecodeError as exc:
-            log.error(f"  [LLM] JSON decode error (attempt {attempt + 1}): {exc}")
+        if success and res:
+            try:
+                raw_response = res.choices[0].message.content
+                log.debug(f"  [LLM] Raw response: {raw_response[:300]}")
+                data = json.loads(raw_response)
+                incidents = data.get("incidents", [])
+                
+                # ── POST-PROCESS VALIDATION (Phase 2) ──────────────
+                validated_incidents = []
+                for idx, incident in enumerate(incidents):
+                    fixed = validate_and_fix_incident(incident, text, article_date)
+                    if fixed:
+                        validated_incidents.append(fixed)
+                    else:
+                        log.debug(f"  [Validation] Rejected incident {idx} after fixes")
+                
+                log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) "
+                         f"(after validation: {len(incidents)} raw → {len(validated_incidents)} valid)")
+                return validated_incidents
+                # ── END POST-PROCESSING ───────────────────────────
+                
+            except json.JSONDecodeError as exc:
+                log.error(f"  [LLM] JSON decode error (attempt {attempt + 1}): {exc}")
+                break
 
-    log.error(f"  [LLM] ❌ Extraction failed after {retries} attempts")
+        # Handle exception outside the lock so we don't block other threads!
+        if exc_to_raise:
+            err_str       = str(exc_to_raise)
+            is_rate_limit = "rate" in err_str.lower() or "429" in err_str
+            if is_rate_limit:
+                retry_after = _parse_retry_after(err_str) or (backoff * 4)
+                log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
+                            f"Waiting {retry_after:.1f}s (released lock)")
+                time.sleep(retry_after)
+            else:
+                wait = backoff
+                log.warning(f"  [LLM] Error (attempt {attempt + 1}): {err_str[:100]} (released lock)")
+                time.sleep(wait)
+            backoff *= 2
+
+    log.error(f"  [LLM] [SKIP] Extraction failed after {retries} attempts")
     return []
 
 
 # ─────────────────────────────────────────────────────────────
 # DATABASE HELPERS
 # ─────────────────────────────────────────────────────────────
+CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "processed_articles.json")
+
+def save_local_cache(fp: str):
+    try:
+        cached = []
+        if os.path.exists(CACHE_FILE):
+            try:
+                with open(CACHE_FILE, "r") as f:
+                    cached = json.load(f)
+            except Exception:
+                pass
+        if not isinstance(cached, list):
+            cached = []
+        if fp not in cached:
+            cached.append(fp)
+            if len(cached) > 2000:
+                cached = cached[-2000:]
+            with open(CACHE_FILE, "w") as f:
+                json.dump(cached, f)
+    except Exception as exc:
+        log.error(f"Failed to write local cache: {exc}")
+
 def load_processed_article_fps(lookback_days: int = 30) -> set[str]:
     """Load article fingerprints to skip already-processed articles."""
+    fps = set()
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         res    = supabase.table("incidents").select("content_fp").gte("date", cutoff).execute()
-        fps    = set()
         for row in res.data:
             raw = row.get("content_fp", "")
             if raw:
                 fps.add(raw.split("_")[0] if "_" in raw else raw)
-        log.info(f"Loaded {len(fps)} processed article FPs from last {lookback_days}d")
-        return fps
+        log.info(f"Loaded {len(fps)} processed article FPs from DB (last {lookback_days}d)")
     except Exception as exc:
-        log.error(f"Failed to load article FPs: {exc}")
-        return set()
+        log.error(f"Failed to load article FPs from DB: {exc}")
+
+    # Load local cache (captures non-conflict articles evaluated previously)
+    if os.path.exists(CACHE_FILE):
+        try:
+            with open(CACHE_FILE, "r") as f:
+                cached = json.load(f)
+            if isinstance(cached, list):
+                fps.update(cached)
+                log.info(f"Loaded {len(cached)} processed article FPs from local cache file")
+        except Exception as exc:
+            log.error(f"Failed to load local cache file: {exc}")
+            
+    return fps
 
 
 def load_recent_incidents(lookback_days: int = 14) -> tuple[set[str], list[dict]]:
@@ -981,7 +1024,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         art_fp = content_fp(url)
         with dedup["lock"]:
             if art_fp in dedup["article_fps"]:
-                log.debug(f"  ❌ Already seen")
+                log.debug(f"  [SKIP] Already seen")
                 result["skipped_already_seen"] += 1
                 return result
 
@@ -991,7 +1034,10 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         log.debug(f"  Text length: {len(text)} chars")
         
         if len(text) < MIN_TEXT_LENGTH:
-            log.debug(f"  ❌ Too short ({len(text)} < {MIN_TEXT_LENGTH})")
+            log.debug(f"  [SKIP] Too short ({len(text)} < {MIN_TEXT_LENGTH})")
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
             result["skipped_too_short"] += 1
             return result
 
@@ -1000,31 +1046,38 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         log.debug(f"  Nigeria score: {score}")
         
         if not is_nigeria_relevant(title, text):
-            log.debug(f"  ❌ Not Nigeria relevant")
+            log.debug(f"  [SKIP] Not Nigeria relevant")
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
             result["skipped_nigeria"] += 1
             return result
 
-        log.debug(f"  ✅ Nigeria relevant")
+        log.debug(f"  [OK] Nigeria relevant")
 
         # Skip follow-up / aftermath articles
         if is_followup_article(title, text):
-            log.info(f"  ❌ Skipping aftermath")
+            log.info(f"  [SKIP] Skipping aftermath")
             with dedup["lock"]:
                 dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
             result["skipped_followup"] += 1
             return result
 
-        log.debug(f"  ✅ Not aftermath")
+        log.debug(f"  [OK] Not aftermath")
         log.info(f"  Processing...")
 
         # LLM extraction
         incidents_list = extract_incidents(title, text, pub_date)
         if not incidents_list:
-            log.info(f"  ❌ LLM extraction returned no incidents")
+            log.info(f"  [SKIP] LLM extraction returned no incidents")
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
             result["ai_failed"] += 1
             return result
 
-        log.info(f"  ✅ LLM extracted {len(incidents_list)} incidents")
+        log.info(f"  [OK] LLM extracted {len(incidents_list)} incidents")
 
         # Process each extracted incident
         for idx, incident in enumerate(incidents_list):
@@ -1038,7 +1091,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 log.debug(f"    State: {raw_state} → {clean_state}")
                 
                 if not clean_state:
-                    log.debug(f"    ❌ Invalid state")
+                    log.debug(f"    [SKIP] Invalid state")
                     result["invalid_state"] += 1
                     continue
 
@@ -1054,11 +1107,11 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
                 # ══ CONFLICT-CASUALTY GATE ══════════════════════════
                 if not is_conflict_casualty(raw_type, fatalities, abductions, injuries):
-                    log.debug(f"    ❌ Rejected by conflict-casualty gate")
+                    log.debug(f"    [SKIP] Rejected by conflict-casualty gate")
                     result["skipped_no_casualties"] += 1
                     continue
 
-                log.debug(f"    ✅ Passed conflict-casualty gate")
+                log.debug(f"    [OK] Passed conflict-casualty gate")
 
                 # Extract location details
                 lga = (incident.get("lga") or "").strip() or None
@@ -1075,7 +1128,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 # ── SKIP INCIDENTS BEFORE START DATE ────────────────
                 occurrence_dt = _parse_date(occurrence_date)
                 if occurrence_dt and occurrence_dt < EVENT_START_DATE:
-                    log.debug(f"    ❌ Before start date ({occurrence_date} < {EVENT_START_DATE.strftime('%Y-%m-%d')})")
+                    log.debug(f"    [SKIP] Before start date ({occurrence_date} < {EVENT_START_DATE.strftime('%Y-%m-%d')})")
                     result["skipped_before_start_date"] += 1
                     continue
 
@@ -1098,22 +1151,21 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 with dedup["lock"]:
                     # Check exact semantic match
                     if sem_fp in dedup["semantic_fps"]:
-                        log.debug(f"    ❌ Duplicate (exact FP)")
+                        log.debug(f"    [SKIP] Duplicate (exact FP)")
                         result["semantic_duplicates"] += 1
                         continue
                     
                     # Check fuzzy match
                     if _is_duplicate(sig, dedup["sigs"]):
-                        log.debug(f"    ❌ Duplicate (fuzzy)")
+                        log.debug(f"    [SKIP] Duplicate (fuzzy)")
                         result["semantic_duplicates"] += 1
                         continue
                     
-                    log.debug(f"    ✅ Unique incident")
+                    log.debug(f"    [OK] Unique incident")
                     
                     # Mark as processed before DB write
                     dedup["semantic_fps"].add(sem_fp)
                     dedup["sigs"].append(sig)
-                    dedup["article_fps"].add(art_fp)
 
                 # Store incident
                 payload = {
@@ -1133,12 +1185,17 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 }
 
                 safe_store(payload)
-                log.info(f"  ✅ SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
+                log.info(f"  [OK] SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
                          f"{fatalities}K / {abductions}A")
                 result["saved_incidents"] += 1
 
             except Exception as exc:
-                log.error(f"  ❌ Incident [{idx}] error: {exc}", exc_info=True)
+                log.error(f"  [SKIP] Incident [{idx}] error: {exc}", exc_info=True)
+
+        # Cache the article fingerprint after processing all incidents
+        with dedup["lock"]:
+            dedup["article_fps"].add(art_fp)
+            save_local_cache(art_fp)
 
     except Exception as exc:
         log.error(f"process_entry unhandled: {exc}", exc_info=True)

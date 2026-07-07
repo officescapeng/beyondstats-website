@@ -27,7 +27,7 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
   useEffect(() => {
     const fetchLatest = async () => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
       
       try {
         const res = await fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc&limit=100`, {
@@ -43,6 +43,7 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
     };
 
     // Poll every 2 minutes as requested
+    fetchLatest();
     const interval = setInterval(fetchLatest, 120000); 
     return () => clearInterval(interval);
   }, []);
@@ -385,7 +386,7 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
               </tr>
             </thead>
             <tbody>
-              {aggregatedData.map((g, idx) => (
+              {(aggregatedData || []).map((g, idx) => (
                 <tr key={idx} className="border-b border-slate-200/10 dark:border-white/5 text-[11px] hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors">
                   <td className="py-3.5 px-2 font-mono font-bold whitespace-nowrap">{g.period}</td>
                   <td className="py-3.5 px-2 text-center font-mono font-bold">{g.incidents}</td>

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, AlertTriangle, Skull, Users, Activity } from 'lucide-react';
 import nigeriaMap from '@svg-maps/nigeria';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
 
 function computeStats(incidents) {
   const totalIncidents = incidents.length;
@@ -13,16 +13,23 @@ function computeStats(incidents) {
   const stateMap = {};
   const typeMap = {};
   for (const i of incidents) {
-    if (!stateMap[i.state]) stateMap[i.state] = { state: i.state, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
-    stateMap[i.state].count++;
-    stateMap[i.state].fatalities += i.fatalities || 0;
-    stateMap[i.state].abductions += i.abductions || 0;
-    stateMap[i.state].injuries += i.injuries || 0;
-    if (!typeMap[i.incident_type]) typeMap[i.incident_type] = { incidentType: i.incident_type, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
-    typeMap[i.incident_type].count++;
-    typeMap[i.incident_type].fatalities += i.fatalities || 0;
-    typeMap[i.incident_type].abductions += i.abductions || 0;
-    typeMap[i.incident_type].injuries += i.injuries || 0;
+    if (!i.state) continue;
+    const rawState = i.state.trim();
+    const normalizedState = rawState.charAt(0).toUpperCase() + rawState.slice(1).toLowerCase();
+
+    if (!stateMap[normalizedState]) stateMap[normalizedState] = { state: normalizedState, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    stateMap[normalizedState].count++;
+    stateMap[normalizedState].fatalities += i.fatalities || 0;
+    stateMap[normalizedState].abductions += i.abductions || 0;
+    stateMap[normalizedState].injuries += i.injuries || 0;
+
+    const rawType = i.incident_type || 'other';
+    const typeKey = getIncidentTypeKey(rawType);
+    if (!typeMap[typeKey]) typeMap[typeKey] = { incidentType: typeKey, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    typeMap[typeKey].count++;
+    typeMap[typeKey].fatalities += i.fatalities || 0;
+    typeMap[typeKey].abductions += i.abductions || 0;
+    typeMap[typeKey].injuries += i.injuries || 0;
   }
   return {
     overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries },
@@ -62,29 +69,32 @@ function formatDate(dateStr) {
 
 function StatsCards({ overall, isDarkMode }) {
   const cards = [
-    { label: 'Total Incidents', value: overall.totalIncidents.toLocaleString(), color: 'text-red-500', icon: '\u26A0' },
-    { label: 'People Killed', value: overall.totalFatalities.toLocaleString(), color: 'text-slate-600', icon: '\u2620' },
-    { label: 'People Abducted', value: overall.totalAbductions.toLocaleString(), color: 'text-amber-600', icon: '\uD83D\uDC64' },
-    { label: 'People Injured', value: overall.totalInjuries.toLocaleString(), color: 'text-orange-600', icon: '\u2764' },
+    { label: 'Total Incidents', value: overall.totalIncidents.toLocaleString(), color: 'text-red-500', icon: AlertTriangle },
+    { label: 'People Killed', value: overall.totalFatalities.toLocaleString(), color: 'text-rose-500', icon: Skull },
+    { label: 'People Abducted', value: overall.totalAbductions.toLocaleString(), color: 'text-amber-500', icon: Users },
+    { label: 'People Injured', value: overall.totalInjuries.toLocaleString(), color: 'text-orange-500', icon: Activity },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      {cards.map((card) => (
-        <div key={card.label} className={`rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <span className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{card.label}</span>
-            <span className={`text-lg ${card.color}`}>{card.icon}</span>
+      {cards.map((card) => {
+        const IconComponent = card.icon;
+        return (
+          <div key={card.label} className={`rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <span className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{card.label}</span>
+              <IconComponent className={`w-5 h-5 ${card.color}`} />
+            </div>
+            <p className={`text-2xl lg:text-3xl font-bold ${card.color}`}>{card.value}</p>
           </div>
-          <p className={`text-2xl lg:text-3xl font-bold ${card.color}`}>{card.value}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
 
 function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
-  const statsMap = new Map(byState.map((s) => [s.state, s]));
+  const statsMap = new Map(byState.map((s) => [s.state ? s.state.toLowerCase().trim() : '', s]));
   const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
   const [tooltip, setTooltip] = useState(null);
 
@@ -107,10 +117,10 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
         <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
           {nigeriaMap.locations.map(loc => {
             const stateName = nameOverrides[loc.name] || loc.name;
-            const stats = statsMap.get(stateName);
+            const stats = statsMap.get(stateName.toLowerCase().trim());
             const fatalities = stats?.fatalities || 0;
             const color = getHeatColor(fatalities);
-            const isSelected = selectedState === stateName;
+            const isSelected = selectedState && selectedState.toLowerCase() === stateName.toLowerCase();
             return (
               <path
                 key={loc.id}
@@ -158,6 +168,18 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
   );
 }
 
+function getIncidentTypeKey(type) {
+  if (!type) return 'other';
+  const t = type.toLowerCase();
+  if (t.includes('terror')) return 'terrorism';
+  if (t.includes('bandit')) return 'banditry';
+  if (t.includes('kidnap') || t.includes('abduct')) return 'kidnapping';
+  if (t.includes('attack')) return 'armed attack';
+  if (t.includes('clash')) return 'clash';
+  if (t.includes('bomb')) return 'bombing';
+  return 'other';
+}
+
 function IncidentTable({ incidents, isDarkMode }) {
   if (incidents.length === 0) {
     return <div className={`text-center py-12 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><p className="text-lg">No incidents found</p></div>;
@@ -180,8 +202,9 @@ function IncidentTable({ incidents, isDarkMode }) {
         </thead>
         <tbody>
           {incidents.map((incident) => {
-            const typeColor = INCIDENT_TYPE_COLORS[incident.incident_type] || INCIDENT_TYPE_COLORS.other;
-            const typeLabel = INCIDENT_TYPE_LABELS[incident.incident_type] || incident.incident_type;
+            const typeKey = getIncidentTypeKey(incident.incident_type);
+            const typeColor = INCIDENT_TYPE_COLORS[typeKey] || INCIDENT_TYPE_COLORS.other;
+            const typeLabel = INCIDENT_TYPE_LABELS[typeKey] || incident.incident_type;
             return (
               <tr key={incident.id} className={`border-b transition-colors ${isDarkMode ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
                 <td className={`py-3 px-3 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(incident.date)}</td>
@@ -243,7 +266,7 @@ export default function ConflictTracker() {
     async function fetchData() {
       try {
         setLoading(true);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?select=*\&order=date.desc`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?select=*&order=date.desc`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
         });
         if (!res.ok) throw new Error('Supabase fetch failed');
@@ -264,13 +287,14 @@ export default function ConflictTracker() {
   }, []);
 
   const filteredIncidents = incidents.filter((i) => {
-    if (filterState && i.state.toLowerCase() !== filterState.toLowerCase()) return false;
-    if (filterType && i.incident_type !== filterType) return false;
+    const activeStateFilter = filterState || selectedMapState;
+    if (activeStateFilter && i.state.toLowerCase() !== activeStateFilter.toLowerCase()) return false;
+    if (filterType && getIncidentTypeKey(i.incident_type) !== filterType) return false;
     return true;
   });
 
-  const stateOptions = [...new Set(incidents.map((i) => i.state))].sort();
-  const typeOptions = [...new Set(incidents.map((i) => i.incident_type))].sort();
+  const stateOptions = [...new Set(incidents.map((i) => i.state))].filter(Boolean).sort();
+  const typeOptions = [...new Set(incidents.map((i) => getIncidentTypeKey(i.incident_type)))].filter(Boolean).sort();
 
   if (loading) {
     return (
