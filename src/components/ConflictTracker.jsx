@@ -2,16 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Moon } from 'lucide-react';
 import nigeriaMap from '@svg-maps/nigeria';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNkdm5jZGtkeWNsc2V3d3l2cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTAyNDQsImV4cCI6MjA5ODEyNjI0NH0.KoCgn1Ez0XZeoYTonvSHyfGCe8nzX0sNFQDb9leH0fw";
-
-const FALLBACK_INCIDENTS = [
-  { id: 1, date: "2026-07-01", state: "Borno", lga: "Konduga", community: "Auno", incident_type: "terrorism", fatalities: 12, abductions: 0, injuries: 8, summary: "ISWAP fighters attacked Auno village, killing at least 12 residents.", source_name: "Daily Trust", source_url: "https://dailytrust.com/security/" },
-  { id: 2, date: "2026-07-02", state: "Kaduna", lga: "Chikun", community: "Guguwa", incident_type: "banditry", fatalities: 8, abductions: 15, injuries: 3, summary: "Armed bandits raided Guguwa community, killing 8 and kidnapping 15 others.", source_name: "Punch", source_url: "https://punchng.com/topics/nigerian-army/" },
-  { id: 3, date: "2026-07-03", state: "Niger", lga: "Shiroro", community: "Kurebe", incident_type: "clash", fatalities: 23, abductions: 0, injuries: 12, summary: "Farmer-herder clash in Kurebe left 23 dead.", source_name: "Premium Times", source_url: "https://www.premiumtimesng.com/news/more-news/" },
-  { id: 4, date: "2026-07-05", state: "Zamfara", lga: "Anka", community: "Fararu", incident_type: "banditry", fatalities: 9, abductions: 30, injuries: 2, summary: "Gunmen attacked Fararu village, killing 9 and kidnapping 30.", source_name: "Vanguard", source_url: "https://www.vanguardngr.com/category/security/" },
-  { id: 5, date: "2026-08-02", state: "Plateau", lga: "Bokkos", community: "Bokkos town", incident_type: "clash", fatalities: 22, abductions: 0, injuries: 15, summary: "Coordinated attacks on Bokkos community left 22 dead.", source_name: "Channels TV", source_url: "https://www.channelstv.com/tags/security/" },
-];
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function computeStats(incidents) {
   const totalIncidents = incidents.length;
@@ -36,8 +28,6 @@ function computeStats(incidents) {
     overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries },
     byState: Object.values(stateMap).sort((a, b) => b.fatalities - a.fatalities),
     byType: Object.values(typeMap).sort((a, b) => b.count - a.count),
-    byDate: [],
-    byLga: [],
   };
 }
 
@@ -264,9 +254,8 @@ export default function ConflictTracker() {
         } else {
           throw new Error('No data');
         }
-      } catch {
-        setIncidents(FALLBACK_INCIDENTS);
-        setStats(computeStats(FALLBACK_INCIDENTS));
+      } catch (err) {
+        setError(err.message || 'Failed to load data');
       } finally {
         setLoading(false);
       }

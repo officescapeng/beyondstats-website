@@ -235,18 +235,19 @@ def canonical_incident_type(raw: str) -> str:
     return "other"
 
 
-def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int) -> bool:
+def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, injuries: int = 0) -> bool:
     """
-    STRICTER: Only log if BOTH conditions hold:
-      1. At least one casualty (someone killed OR abducted)
+    Only log if BOTH conditions hold:
+      1. At least one casualty (someone killed, abducted, or injured)
       2. Incident type matches a conflict keyword OR abductions > 0
     """
     fatalities = _safe_int(fatalities)
     abductions = _safe_int(abductions)
+    injuries   = _safe_int(injuries)
 
     # (1) No casualties -> reject
-    if fatalities <= 0 and abductions <= 0:
-        log.debug(f"    ❌ No casualties (F:{fatalities}, A:{abductions})")
+    if fatalities <= 0 and abductions <= 0 and injuries <= 0:
+        log.debug(f"    ❌ No casualties (F:{fatalities}, A:{abductions}, I:{injuries})")
         return False
 
     it = (incident_type or "").lower().strip()
@@ -290,6 +291,19 @@ def normalize_url(url: str) -> str:
 
 def _domain_of(url: str) -> str:
     return urlsplit(url).netloc.lower()
+
+SOURCE_NAMES = {
+    "www.premiumtimesng.com": "Premium Times",
+    "punchng.com": "Punch",
+    "www.vanguardngr.com": "Vanguard",
+    "dailytrust.com": "Daily Trust",
+    "www.thecable.ng": "The Cable",
+    "www.channelstv.com": "Channels TV",
+}
+
+def source_name_from_url(url: str) -> str:
+    domain = _domain_of(url)
+    return SOURCE_NAMES.get(domain, domain.replace("www.", "").split(".")[0].title())
 
 
 # ─────────────────────────────────────────────────────────────
@@ -620,6 +634,24 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
                         incident["abductions"] = fixed_count
                         break
     
+    # ── Fix 2B: Detect injuries ─────────────────────────────
+    current_injuries = _safe_int(incident.get("injuries"))
+    if current_injuries == 0:
+        injury_patterns = [
+            r'(\d+)\s+(injured|wounded|hurt)',
+            r'(injured|wounded|hurt)\s+(\d+)',
+            r'(\d+)\s+(people|residents|persons?|civilians?|villagers?)\s+(injured|wounded)',
+        ]
+        for pattern in injury_patterns:
+            match = re.search(pattern, text_lower)
+            if match:
+                numbers = [g for g in match.groups() if g and g.isdigit()]
+                if numbers:
+                    fixed_count = int(numbers[0])
+                    log.debug(f"  [Fix] Detected {fixed_count} injuries (LLM missed)")
+                    incident["injuries"] = fixed_count
+                    break
+    
     # ── Fix 3: Correct date year mismatches ────────────────────
     occ_date = (incident.get("occurrence_date") or "")[:10]
     if occ_date and len(occ_date) >= 4:
@@ -652,8 +684,9 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
     # ── Final validation ───────────────────────────────────────
     fatalities = _safe_int(incident.get("fatalities"))
     abductions = _safe_int(incident.get("abductions"))
+    injuries   = _safe_int(incident.get("injuries"))
     
-    if fatalities <= 0 and abductions <= 0:
+    if fatalities <= 0 and abductions <= 0 and injuries <= 0:
         log.debug(f"  [Validation] Still no casualties after fixes - rejecting")
         return None
     
@@ -695,8 +728,13 @@ CASUALTY EXTRACTION RULES:
    - Look for: "kidnapped", "abducted", "hostage", "missing", "taken"
    - Same rules as above.
 
+3. INJURIES (people wounded/injured):
+   - Look for: "injured", "wounded", "hurt"
+   - Same rules as above.
+   - Default to 0 if not mentioned.
+
 3. REJECTION GATE:
-   - If fatalities = 0 AND abductions = 0 → RETURN {{"incidents": []}}
+   - If fatalities = 0 AND abductions = 0 AND injuries = 0 → RETURN {{"incidents": []}}
    - At least ONE must be > 0 to extract
 
 ════════════════════════════════════════════════════════════════
@@ -742,6 +780,7 @@ OTHERWISE: Extract every distinct incident with ALL these keys:
   "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, other],
   "fatalities": integer >= 0 or null,
   "abductions": integer >= 0 or null,
+  "injuries": integer >= 0 or null,
   "occurrence_date": "YYYY-MM-DD" or null,
   "summary": "Brief description of what happened"
 }}
@@ -754,6 +793,7 @@ VALID EXAMPLE:
   "incident_type": "clash",
   "fatalities": 48,
   "abductions": 0,
+  "injuries": 12,
   "occurrence_date": "2026-07-07",
   "summary": "At least 48 people were killed in a farmer herder clash in Shiroro LGA, Niger State."
 }}
@@ -1005,6 +1045,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 # Extract casualty numbers
                 fatalities  = _safe_int(incident.get("fatalities", 0))
                 abductions  = _safe_int(incident.get("abductions", 0))
+                injuries    = _safe_int(incident.get("injuries", 0))
                 raw_type    = (incident.get("incident_type") or "").strip()
                 canon_type  = canonical_incident_type(raw_type)
                 
@@ -1012,7 +1053,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 log.debug(f"    Casualties: {fatalities}K / {abductions}A")
 
                 # ══ CONFLICT-CASUALTY GATE ══════════════════════════
-                if not is_conflict_casualty(raw_type, fatalities, abductions):
+                if not is_conflict_casualty(raw_type, fatalities, abductions, injuries):
                     log.debug(f"    ❌ Rejected by conflict-casualty gate")
                     result["skipped_no_casualties"] += 1
                     continue
@@ -1083,8 +1124,10 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "incident_type": canon_type,
                     "fatalities":    fatalities,
                     "abductions":    abductions,
+                    "injuries":      injuries,
                     "summary":       (incident.get("summary") or "").strip() or None,
                     "source_url":    url,
+                    "source_name":   source_name_from_url(url),
                     "content_fp":    f"{art_fp}_{idx}",
                     "semantic_fp":   sem_fp,
                 }
