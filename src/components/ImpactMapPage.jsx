@@ -655,11 +655,11 @@ export default function ImpactMapPage() {
         </div>
 
         {/* RIGHT COLUMN: MAP CANVAS OR ADMIN PORTAL (LG: 8 cols) */}
-        <div className="lg:col-span-8 h-full min-h-[580px] flex flex-col gap-6 relative">
+        <div className="lg:col-span-8 h-full min-h-[350px] lg:min-h-[580px] flex flex-col gap-6 relative">
           
           {/* MAP CANVAS VIEW */}
           {!showAdminPanel ? (
-            <div className={`w-full flex-1 min-h-[580px] p-1.5 rounded-[2rem] overflow-hidden transition-all duration-300 relative flex flex-col ${
+            <div className={`w-full flex-1 min-h-[350px] lg:min-h-[580px] p-1.5 rounded-[2rem] overflow-hidden transition-all duration-300 relative flex flex-col ${
               isDarkMode 
                 ? 'bg-[#051735]/80 border border-white/10 shadow-2xl dark-theme-map' 
                 : 'bg-white border border-slate-200/60 shadow-xl light-theme-map'
@@ -682,7 +682,7 @@ export default function ImpactMapPage() {
               </div>
 
               {/* MAP COMPONENT */}
-              <div className="w-full flex-1 h-[580px] relative z-0">
+              <div className="w-full flex-1 h-[350px] lg:h-[580px] relative z-0">
                 <MapContainer 
                   center={NIGERIA_CENTER} 
                   zoom={DEFAULT_ZOOM} 
