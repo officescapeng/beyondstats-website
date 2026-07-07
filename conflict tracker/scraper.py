@@ -34,13 +34,26 @@ load_dotenv(dotenv_path=local_env if os.path.exists(local_env) else parent_env)
 
 
 # ─────────────────────────────────────────────────────────────
-# LOGGING
+# LOGGING (Console + Rotating File Handler)
 # ─────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+from logging.handlers import RotatingFileHandler
+
+log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(log_formatter)
+
+log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scraper.log")
+file_handler = RotatingFileHandler(log_file_path, maxBytes=2*1024*1024, backupCount=5, encoding="utf-8")
+file_handler.setFormatter(log_formatter)
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+# Clear any default basicConfig handlers
+for h in list(logger.handlers):
+    logger.removeHandler(h)
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+
 log = logging.getLogger(__name__)
 
 
@@ -62,6 +75,7 @@ if missing:
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+GROQ_MODEL   = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 DRY_RUN      = os.environ.get("DRY_RUN", "false").lower() == "true"
 
 groq_client = Groq(api_key=GROQ_API_KEY)
@@ -71,14 +85,31 @@ supabase    = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ─────────────────────────────────────────────────────────────
 # FEEDS
 # ─────────────────────────────────────────────────────────────
-FEEDS = [
-    "https://www.premiumtimesng.com/feed",
-    "https://punchng.com/feed/",
-    "https://www.vanguardngr.com/feed/",
-    "https://dailytrust.com/feed/",
-    "https://www.thecable.ng/feed",
-    "https://www.channelstv.com/feed/",
-]
+feeds_json_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "feeds.json")
+if os.path.exists(feeds_json_path):
+    try:
+        with open(feeds_json_path, "r", encoding="utf-8") as f:
+            FEEDS = json.load(f)
+        log.info(f"Loaded {len(FEEDS)} feeds from feeds.json")
+    except Exception as exc:
+        log.error(f"Failed to parse feeds.json: {exc}")
+        FEEDS = [
+            "https://www.premiumtimesng.com/feed",
+            "https://punchng.com/feed/",
+            "https://www.vanguardngr.com/feed/",
+            "https://dailytrust.com/feed/",
+            "https://www.thecable.ng/feed",
+            "https://www.channelstv.com/feed/",
+        ]
+else:
+    FEEDS = [
+        "https://www.premiumtimesng.com/feed",
+        "https://punchng.com/feed/",
+        "https://www.vanguardngr.com/feed/",
+        "https://dailytrust.com/feed/",
+        "https://www.thecable.ng/feed",
+        "https://www.channelstv.com/feed/",
+    ]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -835,7 +866,7 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
             try:
                 log.debug(f"  [LLM] Calling Groq API (attempt {attempt + 1})")
                 res = groq_client.chat.completions.create(
-                    model="llama-3.1-8b-instant",
+                    model=GROQ_MODEL,
                     messages=[{"role": "user", "content": prompt}],
                     response_format={"type": "json_object"},
                     temperature=0.1,
@@ -1007,6 +1038,11 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             return result
 
         title = (entry.get("title") or "").strip() or "(no title)"
+        try:
+            enc = sys.stdout.encoding or "utf-8"
+            title_safe = title.encode(enc, errors="ignore").decode(enc)
+        except Exception:
+            title_safe = title.encode("ascii", errors="ignore").decode("ascii")
 
         pub_date = default_date
         t = entry.get("published_parsed") or entry.get("updated_parsed")
@@ -1016,7 +1052,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             except Exception:
                 pass
 
-        log.info(f"\n[Article] {title[:80]}")
+        log.info(f"\n[Article] {title_safe[:80]}")
         log.debug(f"  URL: {url[:80]}")
         log.debug(f"  Pub date: {pub_date}")
 
@@ -1291,6 +1327,21 @@ def run():
         name = key.replace('_', ' ').title()
         log.info(f"  {name:<{pad}} {val:>6}")
     log.info("=" * 70)
+
+    # Sync status to Supabase (catch any missing table errors gracefully)
+    if not DRY_RUN:
+        try:
+            status_payload = {
+                "feeds_parsed":    stats.get("feeds", 0),
+                "articles_parsed": stats.get("entries", 0),
+                "skipped_seen":    stats.get("skipped_already_seen", 0),
+                "saved_incidents": stats.get("saved_incidents", 0),
+                "status":          "success",
+            }
+            supabase.table("scraper_runs").insert(status_payload).execute()
+            log.info("  [Sync] Write sync report to Supabase scraper_runs table SUCCESS")
+        except Exception as exc:
+            log.warning(f"  [Sync] Could not write run report to Supabase (scraper_runs table may not exist): {exc}")
 
 
 # ─────────────────────────────────────────────────────────────
