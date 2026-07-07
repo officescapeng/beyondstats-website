@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Sun, Moon } from 'lucide-react';
 import nigeriaMap from '@svg-maps/nigeria';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://cdvncdkdyclsewwyvrbm.supabase.co";
@@ -69,7 +70,7 @@ function formatDate(dateStr) {
   }
 }
 
-function StatsCards({ overall }) {
+function StatsCards({ overall, isDarkMode }) {
   const cards = [
     { label: 'Total Incidents', value: overall.totalIncidents.toLocaleString(), color: 'text-red-500', icon: '\u26A0' },
     { label: 'People Killed', value: overall.totalFatalities.toLocaleString(), color: 'text-slate-600', icon: '\u2620' },
@@ -80,9 +81,9 @@ function StatsCards({ overall }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
       {cards.map((card) => (
-        <div key={card.label} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
+        <div key={card.label} className={`rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">{card.label}</span>
+            <span className={`text-xs font-semibold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{card.label}</span>
             <span className={`text-lg ${card.color}`}>{card.icon}</span>
           </div>
           <p className={`text-2xl lg:text-3xl font-bold ${card.color}`}>{card.value}</p>
@@ -92,7 +93,7 @@ function StatsCards({ overall }) {
   );
 }
 
-function StateHeatmap({ byState, selectedState, onStateClick }) {
+function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
   const statsMap = new Map(byState.map((s) => [s.state, s]));
   const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
   const [tooltip, setTooltip] = useState(null);
@@ -110,8 +111,8 @@ function StateHeatmap({ byState, selectedState, onStateClick }) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-slate-800 mb-4">Fatalities by State — Choropleth</h3>
+    <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
+      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Fatalities by State &mdash; Choropleth</h3>
       <div className="relative">
         <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
           {nigeriaMap.locations.map(loc => {
@@ -148,15 +149,15 @@ function StateHeatmap({ byState, selectedState, onStateClick }) {
           })}
         </svg>
         {tooltip && (
-          <div className="absolute pointer-events-none bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs shadow-xl z-10 whitespace-nowrap" style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
-            <p className="font-bold text-slate-800">{tooltip.state}</p>
-            <p className="text-slate-500">{tooltip.incidents} incidents</p>
+          <div className={`absolute pointer-events-none rounded-lg px-3 py-2 text-xs shadow-xl z-10 whitespace-nowrap ${isDarkMode ? 'bg-[#051c3a] border border-white/10 text-white' : 'bg-white border border-slate-200'}`} style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
+            <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{tooltip.state}</p>
+            <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
             <p className="text-red-500">{tooltip.fatalities} killed</p>
             <p className="text-amber-600">{tooltip.abductions} abducted</p>
           </div>
         )}
       </div>
-        <div className="flex items-center gap-3 justify-center mt-4 text-xs text-slate-400">
+        <div className={`flex items-center gap-3 justify-center mt-4 text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
         <span>Intensity:</span>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
@@ -167,24 +168,24 @@ function StateHeatmap({ byState, selectedState, onStateClick }) {
   );
 }
 
-function IncidentTable({ incidents }) {
+function IncidentTable({ incidents, isDarkMode }) {
   if (incidents.length === 0) {
-    return <div className="text-center py-12 text-slate-400"><p className="text-lg">No incidents found</p></div>;
+    return <div className={`text-center py-12 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}><p className="text-lg">No incidents found</p></div>;
   }
 
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200">
-            <th className="text-left py-3 px-3 font-semibold text-slate-500">Date</th>
-            <th className="text-left py-3 px-3 font-semibold text-slate-500">Location</th>
-            <th className="text-left py-3 px-3 font-semibold text-slate-500">Type</th>
-            <th className="text-center py-3 px-3 font-semibold text-slate-500">Killed</th>
-            <th className="text-center py-3 px-3 font-semibold text-slate-500">Abducted</th>
-            <th className="text-center py-3 px-3 font-semibold text-slate-500">Injured</th>
-            <th className="text-left py-3 px-3 font-semibold text-slate-500 hidden lg:table-cell">Summary</th>
-            <th className="text-center py-3 px-3 font-semibold text-slate-500">Source</th>
+          <tr className={`border-b ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
+            <th className={`text-left py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Date</th>
+            <th className={`text-left py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Location</th>
+            <th className={`text-left py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Type</th>
+            <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Killed</th>
+            <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Abducted</th>
+            <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Injured</th>
+            <th className={`text-left py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'} hidden lg:table-cell`}>Summary</th>
+            <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Source</th>
           </tr>
         </thead>
         <tbody>
@@ -192,11 +193,11 @@ function IncidentTable({ incidents }) {
             const typeColor = INCIDENT_TYPE_COLORS[incident.incident_type] || INCIDENT_TYPE_COLORS.other;
             const typeLabel = INCIDENT_TYPE_LABELS[incident.incident_type] || incident.incident_type;
             return (
-              <tr key={incident.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="py-3 px-3 whitespace-nowrap text-slate-500">{formatDate(incident.date)}</td>
+              <tr key={incident.id} className={`border-b transition-colors ${isDarkMode ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
+                <td className={`py-3 px-3 whitespace-nowrap ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{formatDate(incident.date)}</td>
                 <td className="py-3 px-3">
-                  <span className="font-medium text-slate-800">{incident.state}</span>
-                  {incident.lga && <span className="text-slate-400"> &middot; {incident.lga}</span>}
+                  <span className={`font-medium ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{incident.state}</span>
+                  {incident.lga && <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}> &middot; {incident.lga}</span>}
                 </td>
                 <td className="py-3 px-3">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ backgroundColor: typeColor }}>
@@ -204,16 +205,16 @@ function IncidentTable({ incidents }) {
                   </span>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {incident.fatalities > 0 ? <span className="font-bold text-red-500">{incident.fatalities}</span> : <span className="text-slate-300">&mdash;</span>}
+                  {incident.fatalities > 0 ? <span className="font-bold text-red-500">{incident.fatalities}</span> : <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>&mdash;</span>}
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {incident.abductions > 0 ? <span className="font-bold text-amber-600">{incident.abductions}</span> : <span className="text-slate-300">&mdash;</span>}
+                  {incident.abductions > 0 ? <span className="font-bold text-amber-600">{incident.abductions}</span> : <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>&mdash;</span>}
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {incident.injuries > 0 ? <span className="font-bold text-orange-600">{incident.injuries}</span> : <span className="text-slate-300">&mdash;</span>}
+                  {incident.injuries > 0 ? <span className="font-bold text-orange-600">{incident.injuries}</span> : <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>&mdash;</span>}
                 </td>
                 <td className="py-3 px-3 hidden lg:table-cell max-w-xs">
-                  <p className="text-slate-500 text-xs leading-relaxed line-clamp-2">{incident.summary}</p>
+                  <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{incident.summary}</p>
                 </td>
                 <td className="py-3 px-3 text-center">
                   {incident.source_name ? (
@@ -221,12 +222,12 @@ function IncidentTable({ incidents }) {
                       href={incident.source_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 hover:text-secondary hover:bg-slate-200 text-[9px] font-semibold uppercase tracking-wider transition-colors"
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors ${isDarkMode ? 'bg-white/10 text-slate-400 hover:text-secondary hover:bg-white/20' : 'bg-slate-100 text-slate-500 hover:text-secondary hover:bg-slate-200'}`}
                     >
                       {incident.source_name}
                     </a>
                   ) : (
-                    <span className="text-slate-300 text-[10px]">&mdash;</span>
+                    <span className={`text-[10px] ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`}>&mdash;</span>
                   )}
                 </td>
               </tr>
@@ -246,6 +247,7 @@ export default function ConflictTracker() {
   const [filterState, setFilterState] = useState('');
   const [filterType, setFilterType] = useState('');
   const [selectedMapState, setSelectedMapState] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -283,7 +285,7 @@ export default function ConflictTracker() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white p-8 flex items-center justify-center">
+      <div className={`min-h-screen p-8 flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20]' : 'bg-white'}`}>
         <div className="text-slate-400 text-lg">Loading conflict data...</div>
       </div>
     );
@@ -291,37 +293,44 @@ export default function ConflictTracker() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-white p-8 flex items-center justify-center">
+      <div className={`min-h-screen p-8 flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20]' : 'bg-white'}`}>
         <div className="text-red-400 text-lg">Error: {error}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="bg-[#052353] py-16 px-6 text-center border-b border-white/5">
-        <div className="max-w-7xl mx-auto">
+    <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20]' : 'bg-white'}`}>
+      <div className="bg-[#052353] py-16 px-6 border-b border-white/5 relative">
+        <div className="max-w-7xl mx-auto text-center">
           <span className="font-inter text-xs font-bold tracking-[0.2em] text-secondary uppercase mb-2 block">Beyond# Observatory</span>
           <h1 className="text-3xl md:text-4xl font-poppins font-bold text-white mb-3">Conflict Incident Tracker</h1>
           <p className="text-white/60 text-sm max-w-2xl mx-auto">
             Real-time tracking of security incidents across Nigeria. Data sourced from news reports via automated scraping and AI extraction.
           </p>
         </div>
+        <button
+          onClick={() => setIsDarkMode(!isDarkMode)}
+          className="absolute top-6 right-6 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer outline-none border-none"
+          title={isDarkMode ? "Light Mode" : "Dark Mode"}
+        >
+          {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
       </div>
       <div className="max-w-7xl mx-auto px-6 py-12">
 
-        {stats && <StatsCards overall={stats.overall} />}
+        {stats && <StatsCards overall={stats.overall} isDarkMode={isDarkMode} />}
 
         {stats && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-              <StateHeatmap byState={stats.byState} selectedState={selectedMapState} onStateClick={setSelectedMapState} />
+              <StateHeatmap byState={stats.byState} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
             </div>
-              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-bold text-slate-800">{selectedMapState ? `Incidents in ${selectedMapState}` : 'Incidents per State'}</h3>
+                <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{selectedMapState ? `Incidents in ${selectedMapState}` : 'Incidents per State'}</h3>
                 {(filterType || filterState || selectedMapState) && (
-                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); }} className="text-[10px] text-slate-400 hover:text-red-500 font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none">Clear</button>
+                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear</button>
                 )}
               </div>
               {selectedMapState && (() => {
@@ -329,19 +338,19 @@ export default function ConflictTracker() {
                 if (!s) return null;
                 return (
                   <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="bg-slate-50 rounded-lg p-2.5 text-center">
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Incidents</div>
-                      <div className="text-lg font-bold text-slate-800">{s.count}</div>
+                      <div className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{s.count}</div>
                     </div>
-                    <div className="bg-red-50 rounded-lg p-2.5 text-center">
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-red-950/40' : 'bg-red-50'}`}>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Killed</div>
                       <div className="text-lg font-bold text-red-500">{s.fatalities}</div>
                     </div>
-                    <div className="bg-amber-50 rounded-lg p-2.5 text-center">
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-amber-950/40' : 'bg-amber-50'}`}>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
                       <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
                     </div>
-                    <div className="bg-orange-50 rounded-lg p-2.5 text-center">
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
                       <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
                     </div>
@@ -349,7 +358,7 @@ export default function ConflictTracker() {
                 );
               })()}
               {!selectedMapState && (
-                <div className="text-center py-8 text-slate-400">
+                <div className={`text-center py-8 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
                   <p className="text-xs">Click a state on the map to view its incident breakdown.</p>
                 </div>
               )}
@@ -357,14 +366,14 @@ export default function ConflictTracker() {
           </div>
         )}
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h3 className="text-sm font-bold text-slate-800">Incidents</h3>
+        <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
+          <div className={`p-5 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
+            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
             <div className="flex gap-3">
               <select
                 value={filterState}
                 onChange={(e) => setFilterState(e.target.value)}
-                className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
               >
                 <option value="">All States</option>
                 {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -372,14 +381,14 @@ export default function ConflictTracker() {
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                className="bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-700 font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
               >
                 <option value="">All Types</option>
                 {typeOptions.map((t) => <option key={t} value={t}>{INCIDENT_TYPE_LABELS[t] || t}</option>)}
               </select>
             </div>
           </div>
-          <IncidentTable incidents={filteredIncidents} />
+          <IncidentTable incidents={filteredIncidents} isDarkMode={isDarkMode} />
         </div>
       </div>
     </div>
