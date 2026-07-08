@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Redirecting...</title>
+    <script type="text/javascript">
+      // Single Page Apps Routing Fallback
+      var pathName = window.location.pathname;
+      var queryString = window.location.search;
+      var hash = window.location.hash;
+      window.location.replace(
+        window.location.origin + '/?redirect_to=' + encodeURIComponent(pathName + queryString + hash)
+      );
+    </script>
+    <style>
+      body {
+        background-color: #062b66;
+        color: #ffffff;
+        font-family: sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .loader {
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="loader">
+      <h2>Loading Beyond#...</h2>
+      <p>Please wait while we redirect you.</p>
+    </div>
+  </body>
+</html>

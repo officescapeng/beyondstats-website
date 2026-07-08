@@ -2922,16 +2922,27 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [])
 
-  // Handle initial page load from URL path (e.g. going directly to /about)
+  // Handle initial page load from URL path or 404 fallback redirect
   useEffect(() => {
-    let path = window.location.pathname
-    if (path.endsWith('/') && path !== '/') path = path.slice(0, -1)
-    const pagePath = path.replace('/', '')
-    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker']
+    // Check if we came from a fallback redirect (e.g. /?redirect_to=%2Fabout)
+    const urlParams = new URLSearchParams(window.location.search);
+    const redirectTo = urlParams.get('redirect_to');
+    
+    let path = redirectTo ? decodeURIComponent(redirectTo) : window.location.pathname;
+    
+    // Remove query params from path for checking page name
+    const cleanPath = path.split('?')[0];
+    let pagePath = cleanPath.replace(/^\//, '');
+    if (pagePath.endsWith('/') && pagePath !== '') pagePath = pagePath.slice(0, -1);
+    
+    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker'];
+    
     if (validPages.includes(pagePath)) {
-      _setCurrentPage(pagePath)
-    } else if (pagePath !== '') {
-      _setCurrentPage('not-found')
+      _setCurrentPage(pagePath);
+      // Restore the clean target URL without the redirect query parameter
+      window.history.replaceState({ page: pagePath }, '', path);
+    } else if (pagePath !== '' && pagePath !== 'home') {
+      _setCurrentPage('not-found');
     }
   }, [])
 
