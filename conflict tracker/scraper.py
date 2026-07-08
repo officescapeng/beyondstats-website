@@ -180,6 +180,7 @@ STATE_ALIASES = {
 
 def resolve_state(raw: str):
     val = raw.strip().lower()
+    val = val.replace("state", "").strip()
     if val in STATE_MAP:
         return STATE_MAP[val]
     for alias, canonical in STATE_ALIASES.items():
