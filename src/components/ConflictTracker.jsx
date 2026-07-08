@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Sun, Moon, AlertTriangle, Skull, Users, Activity } from 'lucide-react';
 import nigeriaMap from '@svg-maps/nigeria';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 function computeStats(incidents) {
   const totalIncidents = incidents.length;
@@ -404,6 +404,63 @@ export default function ConflictTracker() {
           <IncidentTable incidents={filteredIncidents} isDarkMode={isDarkMode} />
         </div>
       </div>
+
+      {/* Data sources & limitations explainer */}
+      <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
+          <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
+                  <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
+                </div>
+                <div>
+                  <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Tracker</h3>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Feeds:</strong> Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV scraped via GitHub Actions every 5 hours.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Extraction:</strong> Groq (Llama 3.1 8B) extracts structured incident data from article text.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Storage:</strong> Supabase with semantic fingerprint deduplication.</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
+                      <span>Media-dependent; may undercount remote incidents.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
+                      <span>5-hour update delay between occurrence and appearance.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
+                      <span>AI-extracted casualty figures may contain inaccuracies.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
+                      <span>Only incidents with at least one casualty are logged.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+              <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+                Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
+              </div>
+            </div>
+          </div>
+        </div>
     </div>
   );
 }

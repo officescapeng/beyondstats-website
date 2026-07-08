@@ -974,19 +974,20 @@ def load_processed_article_fps(lookback_days: int = 30) -> set[str]:
     return fps
 
 
-def load_recent_incidents(lookback_days: int = 14) -> tuple[set[str], list[dict]]:
+def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]]:
     """Load recent incidents for deduplication."""
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         res    = supabase.table("incidents").select(
             "date,state,lga,incident_type,fatalities,abductions,semantic_fp"
         ).gte("date", cutoff).execute()
-
+    
         fps  = set()
         sigs = []
         for row in res.data or []:
-            if row.get("semantic_fp"):
-                fps.add(row["semantic_fp"])
+            fp = row.get("semantic_fp")
+            if fp:
+                fps.add(fp)
             sigs.append({
                 "state":         row.get("state"),
                 "lga":           (row.get("lga") or "").strip().lower() or None,
@@ -995,18 +996,54 @@ def load_recent_incidents(lookback_days: int = 14) -> tuple[set[str], list[dict]
                 "fatalities":    _safe_int(row.get("fatalities")),
                 "abductions":    _safe_int(row.get("abductions")),
             })
-        log.info(f"Loaded {len(fps)} semantic FPs and {len(sigs)} incident sigs from last {lookback_days}d")
+        log.info(f"Loaded {len(fps)} semantic FPs and {len(sigs)} incident sigs from DB (last {lookback_days}d)")
         return fps, sigs
     except Exception as exc:
         log.error(f"Failed to load recent incidents: {exc}")
-        return set(), []
+        # Try with a shorter lookback in case of timeout
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+            res    = supabase.table("incidents").select(
+                "date,state,lga,incident_type,fatalities,abductions,semantic_fp"
+            ).gte("date", cutoff).execute()
+            fps  = set()
+            sigs = []
+            for row in res.data or []:
+                fp = row.get("semantic_fp")
+                if fp:
+                    fps.add(fp)
+                sigs.append({
+                    "state":         row.get("state"),
+                    "lga":           (row.get("lga") or "").strip().lower() or None,
+                    "incident_type": canonical_incident_type(row.get("incident_type")),
+                    "date":          _parse_date(row.get("date")),
+                    "fatalities":    _safe_int(row.get("fatalities")),
+                    "abductions":    _safe_int(row.get("abductions")),
+                })
+            log.info(f"Fallback: loaded {len(fps)} semantic FPs (last 7d)")
+            return fps, sigs
+        except Exception:
+            return set(), []
 
+
+def semantic_fp_exists(sem_fp: str) -> bool:
+    """Check if a semantic fingerprint already exists in the database."""
+    try:
+        res = supabase.table("incidents").select("semantic_fp").eq("semantic_fp", sem_fp).limit(1).execute()
+        return len(res.data or []) > 0
+    except Exception as exc:
+        log.error(f"Failed to check semantic_fp in DB: {exc}")
+        return False
 
 def safe_store(payload: dict):
     if DRY_RUN:
         log.info(f"[DRY RUN] Would insert: {payload['state']} | {payload['date']} | "
                  f"{payload['incident_type']} | {payload['fatalities']} killed / "
                  f"{payload['abductions']} abducted")
+        return
+    # Final DB-level dedup check (catches duplicates if in-memory cache was stale/empty)
+    if semantic_fp_exists(payload.get("semantic_fp", "")):
+        log.debug(f"  [SKIP] Duplicate detected via DB check (semantic_fp match)")
         return
     try:
         supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
@@ -1268,7 +1305,7 @@ def run():
 
     # Load dedup state
     processed_article_fps        = load_processed_article_fps(lookback_days=30)
-    recent_semantic_fps, sigs    = load_recent_incidents(lookback_days=14)
+    recent_semantic_fps, sigs    = load_recent_incidents(lookback_days=30)
 
     dedup = {
         "article_fps":  processed_article_fps,

@@ -149,8 +149,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       });
     }
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (supabaseUrl && supabaseKey) {
       // Fetch data from Supabase REST API
       fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
@@ -426,7 +426,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         <div className="flex justify-between items-center text-sm font-semibold">
           <span className="font-poppins uppercase tracking-wider text-xs opacity-80">Security Index score:</span>
           <span className={`px-2 py-0.5 rounded font-poppins text-xs font-bold ${cat.class}`}>
-            {score}/100 — {cat.label}
+            {score}/100 {cat.label}
           </span>
         </div>
         <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex">
@@ -1063,6 +1063,12 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         .print-only-brief {
           display: none;
         }
+        .recharts-surface:focus,
+        .recharts-surface:focus-visible,
+        .recharts-surface *:focus,
+        .recharts-surface *:focus-visible {
+          outline: none !important;
+        }
         @media print {
           /* Hide the standard interactive dashboard viewport */
           nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
@@ -1111,7 +1117,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             <button
               onClick={() => triggerDailyCheck(false)}
               disabled={isCheckingUpdates}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors border ${
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors border outline-none ${
                 isCheckingUpdates 
                   ? 'bg-blue-950/30 border-blue-500/30 text-blue-300' 
                   : 'bg-white/10 border-transparent text-white/80 hover:bg-white/20'
@@ -1194,7 +1200,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             return (
               <div 
                 key={idx} 
-                className={`p-6 rounded-3xl border text-left flex items-start gap-4 transition-all hover:scale-[1.01] ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'}`}
+                className={`p-6 rounded-3xl border text-left flex items-start gap-4 transition-all hover:scale-[1.01] outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'}`}
+                style={{ outline: 'none' }}
               >
                 <div className={`p-3 rounded-2xl ${isDarkMode ? 'bg-white/5' : 'bg-slate-100'}`}>
                   <Icon className="w-5 h-5 text-[#39B54A]" />
@@ -1348,7 +1355,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 <select 
                   value={selectedStateId}
                   onChange={(e) => setSelectedStateId(e.target.value)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider border cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider border cursor-pointer outline-none ${
                     isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
                   }`}
                 >
@@ -1447,7 +1454,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             
             {/* Poverty card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1490,7 +1497,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Education card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1536,7 +1543,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Health card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1582,7 +1589,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Food Security card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1628,7 +1635,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Displacement card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1674,7 +1681,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Peace & Security card */}
-            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
+            <div className={`p-6 rounded-3xl border text-left flex flex-col justify-between gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
               <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2.5">
@@ -1725,7 +1732,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
       {/* PREDICTIVE EARLY WARNING & FORECAST HUB */}
       {dashboardTab === 'projections' && (
-        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card no-print`}>
+        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200/80 shadow-md hover:shadow-lg'} print-card no-print`} style={{ outline: 'none' }}>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
@@ -1733,7 +1740,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               </span>
               <h2 className="font-poppins font-bold text-xl uppercase tracking-tight mt-1 flex items-center gap-2">
                 <span>Risk Projections for</span>
-                <span className="text-[#39B54A] underline decoration-wavy decoration-[#39B54A]/40">{activeState.name} State</span>
+                <span className="text-[#39B54A]">{activeState.name} State</span>
               </h2>
               <p className="font-inter text-xs opacity-60 mt-1">
                 Deterministic quarterly forecasting for {activeState.name} State based on seasonal indices and administrative trend baselines.
@@ -1817,13 +1824,13 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                   return (
                     <div key={p.key} className={`p-3.5 rounded-xl border text-[11px] flex flex-col gap-2 transition-all hover:shadow-sm ${isDarkMode ? 'bg-[#030e20] border-white/5' : 'bg-white border-slate-200 shadow-sm'}`}>
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${p.color}15` }}>
-                            <Icon className="w-3.5 h-3.5" style={{ color: p.color }} />
+                          <div className="flex items-center gap-2">
+                            <div className="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${p.color}15` }}>
+                              <Icon className="w-3.5 h-3.5" style={{ color: p.color }} />
+                            </div>
+                            <span className="font-semibold text-slate-900">{p.label}</span>
                           </div>
-                          <span className="font-semibold text-slate-800 dark:text-white truncate">{p.label}</span>
-                        </div>
-                        <div className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold font-mono ${isUp ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
+                          <div className={`shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold font-mono ${isUp ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'}`}>
                           {isUp ? '\u25B2' : '\u25BC'} {isUp ? '+' : ''}{outlook.change}%
                         </div>
                       </div>
@@ -1896,8 +1903,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
       {/* STATE COMPARISON TOOL */}
       {dashboardTab === 'comparison' && (
-        <div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`}>
-          <div>
+<div className={`p-6 rounded-3xl border text-left flex flex-col gap-6 outline-none ${isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-200 shadow-sm'} print-card`} style={{ outline: 'none' }}>
+              <div>
             <span className="font-inter text-[10px] font-bold tracking-[0.2em] text-[#39B54A] uppercase block">
               Pillar Analytics
             </span>
@@ -1914,7 +1921,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               <select 
                 value={stateAId}
                 onChange={(e) => setStateAId(e.target.value)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
+                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer outline-none ${
                   isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
                 }`}
               >
@@ -1930,7 +1937,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               <select 
                 value={stateBId}
                 onChange={(e) => setStateBId(e.target.value)}
-                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer ${
+                className={`px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider border cursor-pointer outline-none ${
                   isDarkMode ? 'bg-[#030e20] border-white/10 text-white' : 'bg-slate-100 border-slate-200 text-slate-800'
                 }`}
               >
@@ -2083,6 +2090,67 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       )}
 
       </div>
+      </div>
+
+      {/* Data sources & limitations explainer */}
+      <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
+        <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
+                <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
+              </div>
+              <div>
+                <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Dashboard</h3>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
+                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Conflict Incidents:</strong> Beyond# Live Tracker scraped from 6 Nigerian news outlets; parsed via Groq AI.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
+                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Socioeconomic:</strong> NBS, World Bank, UNICEF, WHO, and administrative data.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
+                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Displacement:</strong> IOM DTM, NEMA, and state emergency management reports.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/40' : 'bg-secondary/40'}`}></span>
+                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Food Security:</strong> Cadre Harmonisé and FAO early warning systems.</span>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
+                    <span>Media-dependent conflict data; may undercount remote incidents.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
+                    <span>5-hour update delay; indicators update annually or quarterly.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
+                    <span>AI-extracted casualty figures may contain inaccuracies.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
+                    <span>State aggregates combine multiple data vintages.</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+              Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* 2. PRINT-ONLY EXECUTIVE BRIEF (Only visible on print) */}

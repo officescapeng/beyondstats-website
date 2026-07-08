@@ -16,7 +16,7 @@ export default function MaintenancePage() {
     setErrorMsg('')
     setLoading(true)
 
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     
     let success = false

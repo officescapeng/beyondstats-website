@@ -1742,7 +1742,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
 
       <div className="max-w-7xl mx-auto px-6 py-20 flex flex-col lg:flex-row gap-16 text-left">
         
-        <div className="w-full lg:w-1/2 flex flex-col justify-between gap-10">
+        <div className="w-full lg:w-1/2 flex flex-col justify-between gap-7">
           <div className="flex flex-col items-start gap-6">
             <h2 className="font-poppins font-bold text-2xl md:text-3xl text-[#062b66] leading-tight">
               Connect With the Beyond# Secretariat
@@ -2860,6 +2860,37 @@ function PrivacyPolicyPage({ setCurrentPage }) {
   )
 }
 
+// ================= SUB-PAGE 9: 404 NOT FOUND =================
+function NotFoundPage({ setCurrentPage }) {
+  return (
+    <div className="animate-fade-in bg-white text-primary flex-1 min-h-[70vh] flex items-center justify-center">
+      <div className="py-20 px-6 text-center">
+        <div className="max-w-7xl mx-auto flex flex-col items-center">
+          <div className="mb-6 p-4 rounded-full bg-slate-100">
+            <FileSearch className="w-10 h-10 text-secondary" />
+          </div>
+          <span className="font-inter text-xs font-bold tracking-[0.25em] text-secondary uppercase mb-4 block">
+            404
+          </span>
+          <h1 className="font-poppins font-bold text-4xl sm:text-5xl md:text-6xl text-primary tracking-tight leading-tight">
+            Page Not Found
+          </h1>
+          <p className="font-inter text-slate-500 text-sm mt-4 max-w-md">
+            The page you are looking for does not exist or has been moved.
+          </p>
+          <button
+            onClick={() => setCurrentPage('home')}
+            className="mt-8 bg-secondary hover:bg-secondary/90 text-white font-inter font-bold text-xs uppercase tracking-widest py-4 px-8 rounded-full flex items-center gap-2 transition-all duration-300 shadow-lg shadow-secondary/15 hover:scale-102 active:scale-98 cursor-pointer outline-none border-none"
+          >
+            Back to Home
+            <ArrowUpRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ================= APP COMPONENT (Router Shell) =================
 function App() {
   const slides = [
@@ -2899,8 +2930,8 @@ function App() {
     const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker']
     if (validPages.includes(pagePath)) {
       _setCurrentPage(pagePath)
-    } else {
-      _setCurrentPage('home')
+    } else if (pagePath !== '') {
+      _setCurrentPage('not-found')
     }
   }, [])
 
@@ -3136,6 +3167,10 @@ function App() {
 
       {currentPage === 'privacy' && (
         <PrivacyPolicyPage setCurrentPage={setCurrentPage} />
+      )}
+
+      {currentPage === 'not-found' && (
+        <NotFoundPage setCurrentPage={setCurrentPage} />
       )}
 
       {/* GLOBAL FOOTER */}

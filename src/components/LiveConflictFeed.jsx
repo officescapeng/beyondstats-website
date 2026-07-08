@@ -26,8 +26,8 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
   // --- D. REAL-TIME STREAMING FEED (POLLING UPGRADE) ---
   useEffect(() => {
     const fetchLatest = async () => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://kpspsgvqylrqfiewglsd.supabase.co";
-      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwc3BzZ3ZxeWxycWZpZXdnbHNkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mjc4OTY2MCwiZXhwIjoyMDk4MzY1NjYwfQ.IFx9v6VeAJjmuee2gm8BCZIhqhmwBPpLrcsddMoP0vg";
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       try {
         const res = await fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc&limit=100`, {

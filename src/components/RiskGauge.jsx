@@ -8,7 +8,7 @@ export default function RiskGauge({ score }) {
       <div className="flex justify-between items-center text-sm font-semibold">
         <span className="font-poppins uppercase tracking-wider text-xs opacity-80">Security Index score:</span>
         <span className={`px-2 py-0.5 rounded font-poppins text-xs font-bold ${cat.class}`}>
-          {score}/100 — {cat.label}
+          {score}/100 {cat.label}
         </span>
       </div>
       <div className="w-full h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden flex">
