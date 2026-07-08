@@ -1,6 +1,6 @@
 name = "beyondstats-website"
 compatibility_date = "2026-07-08"
-main = "src/worker.js"
 
 [assets]
 directory = "./dist"
+spa_mode = true
