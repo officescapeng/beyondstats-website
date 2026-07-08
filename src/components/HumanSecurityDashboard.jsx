@@ -59,14 +59,17 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
   const META_DATA = dataMetadata;
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/hsri')
-      .then(r => r.json())
-      .then(d => {
-        if (d?.stateData) setStateDataList(d.stateData);
-        if (d?.averages) setNationalAverages(d.averages);
-        if (d?.metadata) setDataMetadata(d.metadata);
-      })
-      .catch(() => {});
+    // Only attempt to fetch dynamic calculations from the local API server if running locally
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      fetch('http://localhost:3001/api/hsri')
+        .then(r => r.json())
+        .then(d => {
+          if (d?.stateData) setStateDataList(d.stateData);
+          if (d?.averages) setNationalAverages(d.averages);
+          if (d?.metadata) setDataMetadata(d.metadata);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const [isDarkMode, setIsDarkMode] = useState(false); // Default to light mode (white theme)
