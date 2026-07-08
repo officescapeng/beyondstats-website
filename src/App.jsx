@@ -2945,6 +2945,8 @@ function App() {
       window.history.replaceState({ page: pagePath }, '', path);
     } else if (pagePath !== '' && pagePath !== 'home') {
       _setCurrentPage('not-found');
+      // Keep the invalid URL in the address bar to match native 404 behaviors
+      window.history.replaceState({ page: 'not-found' }, '', path);
     }
   }, [])
 
