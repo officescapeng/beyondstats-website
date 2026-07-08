@@ -384,6 +384,8 @@ export default function ConflictTracker() {
             <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
             <div className="flex gap-3">
               <select
+                id="conflict-filter-state"
+                name="filterState"
                 value={filterState}
                 onChange={(e) => setFilterState(e.target.value)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
@@ -392,6 +394,8 @@ export default function ConflictTracker() {
                 {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
               <select
+                id="conflict-filter-type"
+                name="filterType"
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
                 className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}

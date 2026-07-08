@@ -215,6 +215,8 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
           <div className="relative">
             <input
               type="text"
+              id="header-search-bar"
+              name="searchQuery"
               placeholder="Search site or states..."
               value={searchQuery}
               onFocus={() => setShowSuggestions(true)}
