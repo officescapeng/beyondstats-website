@@ -919,7 +919,7 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
             backoff *= 2
 
     log.error(f"  [LLM] [SKIP] Extraction failed after {retries} attempts")
-    return []
+    return None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1143,12 +1143,16 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
         # LLM extraction
         incidents_list = extract_incidents(title, text, pub_date)
-        if not incidents_list:
+        if incidents_list is None:
+            # API extraction failed due to error. Do NOT cache this article so it can be retried.
+            log.warning(f"  [RETRY] LLM extraction failed due to API error. Will retry next run.")
+            result["ai_failed"] += 1
+            return result
+        elif len(incidents_list) == 0:
             log.info(f"  [SKIP] LLM extraction returned no incidents")
             with dedup["lock"]:
                 dedup["article_fps"].add(art_fp)
                 save_local_cache(art_fp)
-            result["ai_failed"] += 1
             return result
 
         log.info(f"  [OK] LLM extracted {len(incidents_list)} incidents")
