@@ -891,9 +891,43 @@ def _parse_retry_after(err_str: str) -> float | None:
     return None
 
 
-def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict]:
+def extract_incidents_gemini(prompt: str, api_key: str) -> list[dict] | None:
+    """Fallback extraction using Gemini's API."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+    try:
+        log.info("  [LLM] Attempting failover to Gemini API...")
+        r = requests.post(url, headers=headers, json=payload, timeout=20)
+        r.raise_for_status()
+        data = r.json()
+        text = data["candidates"][0]["content"]["parts"][0]["text"]
+        
+        # Parse JSON from response markdown codeblocks if necessary
+        text_clean = text.strip()
+        if text_clean.startswith("```"):
+            lines = text_clean.splitlines()
+            if lines[0].startswith("```json"):
+                text_clean = "\n".join(lines[1:-1])
+            elif lines[0].startswith("```"):
+                text_clean = "\n".join(lines[1:-1])
+        
+        res_data = json.loads(text_clean)
+        return res_data.get("incidents", [])
+    except Exception as exc:
+        log.warning(f"  [LLM] Gemini failover error: {exc}")
+        return None
+
+
+def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict] | None:
     prompt  = _PROMPT_TEMPLATE.format(article_date=article_date, title=title, text=text)
     backoff = 2.0
+    gemini_key = os.environ.get("GEMINI_API_KEY")
 
     for attempt in range(retries):
         success = False
@@ -949,6 +983,21 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
         if exc_to_raise:
             err_str       = str(exc_to_raise)
             is_rate_limit = "rate" in err_str.lower() or "429" in err_str
+            
+            # If we have a Gemini key, and we hit a rate limit or authorization error, try Gemini immediately!
+            if gemini_key and (is_rate_limit or "401" in err_str or "API Key" in err_str):
+                log.warning(f"  [LLM] Groq error encountered: {err_str[:60]}. Initiating Gemini failover.")
+                gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
+                if gemini_incidents is not None:
+                    # Validate and fix incidents
+                    validated_incidents = []
+                    for idx, incident in enumerate(gemini_incidents):
+                        fixed = validate_and_fix_incident(incident, text, article_date)
+                        if fixed:
+                            validated_incidents.append(fixed)
+                    log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via Gemini fallback")
+                    return validated_incidents
+            
             if is_rate_limit:
                 retry_after = _parse_retry_after(err_str) or (backoff * 4)
                 log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
@@ -959,6 +1008,19 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                 log.warning(f"  [LLM] Error (attempt {attempt + 1}): {err_str[:100]} (released lock)")
                 time.sleep(wait)
             backoff *= 2
+
+    # Final fallback if all Groq retries failed
+    if gemini_key:
+        log.warning("  [LLM] Groq extraction exhausted all retries. Performing final Gemini failover attempt.")
+        gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
+        if gemini_incidents is not None:
+            validated_incidents = []
+            for idx, incident in enumerate(gemini_incidents):
+                fixed = validate_and_fix_incident(incident, text, article_date)
+                if fixed:
+                    validated_incidents.append(fixed)
+            log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via final Gemini fallback")
+            return validated_incidents
 
     log.error(f"  [LLM] [SKIP] Extraction failed after {retries} attempts")
     return None
@@ -1078,16 +1140,54 @@ def semantic_fp_exists(sem_fp: str) -> bool:
         log.error(f"Failed to check semantic_fp in DB: {exc}")
         return False
 
+def get_existing_incident(sem_fp: str) -> dict | None:
+    """Fetch an existing incident by its semantic fingerprint."""
+    try:
+        res = supabase.table("incidents").select("*").eq("semantic_fp", sem_fp).limit(1).execute()
+        return res.data[0] if res.data else None
+    except Exception as exc:
+        log.error(f"Failed to fetch incident by semantic_fp: {exc}")
+        return None
+
 def safe_store(payload: dict):
     if DRY_RUN:
         log.info(f"[DRY RUN] Would insert: {payload['state']} | {payload['date']} | "
                  f"{payload['incident_type']} | {payload['fatalities']} killed / "
                  f"{payload['abductions']} abducted")
         return
-    # Final DB-level dedup check (catches duplicates if in-memory cache was stale/empty)
-    if semantic_fp_exists(payload.get("semantic_fp", "")):
-        log.debug(f"  [SKIP] Duplicate detected via DB check (semantic_fp match)")
-        return
+
+    sem_fp = payload.get("semantic_fp", "")
+    existing = get_existing_incident(sem_fp) if sem_fp else None
+
+    if existing:
+        # Merge stats: take maximum values
+        merged_fatalities = max(_safe_int(existing.get("fatalities", 0)), _safe_int(payload.get("fatalities", 0)))
+        merged_abductions = max(_safe_int(existing.get("abductions", 0)), _safe_int(payload.get("abductions", 0)))
+        merged_injuries   = max(_safe_int(existing.get("injuries", 0)), _safe_int(payload.get("injuries", 0)))
+        
+        # Merge source urls (comma separated unique URLs)
+        existing_urls = [u.strip() for u in (existing.get("source_url") or "").split(",") if u.strip()]
+        new_url = payload.get("source_url", "").strip()
+        if new_url and new_url not in existing_urls:
+            existing_urls.append(new_url)
+        merged_urls = ", ".join(existing_urls)
+        
+        # Merge summary
+        existing_summary = (existing.get("summary") or "").strip()
+        new_summary = (payload.get("summary") or "").strip()
+        if new_summary and new_summary not in existing_summary:
+            merged_summary = f"{existing_summary} | [Additional Source] {new_summary}"
+        else:
+            merged_summary = existing_summary
+            
+        payload["fatalities"] = merged_fatalities
+        payload["abductions"] = merged_abductions
+        payload["injuries"]   = merged_injuries
+        payload["source_url"] = merged_urls
+        payload["summary"]    = merged_summary
+        
+        log.info(f"  [MERGE] Merged duplicate incident for {payload['state']} | {payload['date']} (F: {merged_fatalities}, A: {merged_abductions})")
+
     try:
         supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
     except Exception as exc:
@@ -1319,6 +1419,38 @@ def process_entry(entry, dedup, default_date: str) -> dict:
     return result
 
 
+def send_webhook_alert(stats: dict, error_message: str = None):
+    """Send execution report or error alerts to Slack or Discord webhook."""
+    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL") or os.environ.get("SLACK_WEBHOOK_URL")
+    if not webhook_url:
+        return
+        
+    try:
+        if error_message:
+            msg = f"🚨 **Conflict Tracker Scraper CRITICAL FAILURE** 🚨\n**Error:** {error_message}"
+        else:
+            saved = stats.get("saved_incidents", 0)
+            failed = stats.get("ai_failed", 0)
+            status_str = "✅ Success" if failed == 0 else f"⚠️ Warnings (AI failed: {failed})"
+            msg = (
+                f"📊 **Observatory Scraper Run Summary** 📊\n"
+                f"• Feeds parsed: {stats.get('feeds', 0)}\n"
+                f"• Articles parsed: {stats.get('entries', 0)}\n"
+                f"• Saved incidents: {saved}\n"
+                f"• AI/Extraction failures: {failed}\n"
+                f"• Status: {status_str}"
+            )
+        
+        payload = {
+            "content": msg,
+            "text": msg
+        }
+        requests.post(webhook_url, json=payload, timeout=10)
+        log.info("  [Alert] Webhook notification sent successfully")
+    except Exception as exc:
+        log.error(f"  [Alert] Failed to send webhook alert: {exc}")
+
+
 # ─────────────────────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────────────────────
@@ -1423,6 +1555,9 @@ def run():
         except Exception as exc:
             log.warning(f"  [Sync] Could not write run report to Supabase (scraper_runs table may not exist): {exc}")
 
+    # Send run alert
+    send_webhook_alert(stats)
+
 
 # ─────────────────────────────────────────────────────────────
 # ENTRY POINT
@@ -1432,5 +1567,8 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         run()
+    except Exception as exc:
+        send_webhook_alert({}, error_message=str(exc))
+        raise exc
     finally:
         _release_lock()

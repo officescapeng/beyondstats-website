@@ -284,6 +284,28 @@ export default function ConflictTracker() {
   const [filterType, setFilterType] = useState('');
   const [selectedMapState, setSelectedMapState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterDateRange, setFilterDateRange] = useState('');
+
+  const getLgaBreakdown = () => {
+    if (!selectedMapState) return [];
+    const stateIncidents = incidents.filter(
+      (i) => i.state && i.state.toLowerCase() === selectedMapState.toLowerCase()
+    );
+    const lgaMap = {};
+    for (const i of stateIncidents) {
+      const lgaName = (i.lga || 'Unknown').trim();
+      if (!lgaMap[lgaName]) {
+        lgaMap[lgaName] = { name: lgaName, count: 0, fatalities: 0, abductions: 0 };
+      }
+      lgaMap[lgaName].count++;
+      lgaMap[lgaName].fatalities += i.fatalities || 0;
+      lgaMap[lgaName].abductions += i.abductions || 0;
+    }
+    return Object.values(lgaMap).sort(
+      (a, b) => (b.fatalities + b.abductions) - (a.fatalities + a.abductions)
+    );
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -313,6 +335,36 @@ export default function ConflictTracker() {
     const activeStateFilter = filterState || selectedMapState;
     if (activeStateFilter && i.state.toLowerCase() !== activeStateFilter.toLowerCase()) return false;
     if (filterType && getIncidentTypeKey(i.incident_type) !== filterType) return false;
+    
+    // Search Term Filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const match = 
+        (i.summary || '').toLowerCase().includes(term) ||
+        (i.community || '').toLowerCase().includes(term) ||
+        (i.lga || '').toLowerCase().includes(term) ||
+        (i.state || '').toLowerCase().includes(term) ||
+        (i.incident_type || '').toLowerCase().includes(term);
+      if (!match) return false;
+    }
+
+    // Date Range Filter
+    if (filterDateRange) {
+      const incidentDate = new Date(i.date + 'T00:00:00Z');
+      const now = new Date();
+      
+      // Calculate diff in days
+      const diffTime = Math.abs(now - incidentDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (filterDateRange === '7d' && diffDays > 7) return false;
+      if (filterDateRange === '30d' && diffDays > 30) return false;
+      if (filterDateRange === 'this-month') {
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        if (incidentDate < firstDayOfMonth) return false;
+      }
+    }
+    
     return true;
   });
 
@@ -365,30 +417,52 @@ export default function ConflictTracker() {
               <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{selectedMapState ? `Incidents in ${selectedMapState}` : 'Incidents per State'}</h3>
-                {(filterType || filterState || selectedMapState) && (
-                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear</button>
+                {(filterType || filterState || selectedMapState || searchTerm || filterDateRange) && (
+                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); setSearchTerm(''); setFilterDateRange(''); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear All</button>
                 )}
               </div>
               {selectedMapState && (() => {
                 const s = stats.byState.find(s => s.state === selectedMapState);
                 if (!s) return null;
                 return (
-                  <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Incidents</div>
-                      <div className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{s.count}</div>
+                  <div>
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Incidents</div>
+                        <div className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{s.count}</div>
+                      </div>
+                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-red-950/40' : 'bg-red-50'}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Killed</div>
+                        <div className="text-lg font-bold text-red-500">{s.fatalities}</div>
+                      </div>
+                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-amber-950/40' : 'bg-amber-50'}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
+                        <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
+                      </div>
+                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
+                        <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
+                      </div>
                     </div>
-                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-red-950/40' : 'bg-red-50'}`}>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Killed</div>
-                      <div className="text-lg font-bold text-red-500">{s.fatalities}</div>
-                    </div>
-                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-amber-950/40' : 'bg-amber-50'}`}>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
-                      <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
-                    </div>
-                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
-                      <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
+
+                    <div className="mt-5 border-t border-dashed border-slate-200/20 pt-4">
+                      <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>LGA Incident Breakdown</h4>
+                      <div className="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                        {getLgaBreakdown().length > 0 ? (
+                          getLgaBreakdown().map(lga => (
+                            <div key={lga.name} className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${isDarkMode ? 'bg-white/5 border border-white/5' : 'bg-slate-50 border border-slate-100'}`}>
+                              <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{lga.name}</span>
+                              <div className="flex gap-2.5 font-bold">
+                                <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>{lga.count} inc</span>
+                                {lga.fatalities > 0 && <span className="text-rose-500">{lga.fatalities}K</span>}
+                                {lga.abductions > 0 && <span className="text-amber-500">{lga.abductions}A</span>}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className={`text-center py-4 text-xs ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>No incidents logged.</div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -403,9 +477,28 @@ export default function ConflictTracker() {
         )}
 
         <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-          <div className={`p-5 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
-            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
-            <div className="flex gap-3">
+          <div className={`p-5 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:max-w-md">
+              <h3 className={`text-sm font-bold whitespace-nowrap ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
+              <input
+                type="text"
+                placeholder="Search by summary, community, LGA..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className={`w-full rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200 placeholder-slate-600' : 'bg-white border border-slate-300 text-slate-700 placeholder-slate-400'}`}
+              />
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <select
+                value={filterDateRange}
+                onChange={(e) => setFilterDateRange(e.target.value)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
+              >
+                <option value="">All Time</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="this-month">This Month</option>
+              </select>
               <select
                 id="conflict-filter-state"
                 name="filterState"
