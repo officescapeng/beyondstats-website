@@ -118,14 +118,14 @@ function StatsCards({ overall, isDarkMode }) {
 
 function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
   const statsMap = new Map(byState.map((s) => [s.state ? s.state.toLowerCase().trim() : '', s]));
-  const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
+  const maxVictims = Math.max(...byState.map((s) => (s.fatalities || 0) + (s.abductions || 0)), 1);
   const [tooltip, setTooltip] = useState(null);
 
   const nameOverrides = { 'Federal Capital Territory': 'FCT' };
 
-  function getHeatColor(fatalities) {
-    if (fatalities === 0) return '#e2e8f0';
-    const ratio = fatalities / maxFatalities;
+  function getHeatColor(victims) {
+    if (victims === 0) return '#e2e8f0';
+    const ratio = victims / maxVictims;
     if (ratio > 0.75) return '#7f1d1d';
     if (ratio > 0.5) return '#b91c1c';
     if (ratio > 0.25) return '#dc2626';
@@ -135,14 +135,14 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
 
   return (
     <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Fatalities by State &mdash; Choropleth</h3>
+      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Victims by State (Killed & Abducted) &mdash; Choropleth</h3>
       <div className="relative">
         <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
           {nigeriaMap.locations.map(loc => {
             const stateName = nameOverrides[loc.name] || loc.name;
             const stats = statsMap.get(stateName.toLowerCase().trim());
-            const fatalities = stats?.fatalities || 0;
-            const color = getHeatColor(fatalities);
+            const victims = (stats?.fatalities || 0) + (stats?.abductions || 0);
+            const color = getHeatColor(victims);
             const isSelected = selectedState && selectedState.toLowerCase() === stateName.toLowerCase();
             return (
               <path
