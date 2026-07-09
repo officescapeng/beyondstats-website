@@ -620,7 +620,14 @@ export default function ConflictTracker() {
         <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
           <div className={`p-5 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:max-w-md">
-              <h3 className={`text-sm font-bold whitespace-nowrap ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
+              <div className="flex items-baseline gap-2.5">
+                <h3 className={`text-sm font-bold whitespace-nowrap ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
+                {filteredIncidents.length > 0 && (
+                  <span className={`text-[10px] font-semibold whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+                    (showing {Math.min(10, filteredIncidents.length)} of {filteredIncidents.length})
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 placeholder="Search by summary, community, LGA..."
@@ -662,7 +669,7 @@ export default function ConflictTracker() {
               </select>
             </div>
           </div>
-          <IncidentTable incidents={filteredIncidents} isDarkMode={isDarkMode} />
+          <IncidentTable incidents={filteredIncidents.slice(0, 10)} isDarkMode={isDarkMode} />
         </div>
       </div>
 
