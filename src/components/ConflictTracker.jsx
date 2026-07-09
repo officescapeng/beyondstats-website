@@ -527,60 +527,42 @@ export default function ConflictTracker() {
 
       {/* Data sources & limitations explainer */}
       <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
-          <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
-                  <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
-                </div>
-                <div>
-                  <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Tracker</h3>
-                </div>
+        <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Data Ingestion</h4>
+                <p className={`text-xs leading-relaxed mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Incidents are ingested from major Nigerian outlets (Premium Times, Vanguard, Daily Trust, Leadership, Sun News, PM News, The Cable, and Channels TV) via automated feeds running every 5 hours.
+                </p>
+                <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Large Language Models (LLMs) parse raw article text to extract structured incident fields, state/LGA locations, and casualty counts.
+                </p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Feeds:</strong> Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV scraped via GitHub Actions every 5 hours.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Extraction:</strong> Groq (Llama 3.1 8B) extracts structured incident data from article text.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Storage:</strong> Supabase with semantic fingerprint deduplication.</span>
-                    </li>
-                  </ul>
-                </div>
-                <div>
-                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
-                      <span>Media-dependent; may undercount remote incidents.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
-                      <span>5-hour update delay between occurrence and appearance.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
-                      <span>AI-extracted casualty figures may contain inaccuracies.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
-                      <span>Only incidents with at least one casualty are logged.</span>
-                    </li>
-                  </ul>
-                </div>
+              <div>
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Limitations & Scope</h4>
+                <ul className={`space-y-2 text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>Media Under-reporting:</strong> Only covers incidents documented by the national press, leading to possible undercounts in highly remote areas.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>Casualty Threshold:</strong> Only logs active conflict events with fatalities or injuries, and abductions. Hostage rescues and releases are omitted.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>AI Extraction & Deduplication:</strong> Information reflects reported news. AI parses numbers from text and automatically merges duplicate cross-reports.</span>
+                  </li>
+                </ul>
               </div>
-              <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-                Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
-              </div>
+            </div>
+            <div className={`mt-5 pt-3.5 border-t text-[10px] text-center ${isDarkMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
+              Beyond Statistics Observatory &middot; Abuja, FCT, Nigeria &mdash; Research and policy analysis reference.
             </div>
           </div>
         </div>
+      </div>
     </div>
   );
 }
