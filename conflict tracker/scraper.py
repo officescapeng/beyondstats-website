@@ -100,6 +100,10 @@ if os.path.exists(feeds_json_path):
             "https://dailytrust.com/feed/",
             "https://www.thecable.ng/feed",
             "https://www.channelstv.com/feed/",
+            "https://leadership.ng/feed/",
+            "https://sunnewsonline.com/feed/",
+            "https://tribuneonlineng.com/feed/",
+            "https://pmnewsnigeria.com/feed/",
         ]
 else:
     FEEDS = [
@@ -109,6 +113,10 @@ else:
         "https://dailytrust.com/feed/",
         "https://www.thecable.ng/feed",
         "https://www.channelstv.com/feed/",
+        "https://leadership.ng/feed/",
+        "https://sunnewsonline.com/feed/",
+        "https://tribuneonlineng.com/feed/",
+        "https://pmnewsnigeria.com/feed/",
     ]
 
 
@@ -190,18 +198,47 @@ def resolve_state(raw: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# NIGERIA RELEVANCE FILTER (LESS STRICT)
+# NIGERIA RELEVANCE FILTER
 # ─────────────────────────────────────────────────────────────
-_NIGERIA_PATTERNS = [
+NIGERIAN_STATES = {
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
+    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
+    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe",
+    "Zamfara", "FCT",
+}
+NIGERIAN_STATES_LOWER = {s.lower() for s in NIGERIAN_STATES} | {
+    "abuja", "federal capital", "cross river", "akwa ibom"
+}
+
+_NIGERIA_CONTEXT_PATTERNS = [
     re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
-        "nigeria", "nigerian", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
-        "army", "police", "dss", "bandits", "banditry", "boko haram", "herdsmen",
-        "kidnap", "kidnapped", "kidnapping", "abducted", "abduction", "hostage", "ransom",
+        "nigeria", "nigerian", "nigerians"
+    ] + list(NIGERIAN_STATES_LOWER)
+]
+
+_SECURITY_CONTEXT_PATTERNS = [
+    re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
+        "bandit", "bandits", "banditry",
+        "kidnap", "kidnaps", "kidnapped", "kidnapper", "kidnappers", "kidnapping", "kidnappings",
+        "abduct", "abducts", "abducted", "abduction", "abductions",
+        "kill", "kills", "killed", "killing", "killings",
+        "clash", "clashes", "clashed", "clashing",
+        "attack", "attacks", "attacked", "attacker", "attackers", "attacking",
+        "shoot", "shoots", "shot", "shooting", "shootings", "gunfire", "gunshot", "gunshots",
+        "gunman", "gunmen", "armed", "weapons", "rifles",
+        "dead", "death", "deaths", "fatalities", "casualty", "casualties",
+        "herdsman", "herdsmen", "farmer", "farmers",
+        "boko haram", "iswap", "ipob", "insurgent", "insurgents", "insurgency",
+        "terror", "terrorist", "terrorists", "terrorism",
+        "police", "policemen", "army", "soldier", "soldiers", "military", "troops", "dss", "nscdc", "vigilante", "vigilantes",
+        "ambush", "ambushed", "bomb", "bombing", "blast", "explosion",
+        "hostage", "hostages", "ransom"
     ]
 ]
 
 MIN_TEXT_LENGTH  = 150
-MAX_ARTICLE_CHARS = 1500
+MAX_ARTICLE_CHARS = 6000  # Increased to capture detailed reports buried deep in long articles
 
 # ─────────────────────────────────────────────────────────────
 # EVENT LOGGING START DATE
@@ -209,19 +246,24 @@ MAX_ARTICLE_CHARS = 1500
 EVENT_START_DATE = datetime(2026, 7, 1, tzinfo=timezone.utc)
 
 
-def nigeria_score(text: str) -> int:
-    return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
-
-
 def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    Require 2+ Nigeria markers for relevance (less strict).
-    Catches more legitimate Nigerian security articles.
+    Check if the article contains both a Nigerian context (state/national name)
+    and a security context (violent incident, abduction, clash, etc.)
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
-    score = nigeria_score(f"{title} {text}")
-    return score >= 2
+    
+    combined = f"{title} {text}".lower()
+    
+    # Check for Nigerian context
+    has_nigeria = any(p.search(combined) for p in _NIGERIA_CONTEXT_PATTERNS)
+    if not has_nigeria:
+        return False
+        
+    # Check for security context
+    has_security = any(p.search(combined) for p in _SECURITY_CONTEXT_PATTERNS)
+    return has_security
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1116,9 +1158,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             return result
 
         # Nigeria relevance check
-        score = nigeria_score(f"{title} {text}")
-        log.debug(f"  Nigeria score: {score}")
-        
         if not is_nigeria_relevant(title, text):
             log.debug(f"  [SKIP] Not Nigeria relevant")
             with dedup["lock"]:
