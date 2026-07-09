@@ -1744,7 +1744,7 @@ function ContactPage({ formData, handleInputChange, handleSubmit, formSubmitted 
 
       <div className="max-w-7xl mx-auto px-6 py-20 flex flex-col lg:flex-row gap-16 text-left">
         
-        <div className="w-full lg:w-1/2 flex flex-col justify-between gap-7">
+        <div className="w-full lg:w-1/2 flex flex-col justify-start gap-48">
           <div className="flex flex-col items-start gap-6">
             <h2 className="font-poppins font-bold text-2xl md:text-3xl text-[#062b66] leading-tight">
               Connect With the Beyond# Secretariat
