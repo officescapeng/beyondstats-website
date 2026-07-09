@@ -1149,6 +1149,60 @@ def get_existing_incident(sem_fp: str) -> dict | None:
         log.error(f"Failed to fetch incident by semantic_fp: {exc}")
         return None
 
+def find_duplicate_incident_db(payload: dict) -> dict | None:
+    """
+    Search Supabase dynamically for a matching recent incident to merge with,
+    handling date variance (within DEDUP_WINDOW_DAYS) and compatible LGAs.
+    """
+    try:
+        date_str = payload.get("date")
+        d = _parse_date(date_str)
+        if not d:
+            return None
+        
+        # Calculate date range window
+        start_date = (d - timedelta(days=DEDUP_WINDOW_DAYS)).strftime("%Y-%m-%d")
+        end_date = (d + timedelta(days=DEDUP_WINDOW_DAYS)).strftime("%Y-%m-%d")
+        
+        state = payload.get("state")
+        canon_type = canonical_incident_type(payload.get("incident_type"))
+        payload_lga = (payload.get("lga") or "").strip().lower() or None
+        
+        # Query database for recent incidents in the same state
+        res = supabase.table("incidents").select("*") \
+            .eq("state", state) \
+            .gte("date", start_date) \
+            .lte("date", end_date) \
+            .execute()
+            
+        for row in res.data or []:
+            # Match incident type
+            row_type = canonical_incident_type(row.get("incident_type"))
+            if row_type != canon_type:
+                continue
+                
+            # Match LGA (must be compatible)
+            row_lga = (row.get("lga") or "").strip().lower() or None
+            if row_lga and payload_lga and row_lga != payload_lga:
+                continue
+                
+            # Match casualties within tolerance bounds
+            row_fat = _safe_int(row.get("fatalities", 0))
+            row_abd = _safe_int(row.get("abductions", 0))
+            
+            if abs(row_fat - _safe_int(payload.get("fatalities", 0))) > FATALITY_TOLERANCE:
+                continue
+            if abs(row_abd - _safe_int(payload.get("abductions", 0))) > ABDUCTION_TOLERANCE:
+                continue
+                
+            # Found duplicate!
+            return row
+            
+        return None
+    except Exception as exc:
+        log.error(f"Failed searching duplicate incident in DB: {exc}")
+        return None
+
 def safe_store(payload: dict):
     if DRY_RUN:
         log.info(f"[DRY RUN] Would insert: {payload['state']} | {payload['date']} | "
@@ -1156,10 +1210,13 @@ def safe_store(payload: dict):
                  f"{payload['abductions']} abducted")
         return
 
-    sem_fp = payload.get("semantic_fp", "")
-    existing = get_existing_incident(sem_fp) if sem_fp else None
+    # Check for duplicate (exact semantic_fp or fuzzy match) in DB
+    existing = find_duplicate_incident_db(payload)
 
     if existing:
+        # Crucial: use the existing row's semantic_fp so we update it!
+        payload["semantic_fp"] = existing.get("semantic_fp")
+        
         # Merge stats: take maximum values
         merged_fatalities = max(_safe_int(existing.get("fatalities", 0)), _safe_int(payload.get("fatalities", 0)))
         merged_abductions = max(_safe_int(existing.get("abductions", 0)), _safe_int(payload.get("abductions", 0)))
@@ -1180,11 +1237,31 @@ def safe_store(payload: dict):
         else:
             merged_summary = existing_summary
             
+        # Merge LGA/community details (fill in if existing didn't have it)
+        existing_lga = (existing.get("lga") or "").strip()
+        new_lga = (payload.get("lga") or "").strip()
+        merged_lga = existing_lga if existing_lga else new_lga
+        
+        existing_comm = (existing.get("community") or "").strip()
+        new_comm = (payload.get("community") or "").strip()
+        merged_comm = existing_comm if existing_comm else new_comm
+        
+        # Keep earlier date if possible
+        existing_d = _parse_date(existing.get("date"))
+        new_d = _parse_date(payload.get("date"))
+        if existing_d and new_d and new_d < existing_d:
+            merged_date = payload.get("date")
+        else:
+            merged_date = existing.get("date")
+        
         payload["fatalities"] = merged_fatalities
         payload["abductions"] = merged_abductions
         payload["injuries"]   = merged_injuries
         payload["source_url"] = merged_urls
         payload["summary"]    = merged_summary
+        payload["lga"]        = merged_lga
+        payload["community"]  = merged_comm
+        payload["date"]       = merged_date
         
         log.info(f"  [MERGE] Merged duplicate incident for {payload['state']} | {payload['date']} (F: {merged_fatalities}, A: {merged_abductions})")
 
@@ -1364,25 +1441,19 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "abductions":    abductions,
                 }
 
-                # ══ DEDUPLICATION ═══════════════════════════════════
+                # ══ DEDUPLICATION & MERGING ═════════════════════════
+                is_dup = False
                 with dedup["lock"]:
-                    # Check exact semantic match
-                    if sem_fp in dedup["semantic_fps"]:
-                        log.debug(f"    [SKIP] Duplicate (exact FP)")
+                    if sem_fp in dedup["semantic_fps"] or _is_duplicate(sig, dedup["sigs"]):
+                        is_dup = True
                         result["semantic_duplicates"] += 1
-                        continue
                     
-                    # Check fuzzy match
-                    if _is_duplicate(sig, dedup["sigs"]):
-                        log.debug(f"    [SKIP] Duplicate (fuzzy)")
-                        result["semantic_duplicates"] += 1
-                        continue
-                    
-                    log.debug(f"    [OK] Unique incident")
-                    
-                    # Mark as processed before DB write
+                    # Add to cache for subsequent deduplication
                     dedup["semantic_fps"].add(sem_fp)
                     dedup["sigs"].append(sig)
+
+                if is_dup:
+                    log.info(f"    [DUPLICATE] Duplicate detected in-memory; executing merge & store.")
 
                 # Store incident
                 payload = {
