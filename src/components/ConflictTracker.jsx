@@ -116,12 +116,60 @@ function StatsCards({ overall, isDarkMode }) {
   );
 }
 
-function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
+function StateHeatmap({ byState, incidents, selectedState, onStateClick, isDarkMode }) {
   const statsMap = new Map(byState.map((s) => [s.state ? s.state.toLowerCase().trim() : '', s]));
   const maxVictims = Math.max(...byState.map((s) => (s.fatalities || 0) + (s.abductions || 0)), 1);
   const [tooltip, setTooltip] = useState(null);
+  const [centroids, setCentroids] = useState({});
 
   const nameOverrides = { 'Federal Capital Territory': 'FCT' };
+
+  useEffect(() => {
+    const calculateCentroids = () => {
+      const newCentroids = {};
+      const paths = document.querySelectorAll('svg.nigeria-map path');
+      paths.forEach(path => {
+        try {
+          const bbox = path.getBBox();
+          const stateNameAttr = path.getAttribute('data-name');
+          if (stateNameAttr) {
+            newCentroids[stateNameAttr.toLowerCase().trim()] = {
+              x: bbox.x + bbox.width / 2,
+              y: bbox.y + bbox.height / 2
+            };
+          }
+        } catch (e) {
+          // ignore
+        }
+      });
+      if (Object.keys(newCentroids).length > 0) {
+        setCentroids(newCentroids);
+      }
+    };
+
+    // Run after DOM has updated
+    const timer = setTimeout(calculateCentroids, 150);
+    return () => clearTimeout(timer);
+  }, [incidents, byState]);
+
+  // Group incidents by state
+  const incidentsByState = {};
+  for (const i of incidents) {
+    if (!i.state) continue;
+    const key = i.state.toLowerCase().trim();
+    if (!incidentsByState[key]) incidentsByState[key] = [];
+    incidentsByState[key].push(i);
+  }
+
+  const getOffset = (index, total) => {
+    if (total === 1) return { dx: 0, dy: 0 };
+    const angle = (index / total) * 2 * Math.PI;
+    const radius = 9; // spacing in SVG viewBox coordinates
+    return {
+      dx: Math.cos(angle) * radius,
+      dy: Math.sin(angle) * radius
+    };
+  };
 
   function getHeatColor(victims) {
     if (victims === 0) return '#e2e8f0';
@@ -137,7 +185,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
     <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
       <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Victims by State (Killed & Abducted) &mdash; Choropleth</h3>
       <div className="relative">
-        <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
+        <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none nigeria-map">
           {nigeriaMap.locations.map(loc => {
             const stateName = nameOverrides[loc.name] || loc.name;
             const stats = statsMap.get(stateName.toLowerCase().trim());
@@ -147,7 +195,9 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
             return (
               <path
                 key={loc.id}
+                id={loc.id}
                 d={loc.path}
+                data-name={stateName}
                 fill={color}
                 stroke={isSelected ? '#ffffff' : color === '#e2e8f0' ? '#cbd5e1' : '#ffffff'}
                 strokeWidth={isSelected ? '4' : '0.75'}
@@ -158,7 +208,14 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
                   const svg = e.target.closest('svg');
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
-                  setTooltip({ state: loc.name, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                  setTooltip({
+                    state: loc.name,
+                    fatalities: stats?.fatalities || 0,
+                    incidents: stats?.count || 0,
+                    abductions: stats?.abductions || 0,
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                  });
                 }}
                 onMouseMove={e => {
                   const svg = e.target.closest('svg');
@@ -170,22 +227,106 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
               />
             );
           })}
+
+          {/* Incident markers overlaid on map */}
+          {Object.entries(incidentsByState).map(([stateKey, list]) => {
+            const centroid = centroids[stateKey];
+            if (!centroid) return null;
+
+            return list.map((incident, idx) => {
+              const { dx, dy } = getOffset(idx, list.length);
+              const typeKey = getIncidentTypeKey(incident.incident_type);
+              const color = INCIDENT_TYPE_COLORS[typeKey] || INCIDENT_TYPE_COLORS.other;
+              const label = INCIDENT_TYPE_LABELS[typeKey] || 'Other';
+
+              return (
+                <circle
+                  key={incident.id || idx}
+                  cx={centroid.x + dx}
+                  cy={centroid.y + dy}
+                  r="4.5"
+                  fill={color}
+                  stroke="#ffffff"
+                  strokeWidth="1.25"
+                  className="transition-all duration-150 cursor-pointer hover:r-[6.5]"
+                  style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
+                  onMouseEnter={e => {
+                    const svg = e.target.closest('svg');
+                    if (!svg) return;
+                    const rect = svg.getBoundingClientRect();
+                    setTooltip({
+                      state: `${incident.state} (${incident.lga || 'Unknown LGA'})`,
+                      fatalities: incident.fatalities || 0,
+                      incidents: 1,
+                      abductions: incident.abductions || 0,
+                      typeLabel: label,
+                      date: formatDate(incident.date),
+                      summary: incident.summary,
+                      x: e.clientX - rect.left,
+                      y: e.clientY - rect.top
+                    });
+                  }}
+                  onMouseMove={e => {
+                    const svg = e.target.closest('svg');
+                    if (!svg) return;
+                    const rect = svg.getBoundingClientRect();
+                    setTooltip(t => t ? { ...t, x: e.clientX - rect.left, y: e.clientY - rect.top } : null);
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                />
+              );
+            });
+          })}
         </svg>
+
         {tooltip && (
-          <div className={`absolute pointer-events-none rounded-lg px-3 py-2 text-xs shadow-xl z-10 whitespace-nowrap ${isDarkMode ? 'bg-[#051c3a] border border-white/10 text-white' : 'bg-white border border-slate-200'}`} style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
-            <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{tooltip.state}</p>
-            <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
-            <p className="text-red-500">{tooltip.fatalities} killed</p>
-            <p className="text-amber-600">{tooltip.abductions} abducted</p>
+          <div className={`absolute pointer-events-none rounded-lg p-3 text-xs shadow-xl z-20 min-w-[200px] max-w-[280px] ${isDarkMode ? 'bg-[#051c3a] border border-white/10 text-white' : 'bg-white border border-slate-200 text-slate-800'}`} style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
+            <p className="font-bold border-b border-white/10 pb-1 mb-1.5">{tooltip.state}</p>
+            {tooltip.typeLabel ? (
+              <div className="space-y-1">
+                <p className="flex justify-between gap-4 font-semibold text-secondary">
+                  <span>{tooltip.typeLabel}</span>
+                  <span className="opacity-75">{tooltip.date}</span>
+                </p>
+                {(tooltip.fatalities > 0 || tooltip.abductions > 0) && (
+                  <p className="flex gap-2.5 font-bold">
+                    {tooltip.fatalities > 0 && <span className="text-red-500">{tooltip.fatalities} Killed</span>}
+                    {tooltip.abductions > 0 && <span className="text-amber-600">{tooltip.abductions} Abducted</span>}
+                  </p>
+                )}
+                {tooltip.summary && (
+                  <p className={`mt-1.5 border-t border-dashed ${isDarkMode ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'} pt-1.5 text-[10px] leading-relaxed line-clamp-3`}>
+                    {tooltip.summary}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
+                <p className="text-red-500">{tooltip.fatalities} killed</p>
+                <p className="text-amber-600">{tooltip.abductions} abducted</p>
+              </div>
+            )}
           </div>
         )}
       </div>
-        <div className={`flex items-center gap-3 justify-center mt-4 text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-        <span>Intensity:</span>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#dc2626'}} /><span>Med</span></div>
-        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#7f1d1d'}} /><span>High</span></div>
+
+      <div className="flex flex-col sm:flex-row items-center gap-4 justify-between mt-6 pt-4 border-t border-dashed border-slate-200/20 text-xs">
+        <div className={`flex items-center gap-3 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+          <span>Intensity:</span>
+          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
+          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
+          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#dc2626'}} /><span>Med</span></div>
+          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#7f1d1d'}} /><span>High</span></div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 justify-center sm:justify-end">
+          {Object.entries(INCIDENT_TYPE_LABELS).map(([key, val]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: INCIDENT_TYPE_COLORS[key] }} />
+              <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>{val}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -412,7 +553,7 @@ export default function ConflictTracker() {
         {stats && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-              <StateHeatmap byState={stats.byState} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
+              <StateHeatmap byState={stats.byState} incidents={filteredIncidents} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
             </div>
               <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
