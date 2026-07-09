@@ -67,6 +67,29 @@ function formatDate(dateStr) {
   }
 }
 
+function getSourceName(incident) {
+  if (incident.source_name) return incident.source_name;
+  if (!incident.source_url) return "";
+  try {
+    const domain = new URL(incident.source_url).hostname.replace("www.", "").split(".")[0];
+    const map = {
+      vanguardngr: "Vanguard",
+      premiumtimesng: "Premium Times",
+      punchng: "Punch",
+      dailytrust: "Daily Trust",
+      thecable: "TheCable",
+      channelstv: "Channels TV",
+      leadership: "Leadership",
+      sunnewsonline: "Sun News",
+      tribuneonlineng: "Tribune",
+      pmnewsnigeria: "PM News"
+    };
+    return map[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
+  } catch (e) {
+    return "";
+  }
+}
+
 function StatsCards({ overall, isDarkMode }) {
   const cards = [
     { label: 'Total Incidents', value: overall.totalIncidents.toLocaleString(), color: 'text-red-500', icon: AlertTriangle },
@@ -230,14 +253,14 @@ function IncidentTable({ incidents, isDarkMode }) {
                   <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{incident.summary}</p>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {incident.source_name ? (
+                  {getSourceName(incident) ? (
                     <a
                       href={incident.source_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors ${isDarkMode ? 'bg-white/10 text-slate-400 hover:text-secondary hover:bg-white/20' : 'bg-slate-100 text-slate-500 hover:text-secondary hover:bg-slate-200'}`}
                     >
-                      {incident.source_name}
+                      {getSourceName(incident)}
                     </a>
                   ) : (
                     <span className={`text-[10px] ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`}>&mdash;</span>
