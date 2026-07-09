@@ -2098,58 +2098,36 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       {/* Data sources & limitations explainer */}
       <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
         <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-          <div className="p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
-                <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Data Integration</h4>
+                <p className={`text-xs leading-relaxed mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  This dashboard integrates live conflict incidents scraped from major Nigerian press outlets with official socioeconomic indicators (NBS, World Bank, UNICEF, WHO), displacement metrics (IOM DTM, NEMA), and food security surveys (Cadre Harmonisé).
+                </p>
+                <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Analytical scores and threat gauges combine active incident data with historical regional vulnerability profiles for policy planning.
+                </p>
               </div>
               <div>
-                <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Dashboard</h3>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
-                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Conflict Incidents:</strong> Beyond# Live Tracker scraped from 6 Nigerian news outlets; parsed via Groq AI.</span>
+                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Limitations & Scope</h4>
+                <ul className={`space-y-2 text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>Media Under-reporting:</strong> Incident metrics rely on documented press articles, which can result in reporting gaps in remote, offline areas.</span>
                   </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
-                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Socioeconomic:</strong> NBS, World Bank, UNICEF, WHO, and administrative data.</span>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>Data Vintages:</strong> Conflict incident feeds update every 5 hours, whereas development and displacement indicators update on annual, quarterly, or seasonal cycles.</span>
                   </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
-                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Displacement:</strong> IOM DTM, NEMA, and state emergency management reports.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/40' : 'bg-secondary/40'}`}></span>
-                    <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Food Security:</strong> Cadre Harmonisé and FAO early warning systems.</span>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
-                    <span>Media-dependent conflict data; may undercount remote incidents.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
-                    <span>5-hour update delay; indicators update annually or quarterly.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
-                    <span>AI-extracted casualty figures may contain inaccuracies.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
-                    <span>State aggregates combine multiple data vintages.</span>
+                  <li className="flex items-start gap-2">
+                    <span className="text-secondary font-bold select-none">&bull;</span>
+                    <span><strong>AI Extraction & Deduplication:</strong> Information reflects reported news. AI parses numbers from text and automatically merges duplicate cross-reports.</span>
                   </li>
                 </ul>
               </div>
             </div>
-            <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+            <div className={`mt-5 pt-3.5 border-t text-[10px] text-center ${isDarkMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
               Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
             </div>
           </div>
