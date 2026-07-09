@@ -754,6 +754,25 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
         if any(marker in text_lower for marker in violence_markers):
             log.debug(f"  [Fix] Reclassified 'robbery' → 'armed attack'")
             incident["incident_type"] = "armed attack"
+            
+    # ── Fix 5: Reject rescues/releases ───────────────────────
+    summary_lower = (incident.get("summary") or "").lower()
+    rescue_words = ["rescue", "rescued", "release", "released", "freed", "escaped", "regained freedom", "reunited", "escapes"]
+    
+    is_rescue_or_release = any(rw in summary_lower for rw in rescue_words)
+    if not is_rescue_or_release:
+        if "rescue" in text_lower and "abduct" in text_lower and ("troops" in text_lower or "police" in text_lower):
+            is_rescue_or_release = True
+
+    if is_rescue_or_release:
+        if fatalities == 0:
+            log.info(f"  [Validation] Rejecting incident because it represents a rescue/release: {summary_lower[:100]}")
+            return None
+        else:
+            if abductions > 0:
+                log.debug(f"  [Fix] Resetting abductions to 0 for rescue incident with fatalities")
+                incident["abductions"] = 0
+                abductions = 0
     
     # ── Final validation ───────────────────────────────────────
     fatalities = _safe_int(incident.get("fatalities"))
@@ -779,10 +798,15 @@ Extract ONLY conflict-related casualty incidents in Nigeria.
 
 A qualifying incident is:
 - Terrorist / bandit attacks
-- Kidnappings / abductions
+- Kidnappings / abductions (active/fresh abductions only)
 - Communal / farmer-herder clashes
 - Armed robberies with deaths
 - Bombings / explosions
+
+CRITICAL RULE ON RESCUES/RELEASES & PAST EVENTS:
+- Only active/fresh abduction/kidnapping events are to be logged.
+- DO NOT log hostages being rescued, freed, or released. Rescues/releases/escapes are NOT qualifying abductions.
+- Ignore all references to past kidnappings, past conflicts, and past incidents of deaths. Extract ONLY the fresh/active conflict events described in the text.
 
 INCIDENTS MUST HAVE AT LEAST ONE CASUALTY.
 
