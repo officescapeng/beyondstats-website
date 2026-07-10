@@ -2096,7 +2096,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       </div>
 
       {/* Data sources & limitations explainer */}
-      <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
+      <div className="max-w-7xl mx-auto px-6 pb-10 mt-8 no-print">
         <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
           <div className="p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
