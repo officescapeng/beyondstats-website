@@ -298,8 +298,81 @@ export default function ConflictTracker() {
 
   if (loading) {
     return (
-      <div className={`min-h-screen p-8 flex items-center justify-center transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20]' : 'bg-white'}`}>
-        <div className="text-slate-400 text-lg">Loading conflict data...</div>
+      <div className={`min-h-screen w-full transition-colors duration-300 ${isDarkMode ? 'bg-[#030e20]' : 'bg-white'}`}>
+        {/* Banner Skeleton */}
+        <div className="bg-[#052353] py-16 px-6 border-b border-white/5 relative">
+          <div className="max-w-7xl mx-auto text-center flex flex-col items-center">
+            <div className="h-4 w-32 bg-secondary/30 rounded-full animate-pulse mb-3"></div>
+            <div className="h-9 w-64 bg-white/20 rounded-lg animate-pulse mb-3"></div>
+            <div className="h-4 w-96 bg-white/10 rounded-full animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="max-w-7xl mx-auto px-6 py-12 flex flex-col gap-8">
+          {/* 4 Stats Cards Skeleton */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {[1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className={`p-6 rounded-2xl border flex flex-col gap-3 animate-pulse ${
+                  isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-100 shadow-sm'
+                }`}
+              >
+                <div className="h-3 w-20 bg-slate-400/20 rounded"></div>
+                <div className="h-8 w-24 bg-slate-400/30 rounded-lg"></div>
+                <div className="h-3 w-32 bg-slate-400/10 rounded"></div>
+              </div>
+            ))}
+          </div>
+
+          {/* Main Map & Table Layout Skeleton */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Map Column */}
+            <div className="lg:col-span-4 flex flex-col gap-6">
+              <div
+                className={`p-6 rounded-2xl border h-[420px] flex flex-col justify-between animate-pulse ${
+                  isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-100 shadow-sm'
+                }`}
+              >
+                <div className="h-4 w-40 bg-slate-400/20 rounded"></div>
+                <div className="flex-1 flex items-center justify-center my-6">
+                  <div className="w-48 h-48 rounded-full bg-slate-400/10 border-4 border-dashed border-slate-400/20 animate-pulse"></div>
+                </div>
+                <div className="h-10 w-full bg-slate-400/20 rounded-lg"></div>
+              </div>
+            </div>
+
+            {/* Table Column */}
+            <div className="lg:col-span-8">
+              <div
+                className={`rounded-2xl border overflow-hidden p-6 flex flex-col gap-5 animate-pulse ${
+                  isDarkMode ? 'bg-[#051630] border-white/5' : 'bg-white border-slate-100 shadow-sm'
+                }`}
+              >
+                <div className="flex justify-between items-center border-b pb-4 border-slate-400/10">
+                  <div className="h-5 w-24 bg-slate-400/20 rounded"></div>
+                  <div className="flex gap-3">
+                    <div className="h-8 w-24 bg-slate-400/25 rounded-lg"></div>
+                    <div className="h-8 w-24 bg-slate-400/25 rounded-lg"></div>
+                  </div>
+                </div>
+                {/* Table Rows */}
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((r) => (
+                    <div key={r} className="flex justify-between items-center py-2 border-b border-slate-400/5">
+                      <div className="flex flex-col gap-2 flex-1">
+                        <div className="h-4 w-3/4 bg-slate-400/20 rounded"></div>
+                        <div className="h-3 w-1/2 bg-slate-400/10 rounded"></div>
+                      </div>
+                      <div className="h-6 w-16 bg-slate-400/20 rounded"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
