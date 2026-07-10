@@ -1075,7 +1075,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         @media print {
           @page {
             size: A4 portrait;
-            margin: 15mm 20mm !important;
+            margin: 12mm 15mm !important;
           }
           /* Hide the standard interactive dashboard viewport */
           nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
@@ -1088,8 +1088,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             display: block !important;
             min-height: auto !important;
             height: auto !important;
-            font-size: 10.5pt !important;
-            line-height: 1.4 !important;
+            font-size: 10pt !important;
+            line-height: 1.35 !important;
             width: 100% !important;
             margin: 0 !important;
             padding: 0 !important;
@@ -1111,25 +1111,25 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           .page-break {
             page-break-before: always !important;
             break-before: page !important;
-            padding-top: 15mm !important;
+            padding-top: 10mm !important;
           }
-          /* Spacious element overrides to make the brief presentable on A4 */
-          .print-only-brief h1 { font-size: 24pt !important; margin-top: 8px !important; margin-bottom: 8px !important; }
-          .print-only-brief h2 { font-size: 16pt !important; }
-          .print-only-brief h3 { font-size: 13pt !important; margin-top: 12px !important; margin-bottom: 8px !important; }
-          .print-only-brief h4 { font-size: 11pt !important; }
+          /* Balanced spacing elements to strictly limit the brief to 2 pages */
+          .print-only-brief h1 { font-size: 22pt !important; margin-top: 6px !important; margin-bottom: 6px !important; }
+          .print-only-brief h2 { font-size: 15pt !important; }
+          .print-only-brief h3 { font-size: 12pt !important; margin-top: 8px !important; margin-bottom: 6px !important; }
+          .print-only-brief h4 { font-size: 10pt !important; }
           .print-only-brief p, .print-only-brief span, .print-only-brief li, .print-only-brief td, .print-only-brief th {
-            font-size: 9.5pt !important;
+            font-size: 9pt !important;
           }
-          .print-only-brief .gap-6 { gap: 1.5rem !important; }
-          .print-only-brief .p-6 { padding: 1.5rem !important; }
-          .print-only-brief .p-8 { padding: 1.5rem !important; }
-          .print-only-brief .mt-6 { margin-top: 1.5rem !important; }
-          .print-only-brief .pt-6 { padding-top: 1.5rem !important; }
-          .print-only-brief .pb-4 { padding-bottom: 1rem !important; }
-          .print-only-brief .rounded-2xl { border-radius: 1rem !important; }
-          .print-only-brief .p-4 { padding: 1.25rem !important; }
-          .print-only-brief .py-2 { padding-top: 0.6rem !important; padding-bottom: 0.6rem !important; }
+          .print-only-brief .gap-6 { gap: 1.15rem !important; }
+          .print-only-brief .p-6 { padding: 1.15rem !important; }
+          .print-only-brief .p-8 { padding: 1rem !important; }
+          .print-only-brief .mt-6 { margin-top: 1.15rem !important; }
+          .print-only-brief .pt-6 { padding-top: 1.15rem !important; }
+          .print-only-brief .pb-4 { padding-bottom: 0.75rem !important; }
+          .print-only-brief .rounded-2xl { border-radius: 0.75rem !important; }
+          .print-only-brief .p-4 { padding: 1rem !important; }
+          .print-only-brief .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
           .print-only-brief .py-2.5 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
         }
       `}</style>
