@@ -1442,39 +1442,14 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 );
               })}
             </div>
-            {/* Export Dropdown */}
-            <div className="relative" ref={downloadMenuRef}>
-              <button 
-                onClick={() => setDownloadDropdownOpen(!downloadDropdownOpen)}
-                className="bg-[#39B54A] hover:bg-[#2e993d] text-white text-xs font-bold px-4 py-2.5 rounded-full flex items-center gap-2 transition-all duration-200 shadow-md cursor-pointer outline-none w-full justify-center"
-              >
-                <Download className="w-3.5 h-3.5" />
-                DOWNLOAD REPORT
-              </button>
-
-              {downloadDropdownOpen && (
-                <div className={`absolute right-0 mt-2 w-48 rounded-xl shadow-lg border z-50 ${isDarkMode ? 'bg-[#051c3a] border-white/10 text-white' : 'bg-white border-slate-200 text-slate-800'} py-2`}>
-                  <button 
-                    onClick={() => { handleDownloadCSV(); setDownloadDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
-                  >
-                    Export raw dataset (CSV)
-                  </button>
-                  <button 
-                    onClick={() => { handleDownloadExcel(); setDownloadDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
-                  >
-                    Export for Excel (XLS)
-                  </button>
-                  <button 
-                    onClick={() => { handleDownloadPDF(); setDownloadDropdownOpen(false); }}
-                    className={`w-full text-left px-4 py-2 text-xs font-semibold transition-colors ${isDarkMode ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}
-                  >
-                    Print Summary (PDF)
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Direct Download Brief Button */}
+            <button 
+              onClick={handleDownloadPDF}
+              className="bg-[#39B54A] hover:bg-[#2e993d] text-white text-xs font-bold px-5 py-2.5 rounded-full flex items-center gap-2 transition-all duration-200 shadow-md cursor-pointer outline-none w-full justify-center"
+            >
+              <Download className="w-3.5 h-3.5" />
+              DOWNLOAD BRIEF
+            </button>
           </div>
         </div>
         <div className="flex flex-col gap-6">
