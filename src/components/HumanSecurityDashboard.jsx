@@ -1073,28 +1073,59 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           outline: none !important;
         }
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 12mm 15mm !important;
+          }
           /* Hide the standard interactive dashboard viewport */
           nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
             display: none !important;
           }
-          body, html, .w-full, .min-h-screen {
+          body, html, #root {
             background: white !important;
             color: black !important;
+            font-size: 10pt !important;
+            line-height: 1.25 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
           }
-          /* Show custom A4 print brief */
+          /* Show custom A4 print brief and scale to A4 width */
           .print-only-brief {
             display: block !important;
             width: 100% !important;
+            max-width: 100% !important;
             box-sizing: border-box !important;
             padding: 0 !important;
             margin: 0 !important;
             color: black !important;
             background: white !important;
           }
+          .print-only-brief * {
+            max-width: 100% !important;
+          }
           .page-break {
             page-break-before: always !important;
             break-before: page !important;
+            padding-top: 10mm !important;
           }
+          /* Print-specific element overrides to fit A4 height boundaries */
+          .print-only-brief h1 { font-size: 20pt !important; margin-top: 4px !important; margin-bottom: 4px !important; }
+          .print-only-brief h2 { font-size: 14pt !important; }
+          .print-only-brief h3 { font-size: 11pt !important; }
+          .print-only-brief h4 { font-size: 9pt !important; }
+          .print-only-brief p, .print-only-brief span, .print-only-brief li, .print-only-brief td, .print-only-brief th { 
+            font-size: 8.5pt !important; 
+          }
+          .print-only-brief .gap-6 { gap: 0.75rem !important; }
+          .print-only-brief .p-6 { padding: 0.75rem !important; }
+          .print-only-brief .p-8 { padding: 0 !important; }
+          .print-only-brief .mt-6 { margin-top: 0.75rem !important; }
+          .print-only-brief .pt-6 { padding-top: 0.75rem !important; }
+          .print-only-brief .pb-4 { padding-bottom: 0.5rem !important; }
+          .print-only-brief .rounded-2xl { border-radius: 0.75rem !important; }
+          .print-only-brief .p-4 { padding: 0.75rem !important; }
+          .print-only-brief .py-2.5 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
         }
       `}</style>
 
