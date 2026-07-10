@@ -1075,7 +1075,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         @media print {
           @page {
             size: A4 portrait;
-            margin: 12mm 15mm !important;
+            margin: 10mm 15mm !important;
           }
           /* Hide the standard interactive dashboard viewport */
           nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
@@ -1088,7 +1088,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             display: block !important;
             min-height: auto !important;
             height: auto !important;
-            font-size: 10pt !important;
+            font-size: 9.5pt !important;
             line-height: 1.35 !important;
             width: 100% !important;
             margin: 0 !important;
@@ -1111,26 +1111,31 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           .page-break {
             page-break-before: always !important;
             break-before: page !important;
-            padding-top: 10mm !important;
+            padding-top: 8mm !important;
           }
           /* Balanced spacing elements to strictly limit the brief to 2 pages */
           .print-only-brief h1 { font-size: 22pt !important; margin-top: 6px !important; margin-bottom: 6px !important; }
           .print-only-brief h2 { font-size: 15pt !important; }
-          .print-only-brief h3 { font-size: 12pt !important; margin-top: 8px !important; margin-bottom: 6px !important; }
-          .print-only-brief h4 { font-size: 10pt !important; }
+          .print-only-brief h3 { font-size: 11.5pt !important; margin-top: 8px !important; margin-bottom: 6px !important; }
+          .print-only-brief h4 { font-size: 9.5pt !important; }
           .print-only-brief p, .print-only-brief span, .print-only-brief li, .print-only-brief td, .print-only-brief th {
             font-size: 9pt !important;
           }
-          .print-only-brief .gap-6 { gap: 1.15rem !important; }
-          .print-only-brief .p-6 { padding: 1.15rem !important; }
+          .print-only-brief .gap-6 { gap: 1rem !important; }
+          .print-only-brief .p-6 { padding: 1rem !important; }
           .print-only-brief .p-8 { padding: 1rem !important; }
-          .print-only-brief .mt-6 { margin-top: 1.15rem !important; }
-          .print-only-brief .pt-6 { padding-top: 1.15rem !important; }
+          .print-only-brief .mt-6 { margin-top: 0.85rem !important; }
+          .print-only-brief .pt-6 { padding-top: 0.85rem !important; }
           .print-only-brief .pb-4 { padding-bottom: 0.75rem !important; }
+          .print-only-brief .mb-6 { margin-bottom: 1rem !important; }
           .print-only-brief .rounded-2xl { border-radius: 0.75rem !important; }
-          .print-only-brief .p-4 { padding: 1rem !important; }
-          .print-only-brief .py-2 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+          .print-only-brief .p-4 { padding: 0.85rem !important; }
+          .print-only-brief .py-2 { padding-top: 0.45rem !important; padding-bottom: 0.45rem !important; }
           .print-only-brief .py-2.5 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+          
+          /* Compact references layout to guarantee page 3 is never created */
+          .print-only-brief .mt-6 h4 { font-size: 9.5pt !important; margin-bottom: 4px !important; }
+          .print-only-brief .mt-6 p { font-size: 8pt !important; line-height: 1.25 !important; }
         }
       `}</style>
 
