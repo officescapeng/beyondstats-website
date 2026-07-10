@@ -92,7 +92,6 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   const links = [
     { name: 'About', id: 'about' },
     { name: 'Programs', id: 'programs', dropdown: true },
-    { name: 'Conflict Tracker', id: 'tracker' },
     { name: 'Research', id: 'research', disabled: true, soon: true },
     { name: 'Impact', id: 'impact', dropdown: true, disabled: true, soon: true },
     { name: 'Contact', id: 'contact' }
@@ -426,7 +425,6 @@ function Footer({ setCurrentPage }) {
             {[
               { name: 'About', id: 'about' },
               { name: 'What We Do', id: 'programs' },
-              { name: 'Conflict Tracker', id: 'tracker' },
               { name: 'Our Impact Map', id: 'impact-map', disabled: true },
               { name: 'Human Security Dashboard', id: 'dashboard' },
               { name: 'Research & Deliverables', id: 'research', disabled: true },
