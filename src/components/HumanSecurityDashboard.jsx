@@ -1081,9 +1081,13 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           nav, footer, button, .no-print, select, .theme-toggle, .interactive-dashboard-layout {
             display: none !important;
           }
-          body, html, #root {
+          body, html, #root, .min-h-screen, .transition-colors {
             background: white !important;
+            background-color: white !important;
             color: black !important;
+            display: block !important;
+            min-height: auto !important;
+            height: auto !important;
             font-size: 10pt !important;
             line-height: 1.25 !important;
             width: 100% !important;
