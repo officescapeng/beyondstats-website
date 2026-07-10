@@ -2177,7 +2177,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         <div className="flex flex-col gap-6 w-full">
           
           {/* Header row */}
-          <div className="flex justify-between items-center border-b border-black pb-4">
+          <div className="flex justify-between items-center border-b border-black pb-4 mb-6">
             <div>
               <h2 className="font-poppins font-black text-2xl tracking-tighter text-[#052353]">
                 BEYOND STATISTICS INITIATIVE
@@ -2353,7 +2353,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
         {/* PAGE 2 */}
         <div className="page-break flex flex-col gap-6 w-full pt-10">
           
-          <div className="flex justify-between items-center border-b border-black pb-4">
+          <div className="flex justify-between items-center border-b border-black pb-4 mb-6">
             <h2 className="font-poppins font-black text-lg tracking-tighter text-[#052353]">
               BEYOND STATISTICS INITIATIVE
             </h2>
