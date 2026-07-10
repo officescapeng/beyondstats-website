@@ -2352,28 +2352,6 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
               </table>
             </div>
 
-          </div>
-        </div>
-
-        {/* PAGE 2 */}
-        <div className="page-break flex flex-col gap-6 w-full pt-10">
-          
-          <div className="flex justify-between items-center border-b border-black pb-4 mb-6">
-            <h2 className="font-poppins font-black text-lg tracking-tighter text-[#052353]">
-              BEYOND STATISTICS INITIATIVE
-            </h2>
-            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{activeState.name} State Risk Profile Continued</p>
-          </div>
-
-          <div className="border-b border-slate-200 pb-2">
-            <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-[#052353]">
-              I. Core Security &amp; Vulnerability Pillars (Continued)
-            </h3>
-          </div>
-
-          {/* 3 Pillars layout (Food Security, Displacement, Peace & Security) */}
-          <div className="grid grid-cols-1 gap-6 w-full">
-
             {/* Pillar 4: Food Security */}
             <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -2411,6 +2389,29 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 </tbody>
               </table>
             </div>
+
+
+          </div>
+        </div>
+
+        {/* PAGE 2 */}
+        <div className="page-break flex flex-col gap-6 w-full pt-10">
+          
+          <div className="flex justify-between items-center border-b border-black pb-4 mb-6">
+            <h2 className="font-poppins font-black text-lg tracking-tighter text-[#052353]">
+              BEYOND STATISTICS INITIATIVE
+            </h2>
+            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">{activeState.name} State Risk Profile Continued</p>
+          </div>
+
+          <div className="border-b border-slate-200 pb-2">
+            <h3 className="font-poppins font-bold text-sm uppercase tracking-wider text-[#052353]">
+              I. Core Security &amp; Vulnerability Pillars (Continued)
+            </h3>
+          </div>
+
+          {/* 3 Pillars layout (Food Security, Displacement, Peace & Security) */}
+          <div className="grid grid-cols-1 gap-6 w-full">
 
             {/* Pillar 5: Displacement */}
             <div className="border border-slate-200 rounded-xl p-4 flex flex-col gap-3">
