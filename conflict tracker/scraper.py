@@ -100,10 +100,6 @@ if os.path.exists(feeds_json_path):
             "https://dailytrust.com/feed/",
             "https://www.thecable.ng/feed",
             "https://www.channelstv.com/feed/",
-            "https://leadership.ng/feed/",
-            "https://sunnewsonline.com/feed/",
-            "https://tribuneonlineng.com/feed/",
-            "https://pmnewsnigeria.com/feed/",
         ]
 else:
     FEEDS = [
@@ -113,10 +109,6 @@ else:
         "https://dailytrust.com/feed/",
         "https://www.thecable.ng/feed",
         "https://www.channelstv.com/feed/",
-        "https://leadership.ng/feed/",
-        "https://sunnewsonline.com/feed/",
-        "https://tribuneonlineng.com/feed/",
-        "https://pmnewsnigeria.com/feed/",
     ]
 
 
@@ -198,47 +190,18 @@ def resolve_state(raw: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# NIGERIA RELEVANCE FILTER
+# NIGERIA RELEVANCE FILTER (LESS STRICT)
 # ─────────────────────────────────────────────────────────────
-NIGERIAN_STATES = {
-    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
-    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo", "Jigawa",
-    "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger",
-    "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe",
-    "Zamfara", "FCT",
-}
-NIGERIAN_STATES_LOWER = {s.lower() for s in NIGERIAN_STATES} | {
-    "abuja", "federal capital", "cross river", "akwa ibom"
-}
-
-_NIGERIA_CONTEXT_PATTERNS = [
+_NIGERIA_PATTERNS = [
     re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
-        "nigeria", "nigerian", "nigerians"
-    ] + list(NIGERIAN_STATES_LOWER)
-]
-
-_SECURITY_CONTEXT_PATTERNS = [
-    re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
-        "bandit", "bandits", "banditry",
-        "kidnap", "kidnaps", "kidnapped", "kidnapper", "kidnappers", "kidnapping", "kidnappings",
-        "abduct", "abducts", "abducted", "abduction", "abductions",
-        "kill", "kills", "killed", "killing", "killings",
-        "clash", "clashes", "clashed", "clashing",
-        "attack", "attacks", "attacked", "attacker", "attackers", "attacking",
-        "shoot", "shoots", "shot", "shooting", "shootings", "gunfire", "gunshot", "gunshots",
-        "gunman", "gunmen", "armed", "weapons", "rifles",
-        "dead", "death", "deaths", "fatalities", "casualty", "casualties",
-        "herdsman", "herdsmen", "farmer", "farmers",
-        "boko haram", "iswap", "ipob", "insurgent", "insurgents", "insurgency",
-        "terror", "terrorist", "terrorists", "terrorism",
-        "police", "policemen", "army", "soldier", "soldiers", "military", "troops", "dss", "nscdc", "vigilante", "vigilantes",
-        "ambush", "ambushed", "bomb", "bombing", "blast", "explosion",
-        "hostage", "hostages", "ransom"
+        "nigeria", "nigerian", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
+        "army", "police", "dss", "bandits", "banditry", "boko haram", "herdsmen",
+        "kidnap", "kidnapped", "kidnapping", "abducted", "abduction", "hostage", "ransom",
     ]
 ]
 
 MIN_TEXT_LENGTH  = 150
-MAX_ARTICLE_CHARS = 6000  # Increased to capture detailed reports buried deep in long articles
+MAX_ARTICLE_CHARS = 1500
 
 # ─────────────────────────────────────────────────────────────
 # EVENT LOGGING START DATE
@@ -246,24 +209,19 @@ MAX_ARTICLE_CHARS = 6000  # Increased to capture detailed reports buried deep in
 EVENT_START_DATE = datetime(2026, 7, 1, tzinfo=timezone.utc)
 
 
+def nigeria_score(text: str) -> int:
+    return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
+
+
 def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    Check if the article contains both a Nigerian context (state/national name)
-    and a security context (violent incident, abduction, clash, etc.)
+    Require 2+ Nigeria markers for relevance (less strict).
+    Catches more legitimate Nigerian security articles.
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
-    
-    combined = f"{title} {text}".lower()
-    
-    # Check for Nigerian context
-    has_nigeria = any(p.search(combined) for p in _NIGERIA_CONTEXT_PATTERNS)
-    if not has_nigeria:
-        return False
-        
-    # Check for security context
-    has_security = any(p.search(combined) for p in _SECURITY_CONTEXT_PATTERNS)
-    return has_security
+    score = nigeria_score(f"{title} {text}")
+    return score >= 2
 
 
 # ─────────────────────────────────────────────────────────────
@@ -754,25 +712,6 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
         if any(marker in text_lower for marker in violence_markers):
             log.debug(f"  [Fix] Reclassified 'robbery' → 'armed attack'")
             incident["incident_type"] = "armed attack"
-            
-    # ── Fix 5: Reject rescues/releases ───────────────────────
-    summary_lower = (incident.get("summary") or "").lower()
-    rescue_words = ["rescue", "rescued", "release", "released", "freed", "escaped", "regained freedom", "reunited", "escapes"]
-    
-    is_rescue_or_release = any(rw in summary_lower for rw in rescue_words)
-    if not is_rescue_or_release:
-        if "rescue" in text_lower and "abduct" in text_lower and ("troops" in text_lower or "police" in text_lower):
-            is_rescue_or_release = True
-
-    if is_rescue_or_release:
-        if fatalities == 0:
-            log.info(f"  [Validation] Rejecting incident because it represents a rescue/release: {summary_lower[:100]}")
-            return None
-        else:
-            if abductions > 0:
-                log.debug(f"  [Fix] Resetting abductions to 0 for rescue incident with fatalities")
-                incident["abductions"] = 0
-                abductions = 0
     
     # ── Final validation ───────────────────────────────────────
     fatalities = _safe_int(incident.get("fatalities"))
@@ -798,15 +737,10 @@ Extract ONLY conflict-related casualty incidents in Nigeria.
 
 A qualifying incident is:
 - Terrorist / bandit attacks
-- Kidnappings / abductions (active/fresh abductions only)
+- Kidnappings / abductions
 - Communal / farmer-herder clashes
 - Armed robberies with deaths
 - Bombings / explosions
-
-CRITICAL RULE ON RESCUES/RELEASES & PAST EVENTS:
-- Only active/fresh abduction/kidnapping events are to be logged.
-- DO NOT log hostages being rescued, freed, or released. Rescues/releases/escapes are NOT qualifying abductions.
-- Ignore all references to past kidnappings, past conflicts, and past incidents of deaths. Extract ONLY the fresh/active conflict events described in the text.
 
 INCIDENTS MUST HAVE AT LEAST ONE CASUALTY.
 
@@ -905,10 +839,6 @@ _groq_lock = _threading.Lock()
 _GROQ_MIN_INTERVAL = 5.0
 _groq_last_call: list[float] = [0.0]
 
-_gemini_lock = _threading.Lock()
-_GEMINI_MIN_INTERVAL = 4.5  # Spaced to ensure max 13 RPM (under Gemini's 15 RPM limit)
-_gemini_last_call: list[float] = [0.0]
-
 _RETRY_AFTER_RE = re.compile(r"try again in\s+([\d.]+)s", re.IGNORECASE)
 
 
@@ -919,52 +849,9 @@ def _parse_retry_after(err_str: str) -> float | None:
     return None
 
 
-def extract_incidents_gemini(prompt: str, api_key: str) -> list[dict] | None:
-    """Fallback extraction using Gemini's API with strict rate-limiting/throttling."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-    headers = {"Content-Type": "application/json"}
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "responseMimeType": "application/json"
-        }
-    }
-    
-    with _gemini_lock:
-        elapsed = time.monotonic() - _gemini_last_call[0]
-        gap     = _GEMINI_MIN_INTERVAL - elapsed
-        if gap > 0:
-            time.sleep(gap)
-            
-        try:
-            log.info("  [LLM] Attempting failover to Gemini API (throttled)...")
-            r = requests.post(url, headers=headers, json=payload, timeout=20)
-            _gemini_last_call[0] = time.monotonic()
-            r.raise_for_status()
-            data = r.json()
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            
-            # Parse JSON from response markdown codeblocks if necessary
-            text_clean = text.strip()
-            if text_clean.startswith("```"):
-                lines = text_clean.splitlines()
-                if lines[0].startswith("```json"):
-                    text_clean = "\n".join(lines[1:-1])
-                elif lines[0].startswith("```"):
-                    text_clean = "\n".join(lines[1:-1])
-            
-            res_data = json.loads(text_clean)
-            return res_data.get("incidents", [])
-        except Exception as exc:
-            _gemini_last_call[0] = time.monotonic()
-            log.warning(f"  [LLM] Gemini failover error: {exc}")
-            return None
-
-
-def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict] | None:
+def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict]:
     prompt  = _PROMPT_TEMPLATE.format(article_date=article_date, title=title, text=text)
     backoff = 2.0
-    gemini_key = os.environ.get("GEMINI_API_KEY")
 
     for attempt in range(retries):
         success = False
@@ -1020,21 +907,6 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
         if exc_to_raise:
             err_str       = str(exc_to_raise)
             is_rate_limit = "rate" in err_str.lower() or "429" in err_str
-            
-            # If we have a Gemini key, and we hit a rate limit or authorization error, try Gemini immediately!
-            if gemini_key and (is_rate_limit or "401" in err_str or "API Key" in err_str):
-                log.warning(f"  [LLM] Groq error encountered: {err_str[:60]}. Initiating Gemini failover.")
-                gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
-                if gemini_incidents is not None:
-                    # Validate and fix incidents
-                    validated_incidents = []
-                    for idx, incident in enumerate(gemini_incidents):
-                        fixed = validate_and_fix_incident(incident, text, article_date)
-                        if fixed:
-                            validated_incidents.append(fixed)
-                    log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via Gemini fallback")
-                    return validated_incidents
-            
             if is_rate_limit:
                 retry_after = _parse_retry_after(err_str) or (backoff * 4)
                 log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
@@ -1045,19 +917,6 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                 log.warning(f"  [LLM] Error (attempt {attempt + 1}): {err_str[:100]} (released lock)")
                 time.sleep(wait)
             backoff *= 2
-
-    # Final fallback if all Groq retries failed
-    if gemini_key:
-        log.warning("  [LLM] Groq extraction exhausted all retries. Performing final Gemini failover attempt.")
-        gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
-        if gemini_incidents is not None:
-            validated_incidents = []
-            for idx, incident in enumerate(gemini_incidents):
-                fixed = validate_and_fix_incident(incident, text, article_date)
-                if fixed:
-                    validated_incidents.append(fixed)
-            log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via final Gemini fallback")
-            return validated_incidents
 
     log.error(f"  [LLM] [SKIP] Extraction failed after {retries} attempts")
     return None
@@ -1177,131 +1036,16 @@ def semantic_fp_exists(sem_fp: str) -> bool:
         log.error(f"Failed to check semantic_fp in DB: {exc}")
         return False
 
-def get_existing_incident(sem_fp: str) -> dict | None:
-    """Fetch an existing incident by its semantic fingerprint."""
-    try:
-        res = supabase.table("incidents").select("*").eq("semantic_fp", sem_fp).limit(1).execute()
-        return res.data[0] if res.data else None
-    except Exception as exc:
-        log.error(f"Failed to fetch incident by semantic_fp: {exc}")
-        return None
-
-def find_duplicate_incident_db(payload: dict) -> dict | None:
-    """
-    Search Supabase dynamically for a matching recent incident to merge with,
-    handling date variance (within DEDUP_WINDOW_DAYS) and compatible LGAs.
-    """
-    try:
-        date_str = payload.get("date")
-        d = _parse_date(date_str)
-        if not d:
-            return None
-        
-        # Calculate date range window
-        start_date = (d - timedelta(days=DEDUP_WINDOW_DAYS)).strftime("%Y-%m-%d")
-        end_date = (d + timedelta(days=DEDUP_WINDOW_DAYS)).strftime("%Y-%m-%d")
-        
-        state = payload.get("state")
-        canon_type = canonical_incident_type(payload.get("incident_type"))
-        payload_lga = (payload.get("lga") or "").strip().lower() or None
-        
-        # Query database for recent incidents in the same state
-        res = supabase.table("incidents").select("*") \
-            .eq("state", state) \
-            .gte("date", start_date) \
-            .lte("date", end_date) \
-            .execute()
-            
-        for row in res.data or []:
-            # Match incident type
-            row_type = canonical_incident_type(row.get("incident_type"))
-            if row_type != canon_type:
-                continue
-                
-            # Match LGA (must be compatible)
-            row_lga = (row.get("lga") or "").strip().lower() or None
-            if row_lga and payload_lga and row_lga != payload_lga:
-                continue
-                
-            # Match casualties within tolerance bounds
-            row_fat = _safe_int(row.get("fatalities", 0))
-            row_abd = _safe_int(row.get("abductions", 0))
-            
-            if abs(row_fat - _safe_int(payload.get("fatalities", 0))) > FATALITY_TOLERANCE:
-                continue
-            if abs(row_abd - _safe_int(payload.get("abductions", 0))) > ABDUCTION_TOLERANCE:
-                continue
-                
-            # Found duplicate!
-            return row
-            
-        return None
-    except Exception as exc:
-        log.error(f"Failed searching duplicate incident in DB: {exc}")
-        return None
-
 def safe_store(payload: dict):
     if DRY_RUN:
         log.info(f"[DRY RUN] Would insert: {payload['state']} | {payload['date']} | "
                  f"{payload['incident_type']} | {payload['fatalities']} killed / "
                  f"{payload['abductions']} abducted")
         return
-
-    # Check for duplicate (exact semantic_fp or fuzzy match) in DB
-    existing = find_duplicate_incident_db(payload)
-
-    if existing:
-        # Crucial: use the existing row's semantic_fp so we update it!
-        payload["semantic_fp"] = existing.get("semantic_fp")
-        
-        # Merge stats: take maximum values
-        merged_fatalities = max(_safe_int(existing.get("fatalities", 0)), _safe_int(payload.get("fatalities", 0)))
-        merged_abductions = max(_safe_int(existing.get("abductions", 0)), _safe_int(payload.get("abductions", 0)))
-        merged_injuries   = max(_safe_int(existing.get("injuries", 0)), _safe_int(payload.get("injuries", 0)))
-        
-        # Merge source urls (comma separated unique URLs)
-        existing_urls = [u.strip() for u in (existing.get("source_url") or "").split(",") if u.strip()]
-        new_url = payload.get("source_url", "").strip()
-        if new_url and new_url not in existing_urls:
-            existing_urls.append(new_url)
-        merged_urls = ", ".join(existing_urls)
-        
-        # Merge summary
-        existing_summary = (existing.get("summary") or "").strip()
-        new_summary = (payload.get("summary") or "").strip()
-        if new_summary and new_summary not in existing_summary:
-            merged_summary = f"{existing_summary} | [Additional Source] {new_summary}"
-        else:
-            merged_summary = existing_summary
-            
-        # Merge LGA/community details (fill in if existing didn't have it)
-        existing_lga = (existing.get("lga") or "").strip()
-        new_lga = (payload.get("lga") or "").strip()
-        merged_lga = existing_lga if existing_lga else new_lga
-        
-        existing_comm = (existing.get("community") or "").strip()
-        new_comm = (payload.get("community") or "").strip()
-        merged_comm = existing_comm if existing_comm else new_comm
-        
-        # Keep earlier date if possible
-        existing_d = _parse_date(existing.get("date"))
-        new_d = _parse_date(payload.get("date"))
-        if existing_d and new_d and new_d < existing_d:
-            merged_date = payload.get("date")
-        else:
-            merged_date = existing.get("date")
-        
-        payload["fatalities"] = merged_fatalities
-        payload["abductions"] = merged_abductions
-        payload["injuries"]   = merged_injuries
-        payload["source_url"] = merged_urls
-        payload["summary"]    = merged_summary
-        payload["lga"]        = merged_lga
-        payload["community"]  = merged_comm
-        payload["date"]       = merged_date
-        
-        log.info(f"  [MERGE] Merged duplicate incident for {payload['state']} | {payload['date']} (F: {merged_fatalities}, A: {merged_abductions})")
-
+    # Final DB-level dedup check (catches duplicates if in-memory cache was stale/empty)
+    if semantic_fp_exists(payload.get("semantic_fp", "")):
+        log.debug(f"  [SKIP] Duplicate detected via DB check (semantic_fp match)")
+        return
     try:
         supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
     except Exception as exc:
@@ -1372,6 +1116,9 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             return result
 
         # Nigeria relevance check
+        score = nigeria_score(f"{title} {text}")
+        log.debug(f"  Nigeria score: {score}")
+        
         if not is_nigeria_relevant(title, text):
             log.debug(f"  [SKIP] Not Nigeria relevant")
             with dedup["lock"]:
@@ -1478,19 +1225,25 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "abductions":    abductions,
                 }
 
-                # ══ DEDUPLICATION & MERGING ═════════════════════════
-                is_dup = False
+                # ══ DEDUPLICATION ═══════════════════════════════════
                 with dedup["lock"]:
-                    if sem_fp in dedup["semantic_fps"] or _is_duplicate(sig, dedup["sigs"]):
-                        is_dup = True
+                    # Check exact semantic match
+                    if sem_fp in dedup["semantic_fps"]:
+                        log.debug(f"    [SKIP] Duplicate (exact FP)")
                         result["semantic_duplicates"] += 1
+                        continue
                     
-                    # Add to cache for subsequent deduplication
+                    # Check fuzzy match
+                    if _is_duplicate(sig, dedup["sigs"]):
+                        log.debug(f"    [SKIP] Duplicate (fuzzy)")
+                        result["semantic_duplicates"] += 1
+                        continue
+                    
+                    log.debug(f"    [OK] Unique incident")
+                    
+                    # Mark as processed before DB write
                     dedup["semantic_fps"].add(sem_fp)
                     dedup["sigs"].append(sig)
-
-                if is_dup:
-                    log.info(f"    [DUPLICATE] Duplicate detected in-memory; executing merge & store.")
 
                 # Store incident
                 payload = {
@@ -1504,6 +1257,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "injuries":      injuries,
                     "summary":       (incident.get("summary") or "").strip() or None,
                     "source_url":    url,
+                    "source_name":   source_name_from_url(url),
                     "content_fp":    f"{art_fp}_{idx}",
                     "semantic_fp":   sem_fp,
                 }
@@ -1525,38 +1279,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         log.error(f"process_entry unhandled: {exc}", exc_info=True)
 
     return result
-
-
-def send_webhook_alert(stats: dict, error_message: str = None):
-    """Send execution report or error alerts to Slack or Discord webhook."""
-    webhook_url = os.environ.get("DISCORD_WEBHOOK_URL") or os.environ.get("SLACK_WEBHOOK_URL")
-    if not webhook_url:
-        return
-        
-    try:
-        if error_message:
-            msg = f"🚨 **Conflict Tracker Scraper CRITICAL FAILURE** 🚨\n**Error:** {error_message}"
-        else:
-            saved = stats.get("saved_incidents", 0)
-            failed = stats.get("ai_failed", 0)
-            status_str = "✅ Success" if failed == 0 else f"⚠️ Warnings (AI failed: {failed})"
-            msg = (
-                f"📊 **Observatory Scraper Run Summary** 📊\n"
-                f"• Feeds parsed: {stats.get('feeds', 0)}\n"
-                f"• Articles parsed: {stats.get('entries', 0)}\n"
-                f"• Saved incidents: {saved}\n"
-                f"• AI/Extraction failures: {failed}\n"
-                f"• Status: {status_str}"
-            )
-        
-        payload = {
-            "content": msg,
-            "text": msg
-        }
-        requests.post(webhook_url, json=payload, timeout=10)
-        log.info("  [Alert] Webhook notification sent successfully")
-    except Exception as exc:
-        log.error(f"  [Alert] Failed to send webhook alert: {exc}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1663,9 +1385,6 @@ def run():
         except Exception as exc:
             log.warning(f"  [Sync] Could not write run report to Supabase (scraper_runs table may not exist): {exc}")
 
-    # Send run alert
-    send_webhook_alert(stats)
-
 
 # ─────────────────────────────────────────────────────────────
 # ENTRY POINT
@@ -1675,8 +1394,5 @@ if __name__ == "__main__":
         sys.exit(0)
     try:
         run()
-    except Exception as exc:
-        send_webhook_alert({}, error_message=str(exc))
-        raise exc
     finally:
         _release_lock()

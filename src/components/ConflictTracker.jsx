@@ -67,29 +67,6 @@ function formatDate(dateStr) {
   }
 }
 
-function getSourceName(incident) {
-  if (incident.source_name) return incident.source_name;
-  if (!incident.source_url) return "";
-  try {
-    const domain = new URL(incident.source_url).hostname.replace("www.", "").split(".")[0];
-    const map = {
-      vanguardngr: "Vanguard",
-      premiumtimesng: "Premium Times",
-      punchng: "Punch",
-      dailytrust: "Daily Trust",
-      thecable: "TheCable",
-      channelstv: "Channels TV",
-      leadership: "Leadership",
-      sunnewsonline: "Sun News",
-      tribuneonlineng: "Tribune",
-      pmnewsnigeria: "PM News"
-    };
-    return map[domain] || domain.charAt(0).toUpperCase() + domain.slice(1);
-  } catch (e) {
-    return "";
-  }
-}
-
 function StatsCards({ overall, isDarkMode }) {
   const cards = [
     { label: 'Total Incidents', value: overall.totalIncidents.toLocaleString(), color: 'text-red-500', icon: AlertTriangle },
@@ -116,64 +93,16 @@ function StatsCards({ overall, isDarkMode }) {
   );
 }
 
-function StateHeatmap({ byState, incidents, selectedState, onStateClick, isDarkMode }) {
+function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
   const statsMap = new Map(byState.map((s) => [s.state ? s.state.toLowerCase().trim() : '', s]));
-  const maxVictims = Math.max(...byState.map((s) => (s.fatalities || 0) + (s.abductions || 0)), 1);
+  const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
   const [tooltip, setTooltip] = useState(null);
-  const [centroids, setCentroids] = useState({});
 
   const nameOverrides = { 'Federal Capital Territory': 'FCT' };
 
-  useEffect(() => {
-    const calculateCentroids = () => {
-      const newCentroids = {};
-      const paths = document.querySelectorAll('svg.nigeria-map path');
-      paths.forEach(path => {
-        try {
-          const bbox = path.getBBox();
-          const stateNameAttr = path.getAttribute('data-name');
-          if (stateNameAttr) {
-            newCentroids[stateNameAttr.toLowerCase().trim()] = {
-              x: bbox.x + bbox.width / 2,
-              y: bbox.y + bbox.height / 2
-            };
-          }
-        } catch (e) {
-          // ignore
-        }
-      });
-      if (Object.keys(newCentroids).length > 0) {
-        setCentroids(newCentroids);
-      }
-    };
-
-    // Run after DOM has updated
-    const timer = setTimeout(calculateCentroids, 150);
-    return () => clearTimeout(timer);
-  }, [incidents, byState]);
-
-  // Group incidents by state
-  const incidentsByState = {};
-  for (const i of incidents) {
-    if (!i.state) continue;
-    const key = i.state.toLowerCase().trim();
-    if (!incidentsByState[key]) incidentsByState[key] = [];
-    incidentsByState[key].push(i);
-  }
-
-  const getOffset = (index, total) => {
-    if (total === 1) return { dx: 0, dy: 0 };
-    const angle = (index / total) * 2 * Math.PI;
-    const radius = 9; // spacing in SVG viewBox coordinates
-    return {
-      dx: Math.cos(angle) * radius,
-      dy: Math.sin(angle) * radius
-    };
-  };
-
-  function getHeatColor(victims) {
-    if (victims === 0) return '#e2e8f0';
-    const ratio = victims / maxVictims;
+  function getHeatColor(fatalities) {
+    if (fatalities === 0) return '#e2e8f0';
+    const ratio = fatalities / maxFatalities;
     if (ratio > 0.75) return '#7f1d1d';
     if (ratio > 0.5) return '#b91c1c';
     if (ratio > 0.25) return '#dc2626';
@@ -183,21 +112,19 @@ function StateHeatmap({ byState, incidents, selectedState, onStateClick, isDarkM
 
   return (
     <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Victims by State (Killed & Abducted) &mdash; Choropleth</h3>
+      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Fatalities by State &mdash; Choropleth</h3>
       <div className="relative">
-        <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none nigeria-map">
+        <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
           {nigeriaMap.locations.map(loc => {
             const stateName = nameOverrides[loc.name] || loc.name;
             const stats = statsMap.get(stateName.toLowerCase().trim());
-            const victims = (stats?.fatalities || 0) + (stats?.abductions || 0);
-            const color = getHeatColor(victims);
+            const fatalities = stats?.fatalities || 0;
+            const color = getHeatColor(fatalities);
             const isSelected = selectedState && selectedState.toLowerCase() === stateName.toLowerCase();
             return (
               <path
                 key={loc.id}
-                id={loc.id}
                 d={loc.path}
-                data-name={stateName}
                 fill={color}
                 stroke={isSelected ? '#ffffff' : color === '#e2e8f0' ? '#cbd5e1' : '#ffffff'}
                 strokeWidth={isSelected ? '4' : '0.75'}
@@ -208,14 +135,7 @@ function StateHeatmap({ byState, incidents, selectedState, onStateClick, isDarkM
                   const svg = e.target.closest('svg');
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
-                  setTooltip({
-                    state: loc.name,
-                    fatalities: stats?.fatalities || 0,
-                    incidents: stats?.count || 0,
-                    abductions: stats?.abductions || 0,
-                    x: e.clientX - rect.left,
-                    y: e.clientY - rect.top
-                  });
+                  setTooltip({ state: loc.name, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
                 }}
                 onMouseMove={e => {
                   const svg = e.target.closest('svg');
@@ -227,106 +147,22 @@ function StateHeatmap({ byState, incidents, selectedState, onStateClick, isDarkM
               />
             );
           })}
-
-          {/* Incident markers overlaid on map */}
-          {Object.entries(incidentsByState).map(([stateKey, list]) => {
-            const centroid = centroids[stateKey];
-            if (!centroid) return null;
-
-            return list.map((incident, idx) => {
-              const { dx, dy } = getOffset(idx, list.length);
-              const typeKey = getIncidentTypeKey(incident.incident_type);
-              const color = INCIDENT_TYPE_COLORS[typeKey] || INCIDENT_TYPE_COLORS.other;
-              const label = INCIDENT_TYPE_LABELS[typeKey] || 'Other';
-
-              return (
-                <circle
-                  key={incident.id || idx}
-                  cx={centroid.x + dx}
-                  cy={centroid.y + dy}
-                  r="4.5"
-                  fill={color}
-                  stroke="#ffffff"
-                  strokeWidth="1.25"
-                  className="transition-all duration-150 cursor-pointer hover:r-[6.5]"
-                  style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))' }}
-                  onMouseEnter={e => {
-                    const svg = e.target.closest('svg');
-                    if (!svg) return;
-                    const rect = svg.getBoundingClientRect();
-                    setTooltip({
-                      state: `${incident.state} (${incident.lga || 'Unknown LGA'})`,
-                      fatalities: incident.fatalities || 0,
-                      incidents: 1,
-                      abductions: incident.abductions || 0,
-                      typeLabel: label,
-                      date: formatDate(incident.date),
-                      summary: incident.summary,
-                      x: e.clientX - rect.left,
-                      y: e.clientY - rect.top
-                    });
-                  }}
-                  onMouseMove={e => {
-                    const svg = e.target.closest('svg');
-                    if (!svg) return;
-                    const rect = svg.getBoundingClientRect();
-                    setTooltip(t => t ? { ...t, x: e.clientX - rect.left, y: e.clientY - rect.top } : null);
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                />
-              );
-            });
-          })}
         </svg>
-
         {tooltip && (
-          <div className={`absolute pointer-events-none rounded-lg p-3 text-xs shadow-xl z-20 min-w-[200px] max-w-[280px] ${isDarkMode ? 'bg-[#051c3a] border border-white/10 text-white' : 'bg-white border border-slate-200 text-slate-800'}`} style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
-            <p className="font-bold border-b border-white/10 pb-1 mb-1.5">{tooltip.state}</p>
-            {tooltip.typeLabel ? (
-              <div className="space-y-1">
-                <p className="flex justify-between gap-4 font-semibold text-secondary">
-                  <span>{tooltip.typeLabel}</span>
-                  <span className="opacity-75">{tooltip.date}</span>
-                </p>
-                {(tooltip.fatalities > 0 || tooltip.abductions > 0) && (
-                  <p className="flex gap-2.5 font-bold">
-                    {tooltip.fatalities > 0 && <span className="text-red-500">{tooltip.fatalities} Killed</span>}
-                    {tooltip.abductions > 0 && <span className="text-amber-600">{tooltip.abductions} Abducted</span>}
-                  </p>
-                )}
-                {tooltip.summary && (
-                  <p className={`mt-1.5 border-t border-dashed ${isDarkMode ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'} pt-1.5 text-[10px] leading-relaxed line-clamp-3`}>
-                    {tooltip.summary}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
-                <p className="text-red-500">{tooltip.fatalities} killed</p>
-                <p className="text-amber-600">{tooltip.abductions} abducted</p>
-              </div>
-            )}
+          <div className={`absolute pointer-events-none rounded-lg px-3 py-2 text-xs shadow-xl z-10 whitespace-nowrap ${isDarkMode ? 'bg-[#051c3a] border border-white/10 text-white' : 'bg-white border border-slate-200'}`} style={{ left: tooltip.x + 12, top: tooltip.y - 12 }}>
+            <p className={`font-bold ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{tooltip.state}</p>
+            <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
+            <p className="text-red-500">{tooltip.fatalities} killed</p>
+            <p className="text-amber-600">{tooltip.abductions} abducted</p>
           </div>
         )}
       </div>
-
-      <div className="flex flex-col sm:flex-row items-center gap-4 justify-between mt-6 pt-4 border-t border-dashed border-slate-200/20 text-xs">
-        <div className={`flex items-center gap-3 ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-          <span>Intensity:</span>
-          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
-          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
-          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#dc2626'}} /><span>Med</span></div>
-          <div className="flex items-center gap-1"><div className="w-3.5 h-2.5 rounded-sm" style={{backgroundColor:'#7f1d1d'}} /><span>High</span></div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 justify-center sm:justify-end">
-          {Object.entries(INCIDENT_TYPE_LABELS).map(([key, val]) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: INCIDENT_TYPE_COLORS[key] }} />
-              <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>{val}</span>
-            </div>
-          ))}
-        </div>
+        <div className={`flex items-center gap-3 justify-center mt-4 text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
+        <span>Intensity:</span>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#dc2626'}} /><span>Med</span></div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#7f1d1d'}} /><span>High</span></div>
       </div>
     </div>
   );
@@ -394,14 +230,14 @@ function IncidentTable({ incidents, isDarkMode }) {
                   <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{incident.summary}</p>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {getSourceName(incident) ? (
+                  {incident.source_name ? (
                     <a
                       href={incident.source_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors ${isDarkMode ? 'bg-white/10 text-slate-400 hover:text-secondary hover:bg-white/20' : 'bg-slate-100 text-slate-500 hover:text-secondary hover:bg-slate-200'}`}
                     >
-                      {getSourceName(incident)}
+                      {incident.source_name}
                     </a>
                   ) : (
                     <span className={`text-[10px] ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`}>&mdash;</span>
@@ -425,28 +261,6 @@ export default function ConflictTracker() {
   const [filterType, setFilterType] = useState('');
   const [selectedMapState, setSelectedMapState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterDateRange, setFilterDateRange] = useState('');
-
-  const getLgaBreakdown = () => {
-    if (!selectedMapState) return [];
-    const stateIncidents = incidents.filter(
-      (i) => i.state && i.state.toLowerCase() === selectedMapState.toLowerCase()
-    );
-    const lgaMap = {};
-    for (const i of stateIncidents) {
-      const lgaName = (i.lga || 'Unknown').trim();
-      if (!lgaMap[lgaName]) {
-        lgaMap[lgaName] = { name: lgaName, count: 0, fatalities: 0, abductions: 0 };
-      }
-      lgaMap[lgaName].count++;
-      lgaMap[lgaName].fatalities += i.fatalities || 0;
-      lgaMap[lgaName].abductions += i.abductions || 0;
-    }
-    return Object.values(lgaMap).sort(
-      (a, b) => (b.fatalities + b.abductions) - (a.fatalities + a.abductions)
-    );
-  };
 
   useEffect(() => {
     async function fetchData() {
@@ -476,36 +290,6 @@ export default function ConflictTracker() {
     const activeStateFilter = filterState || selectedMapState;
     if (activeStateFilter && i.state.toLowerCase() !== activeStateFilter.toLowerCase()) return false;
     if (filterType && getIncidentTypeKey(i.incident_type) !== filterType) return false;
-    
-    // Search Term Filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const match = 
-        (i.summary || '').toLowerCase().includes(term) ||
-        (i.community || '').toLowerCase().includes(term) ||
-        (i.lga || '').toLowerCase().includes(term) ||
-        (i.state || '').toLowerCase().includes(term) ||
-        (i.incident_type || '').toLowerCase().includes(term);
-      if (!match) return false;
-    }
-
-    // Date Range Filter
-    if (filterDateRange) {
-      const incidentDate = new Date(i.date + 'T00:00:00Z');
-      const now = new Date();
-      
-      // Calculate diff in days
-      const diffTime = Math.abs(now - incidentDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (filterDateRange === '7d' && diffDays > 7) return false;
-      if (filterDateRange === '30d' && diffDays > 30) return false;
-      if (filterDateRange === 'this-month') {
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        if (incidentDate < firstDayOfMonth) return false;
-      }
-    }
-    
     return true;
   });
 
@@ -553,57 +337,35 @@ export default function ConflictTracker() {
         {stats && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-              <StateHeatmap byState={stats.byState} incidents={filteredIncidents} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
+              <StateHeatmap byState={stats.byState} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
             </div>
               <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{selectedMapState ? `Incidents in ${selectedMapState}` : 'Incidents per State'}</h3>
-                {(filterType || filterState || selectedMapState || searchTerm || filterDateRange) && (
-                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); setSearchTerm(''); setFilterDateRange(''); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear All</button>
+                {(filterType || filterState || selectedMapState) && (
+                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear</button>
                 )}
               </div>
               {selectedMapState && (() => {
                 const s = stats.byState.find(s => s.state === selectedMapState);
                 if (!s) return null;
                 return (
-                  <div>
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Incidents</div>
-                        <div className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{s.count}</div>
-                      </div>
-                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-red-950/40' : 'bg-red-50'}`}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Killed</div>
-                        <div className="text-lg font-bold text-red-500">{s.fatalities}</div>
-                      </div>
-                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-amber-950/40' : 'bg-amber-50'}`}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
-                        <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
-                      </div>
-                      <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
-                        <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
-                      </div>
+                  <div className="grid grid-cols-2 gap-2 mb-4">
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-white/5' : 'bg-slate-50'}`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Incidents</div>
+                      <div className={`text-lg font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{s.count}</div>
                     </div>
-
-                    <div className="mt-5 border-t border-dashed border-slate-200/20 pt-4">
-                      <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>LGA Incident Breakdown</h4>
-                      <div className="max-h-56 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                        {getLgaBreakdown().length > 0 ? (
-                          getLgaBreakdown().map(lga => (
-                            <div key={lga.name} className={`flex items-center justify-between p-2.5 rounded-lg text-xs ${isDarkMode ? 'bg-white/5 border border-white/5' : 'bg-slate-50 border border-slate-100'}`}>
-                              <span className={`font-semibold ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{lga.name}</span>
-                              <div className="flex gap-2.5 font-bold">
-                                <span className={isDarkMode ? 'text-slate-500' : 'text-slate-400'}>{lga.count} inc</span>
-                                {lga.fatalities > 0 && <span className="text-rose-500">{lga.fatalities}K</span>}
-                                {lga.abductions > 0 && <span className="text-amber-500">{lga.abductions}A</span>}
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className={`text-center py-4 text-xs ${isDarkMode ? 'text-slate-600' : 'text-slate-400'}`}>No incidents logged.</div>
-                        )}
-                      </div>
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-red-950/40' : 'bg-red-50'}`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-red-400">Killed</div>
+                      <div className="text-lg font-bold text-red-500">{s.fatalities}</div>
+                    </div>
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-amber-950/40' : 'bg-amber-50'}`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
+                      <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
+                    </div>
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
+                      <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
                     </div>
                   </div>
                 );
@@ -618,35 +380,9 @@ export default function ConflictTracker() {
         )}
 
         <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-          <div className={`p-5 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:max-w-md">
-              <div className="flex items-baseline gap-2.5">
-                <h3 className={`text-sm font-bold whitespace-nowrap ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
-                {filteredIncidents.length > 0 && (
-                  <span className={`text-[10px] font-semibold whitespace-nowrap ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
-                    (showing {Math.min(10, filteredIncidents.length)} of {filteredIncidents.length})
-                  </span>
-                )}
-              </div>
-              <input
-                type="text"
-                placeholder="Search by summary, community, LGA..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200 placeholder-slate-600' : 'bg-white border border-slate-300 text-slate-700 placeholder-slate-400'}`}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2.5">
-              <select
-                value={filterDateRange}
-                onChange={(e) => setFilterDateRange(e.target.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
-              >
-                <option value="">All Time</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="this-month">This Month</option>
-              </select>
+          <div className={`p-5 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
+            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
+            <div className="flex gap-3">
               <select
                 id="conflict-filter-state"
                 name="filterState"
@@ -669,48 +405,66 @@ export default function ConflictTracker() {
               </select>
             </div>
           </div>
-          <IncidentTable incidents={filteredIncidents.slice(0, 10)} isDarkMode={isDarkMode} />
+          <IncidentTable incidents={filteredIncidents} isDarkMode={isDarkMode} />
         </div>
       </div>
 
       {/* Data sources & limitations explainer */}
       <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
-        <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-          <div className="p-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Data Ingestion</h4>
-                <p className={`text-xs leading-relaxed mb-3 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Incidents are ingested from major Nigerian outlets (Premium Times, Vanguard, Daily Trust, Leadership, Sun News, PM News, The Cable, and Channels TV) via automated feeds running every 5 hours.
-                </p>
-                <p className={`text-xs leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Large Language Models (LLMs) parse raw article text to extract structured incident fields, state/LGA locations, and casualty counts.
-                </p>
+          <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
+                  <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
+                </div>
+                <div>
+                  <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Tracker</h3>
+                </div>
               </div>
-              <div>
-                <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>Limitations & Scope</h4>
-                <ul className={`space-y-2 text-xs ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <li className="flex items-start gap-2">
-                    <span className="text-secondary font-bold select-none">&bull;</span>
-                    <span><strong>Media Under-reporting:</strong> Only covers incidents documented by the national press, leading to possible undercounts in highly remote areas.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-secondary font-bold select-none">&bull;</span>
-                    <span><strong>Casualty Threshold:</strong> Only logs active conflict events with fatalities or injuries, and abductions. Hostage rescues and releases are omitted.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-secondary font-bold select-none">&bull;</span>
-                    <span><strong>AI Extraction & Deduplication:</strong> Information reflects reported news. AI parses numbers from text and automatically merges duplicate cross-reports.</span>
-                  </li>
-                </ul>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Feeds:</strong> Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV scraped via GitHub Actions every 5 hours.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Extraction:</strong> Groq (Llama 3.1 8B) extracts structured incident data from article text.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
+                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Storage:</strong> Supabase with semantic fingerprint deduplication.</span>
+                    </li>
+                  </ul>
+                </div>
+                <div>
+                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
+                      <span>Media-dependent; may undercount remote incidents.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
+                      <span>5-hour update delay between occurrence and appearance.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
+                      <span>AI-extracted casualty figures may contain inaccuracies.</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
+                      <span>Only incidents with at least one casualty are logged.</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
-            </div>
-            <div className={`mt-5 pt-3.5 border-t text-[10px] text-center ${isDarkMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
-              Beyond Statistics Observatory &middot; Abuja, FCT, Nigeria &mdash; Research and policy analysis reference.
+              <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+                Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
+              </div>
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }
