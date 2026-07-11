@@ -847,6 +847,10 @@ _groq_lock = _threading.Lock()
 _GROQ_MIN_INTERVAL = 5.0
 _groq_last_call: list[float] = [0.0]
 
+_gemini_lock = _threading.Lock()
+_GEMINI_MIN_INTERVAL = 4.5  # Spaced to ensure max 13 RPM (under Gemini's 15 RPM limit)
+_gemini_last_call: list[float] = [0.0]
+
 _RETRY_AFTER_RE = re.compile(r"try again in\s+([\d.]+)s", re.IGNORECASE)
 
 
@@ -857,9 +861,52 @@ def _parse_retry_after(err_str: str) -> float | None:
     return None
 
 
-def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict]:
+def extract_incidents_gemini(prompt: str, api_key: str) -> list[dict] | None:
+    """Fallback extraction using Gemini's API with strict rate-limiting/throttling."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+    
+    with _gemini_lock:
+        elapsed = time.monotonic() - _gemini_last_call[0]
+        gap     = _GEMINI_MIN_INTERVAL - elapsed
+        if gap > 0:
+            time.sleep(gap)
+            
+        try:
+            log.info("  [LLM] Attempting failover to Gemini API (throttled)...")
+            r = requests.post(url, headers=headers, json=payload, timeout=20)
+            _gemini_last_call[0] = time.monotonic()
+            r.raise_for_status()
+            data = r.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"]
+            
+            # Parse JSON from response markdown codeblocks if necessary
+            text_clean = text.strip()
+            if text_clean.startswith("```"):
+                lines = text_clean.splitlines()
+                if lines[0].startswith("```json"):
+                    text_clean = "\n".join(lines[1:-1])
+                elif lines[0].startswith("```"):
+                    text_clean = "\n".join(lines[1:-1])
+            
+            res_data = json.loads(text_clean)
+            return res_data.get("incidents", [])
+        except Exception as exc:
+            _gemini_last_call[0] = time.monotonic()
+            log.warning(f"  [LLM] Gemini failover error: {exc}")
+            return None
+
+
+def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict] | None:
     prompt  = _PROMPT_TEMPLATE.format(article_date=article_date, title=title, text=text)
     backoff = 2.0
+    gemini_key = os.environ.get("GEMINI_API_KEY")
 
     for attempt in range(retries):
         success = False
@@ -915,6 +962,21 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
         if exc_to_raise:
             err_str       = str(exc_to_raise)
             is_rate_limit = "rate" in err_str.lower() or "429" in err_str
+            
+            # If we have a Gemini key, and we hit a rate limit or authorization error, try Gemini immediately!
+            if gemini_key and (is_rate_limit or "401" in err_str or "API Key" in err_str):
+                log.warning(f"  [LLM] Groq error encountered: {err_str[:60]}. Initiating Gemini failover.")
+                gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
+                if gemini_incidents is not None:
+                    # Validate and fix incidents
+                    validated_incidents = []
+                    for idx, incident in enumerate(gemini_incidents):
+                        fixed = validate_and_fix_incident(incident, text, article_date)
+                        if fixed:
+                            validated_incidents.append(fixed)
+                    log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via Gemini fallback")
+                    return validated_incidents
+            
             if is_rate_limit:
                 retry_after = _parse_retry_after(err_str) or (backoff * 4)
                 log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
@@ -925,6 +987,19 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
                 log.warning(f"  [LLM] Error (attempt {attempt + 1}): {err_str[:100]} (released lock)")
                 time.sleep(wait)
             backoff *= 2
+
+    # Final fallback if all Groq retries failed
+    if gemini_key:
+        log.warning("  [LLM] Groq extraction exhausted all retries. Performing final Gemini failover attempt.")
+        gemini_incidents = extract_incidents_gemini(prompt, gemini_key)
+        if gemini_incidents is not None:
+            validated_incidents = []
+            for idx, incident in enumerate(gemini_incidents):
+                fixed = validate_and_fix_incident(incident, text, article_date)
+                if fixed:
+                    validated_incidents.append(fixed)
+            log.info(f"  [LLM] [SUCCESS] Extracted {len(validated_incidents)} incident(s) via final Gemini fallback")
+            return validated_incidents
 
     log.error(f"  [LLM] [SKIP] Extraction failed after {retries} attempts")
     return None
