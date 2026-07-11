@@ -224,6 +224,15 @@ def is_nigeria_relevant(title: str, text: str) -> bool:
     return score >= 1
 
 
+def is_conflict_relevant(title: str, text: str) -> bool:
+    """
+    Check if the article contains conflict-related keywords.
+    Only articles with at least one conflict marker are sent to the LLM.
+    """
+    combined = f"{title} {text}".lower()
+    return any(kw in combined for kw in _CONFLICT_KEYWORDS)
+
+
 # ─────────────────────────────────────────────────────────────
 # CONFLICT-CASUALTY CLASSIFICATION
 # ─────────────────────────────────────────────────────────────
@@ -1211,6 +1220,14 @@ def process_entry(entry, dedup, default_date: str) -> dict:
             return result
 
         log.debug(f"  [OK] Nigeria relevant")
+
+        # Conflict relevance pre-filter (saves LLM tokens and prevents 429 rate limits)
+        if not is_conflict_relevant(title, text):
+            log.debug(f"  [SKIP] Not conflict relevant (no conflict keywords found)")
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
+            return result
 
         # Skip follow-up / aftermath articles (disabled to avoid missing updated reports)
         # if is_followup_article(title, text):
