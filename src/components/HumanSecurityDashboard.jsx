@@ -159,6 +159,14 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
       fetch(`${supabaseUrl}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
       })
+      .then(res => {
+        if (!res.ok && res.status === 400) {
+          return fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
+            headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+          });
+        }
+        return res;
+      })
       .then(res => res.json())
       .then(data => {
         setRawIncidents(data || []);
