@@ -36,6 +36,13 @@ export default function ReviewPortal({ setCurrentPage }) {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
   
+  // Auth state
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('review_auth') === 'true';
+  });
+  const [passcode, setPasscode] = useState('');
+  const [authError, setAuthError] = useState('');
+  
   // Editing state
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -58,8 +65,71 @@ export default function ReviewPortal({ setCurrentPage }) {
   };
 
   useEffect(() => {
-    fetchPending();
-  }, []);
+    if (isAuthenticated) {
+      fetchPending();
+    }
+  }, [isAuthenticated]);
+
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    const expected = import.meta.env.VITE_ADMIN_PASSCODE || 'beyondstats2026';
+    if (passcode === expected) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('review_auth', 'true');
+      setAuthError('');
+    } else {
+      setAuthError('Invalid passcode. Access denied.');
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#030e20] text-slate-100 font-inter flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-[#051630] border border-white/10 rounded-3xl p-8 text-center shadow-2xl animate-fade-in">
+          <div className="w-16 h-16 bg-[#052353] border border-white/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Shield className="w-8 h-8 text-secondary" />
+          </div>
+          
+          <h2 className="text-xl font-poppins font-bold text-white mb-2 font-poppins">Restricted Access</h2>
+          <p className="text-xs text-slate-400 mb-6 max-w-xs mx-auto">
+            This portal is restricted to authorized registry administrators. Please enter the passcode to proceed.
+          </p>
+
+          <form onSubmit={handleAuthSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col text-left gap-1.5">
+              <label className="text-xs font-semibold text-slate-400">Passcode</label>
+              <input
+                type="password"
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="••••••••"
+                className="bg-[#030e20] border border-white/20 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-secondary focus:border-secondary text-center text-sm tracking-widest"
+                required
+              />
+            </div>
+            
+            {authError && (
+              <p className="text-xs text-red-400 font-semibold">{authError}</p>
+            )}
+
+            <button
+              type="submit"
+              className="bg-secondary hover:bg-secondary/90 text-white font-bold py-3 rounded-xl transition-all cursor-pointer border-none text-xs tracking-wider uppercase mt-2 font-inter"
+            >
+              Verify Passcode
+            </button>
+          </form>
+
+          <button
+            onClick={() => setCurrentPage('home')}
+            className="mt-6 text-xs text-slate-500 hover:text-slate-300 transition-colors border-none bg-transparent cursor-pointer font-semibold flex items-center justify-center gap-1.5 mx-auto"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" /> Return to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const handleAction = async (id, statusUpdate, updatedFields = null) => {
     try {
