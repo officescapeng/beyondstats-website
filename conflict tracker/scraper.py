@@ -215,13 +215,13 @@ def nigeria_score(text: str) -> int:
 
 def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    Require 2+ Nigeria markers for relevance (less strict).
+    Require 1+ Nigeria markers for relevance (relaxed).
     Catches more legitimate Nigerian security articles.
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
     score = nigeria_score(f"{title} {text}")
-    return score >= 2
+    return score >= 1
 
 
 # ─────────────────────────────────────────────────────────────
@@ -269,37 +269,41 @@ def canonical_incident_type(raw: str) -> str:
 
 def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, injuries: int = 0) -> bool:
     """
-    Only log if BOTH conditions hold:
-      1. At least one casualty (someone killed, abducted, or injured)
-      2. Incident type matches a conflict keyword OR abductions > 0
+    Check if the incident matches a conflict event.
+    Since we verify manually, we are relaxed and allow zero-casualty events
+    if they are explicitly classified as a recognized conflict type.
     """
     fatalities = _safe_int(fatalities)
     abductions = _safe_int(abductions)
     injuries   = _safe_int(injuries)
 
-    # (1) No casualties -> reject
-    if fatalities <= 0 and abductions <= 0 and injuries <= 0:
-        log.debug(f"    [SKIP] No casualties (F:{fatalities}, A:{abductions}, I:{injuries})")
-        return False
-
     it = (incident_type or "").lower().strip()
 
-    # (2) Explicit non-conflict cause -> reject
+    # (1) Explicit non-conflict cause -> reject
     if any(k in it for k in _NON_CONFLICT_KEYWORDS):
         log.debug(f"    [SKIP] Non-conflict keyword found in: {incident_type}")
         return False
 
-    # (3) Abduction is always conflict; otherwise require a conflict keyword
+    # (2) Abduction is always conflict
     if abductions > 0:
         log.debug(f"    [OK] Has abductions ({abductions})")
         return True
-    
-    has_conflict = any(k in it for k in _CONFLICT_KEYWORDS)
-    if has_conflict:
-        log.debug(f"    [OK] Has conflict keyword in: {incident_type}")
+
+    # (3) Standard casualty filter
+    if fatalities > 0 or injuries > 0:
+        has_conflict = any(k in it for k in _CONFLICT_KEYWORDS)
+        if has_conflict:
+            log.debug(f"    [OK] Has conflict keyword in: {incident_type}")
+            return True
+
+    # (4) Relaxed: Allow zero-casualty events if they are recognized conflict types
+    recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack"]
+    canon = canonical_incident_type(incident_type)
+    if canon in recognized_types:
+        log.debug(f"    [OK] Allowing zero-casualty/unknown incident of recognized type: {canon}")
         return True
     
-    log.debug(f"    [SKIP] No conflict keyword in: {incident_type}")
+    log.debug(f"    [SKIP] No casualties and not a recognized conflict type: {incident_type}")
     return False
 
 
@@ -719,8 +723,13 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
     injuries   = _safe_int(incident.get("injuries"))
     
     if fatalities <= 0 and abductions <= 0 and injuries <= 0:
-        log.debug(f"  [Validation] Still no casualties after fixes - rejecting")
-        return None
+        recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack"]
+        canon = canonical_incident_type(incident.get("incident_type"))
+        if canon in recognized_types:
+            log.debug(f"  [Validation] Allowing zero-casualty incident of recognized type: {canon}")
+        else:
+            log.debug(f"  [Validation] Still no casualties after fixes - rejecting")
+            return None
     
     return incident
 
@@ -733,7 +742,7 @@ The article was published on: {article_date}.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no preamble.
 
-Extract ONLY conflict-related casualty incidents in Nigeria.
+Extract ONLY conflict-related security incidents (with or without casualties) in Nigeria.
 
 A qualifying incident is:
 - Terrorist / bandit attacks
@@ -742,7 +751,7 @@ A qualifying incident is:
 - Armed robberies with deaths
 - Bombings / explosions
 
-INCIDENTS MUST HAVE AT LEAST ONE CASUALTY.
+INCIDENTS SHOULD PREFERABLY HAVE AT LEAST ONE CASUALTY, BUT YOU MAY EXTRACT ZERO-CASUALTY OR UNKNOWN-CASUALTY ATTACKS IF THEY DESCRIBE HIGHLY RELEVANT CONFLICT ACTIONS (E.G. BOMBINGS, BANDIT ATTACKS, CLASHES, OR KIDNAPPING ATTEMPTS).
 
 ════════════════════════════════════════════════════════════════
 
@@ -766,8 +775,7 @@ CASUALTY EXTRACTION RULES:
    - Default to 0 if not mentioned.
 
 3. REJECTION GATE:
-   - If fatalities = 0 AND abductions = 0 AND injuries = 0 → RETURN {{"incidents": []}}
-   - At least ONE must be > 0 to extract
+   - If fatalities = 0, abductions = 0, and injuries = 0, you should STILL extract the incident if it describes a significant security event (e.g. gun attack, explosion, communal clash). Only return an empty list if there are no security incidents reported.
 
 ════════════════════════════════════════════════════════════════
 
@@ -1129,14 +1137,14 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
         log.debug(f"  [OK] Nigeria relevant")
 
-        # Skip follow-up / aftermath articles
-        if is_followup_article(title, text):
-            log.info(f"  [SKIP] Skipping aftermath")
-            with dedup["lock"]:
-                dedup["article_fps"].add(art_fp)
-                save_local_cache(art_fp)
-            result["skipped_followup"] += 1
-            return result
+        # Skip follow-up / aftermath articles (disabled to avoid missing updated reports)
+        # if is_followup_article(title, text):
+        #     log.info(f"  [SKIP] Skipping aftermath")
+        #     with dedup["lock"]:
+        #         dedup["article_fps"].add(art_fp)
+        #         save_local_cache(art_fp)
+        #     result["skipped_followup"] += 1
+        #     return result
 
         log.debug(f"  [OK] Not aftermath")
         log.info(f"  Processing...")
