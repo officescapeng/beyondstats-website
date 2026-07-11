@@ -91,7 +91,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   }
 
   const links = [
-    { name: 'About', id: 'about' },
+    { name: 'About', id: 'about', dropdown: true },
     { name: 'Programs', id: 'programs', dropdown: true },
     { name: 'Research', id: 'research', disabled: true, soon: true },
     { name: 'Impact', id: 'impact', dropdown: true, disabled: true, soon: true },
@@ -112,17 +112,20 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
 
       <div className="hidden md:flex items-center gap-7">
         {links.map((link) => {
+          const isAbout = link.id === 'about';
           const isPrograms = link.id === 'programs';
           const isImpact = link.id === 'impact';
           
-          if (isPrograms || isImpact) {
+          if (isAbout || isPrograms || isImpact) {
             return (
               <div key={link.id} className="relative group/nav">
                 <button
+                  onClick={link.disabled || link.id === 'programs' ? undefined : () => setCurrentPage(link.id)}
                   className={`font-inter text-[11px] font-semibold uppercase tracking-widest flex items-center gap-1.5 cursor-pointer outline-none transition-colors ${
                     link.disabled ? 'text-white/40 hover:text-white/40' :
-                    currentPage === link.id ||
-                    (link.id === 'programs' && (currentPage === 'programs' || currentPage === 'dashboard' || currentPage === 'tracker')) ||
+                    (currentPage === link.id && link.id !== 'programs') ||
+                    (link.id === 'about' && (currentPage === 'about' || currentPage === 'programs')) ||
+                    (link.id === 'programs' && (currentPage === 'dashboard' || currentPage === 'tracker')) ||
                     (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
                       ? 'text-secondary'
                       : 'text-white/80 hover:text-secondary'
@@ -140,7 +143,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                 {/* Dropdown Menu */}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
                   <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
-                    {isPrograms ? (
+                    {isAbout ? (
                       <>
                         <button
                           onClick={() => setCurrentPage('programs')}
@@ -148,6 +151,9 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                         >
                           What We Do
                         </button>
+                      </>
+                    ) : isPrograms ? (
+                      <>
                         <button
                           onClick={() => setCurrentPage('dashboard')}
                           className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
@@ -3083,8 +3089,8 @@ function App() {
           <div className="flex flex-col gap-6 my-auto text-left">
             {[
               { name: 'About Us', id: 'about' },
-              { name: 'What We Do', id: 'programs' },
-              { name: 'Human Security Dashboard', id: 'dashboard', indent: true },
+              { name: 'What We Do', id: 'programs', indent: true },
+              { name: 'Human Security Dashboard', id: 'dashboard' },
               { name: 'Conflict Tracker', id: 'tracker', indent: true },
               { name: 'Research Hub', id: 'research', disabled: true },
               { name: 'Our Impact Stories', id: 'impact', disabled: true },
