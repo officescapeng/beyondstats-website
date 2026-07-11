@@ -45,6 +45,7 @@ import {
 import HumanSecurityDashboard from './components/HumanSecurityDashboard'
 import ImpactMapPage from './components/ImpactMapPage'
 import ConflictTracker from './components/ConflictTracker'
+import ReviewPortal from './components/ReviewPortal'
 import { fetchArticles, fetchPublications } from './services/sanity'
 import { PROCESSED_STATE_DATA } from './data/humanSecurityData'
 
@@ -515,6 +516,14 @@ function Footer({ setCurrentPage }) {
             Privacy Policy
           </button>
           <a href="#" className="font-inter text-[10px] text-white/30 hover:text-white uppercase tracking-wider transition-colors">Terms of Service</a>
+          {(window.location.hostname === 'localhost' || window.location.search.includes('review') || window.location.search.includes('admin')) && (
+            <button 
+              onClick={() => setCurrentPage('review')} 
+              className="font-inter text-[10px] text-slate-500 hover:text-secondary uppercase tracking-wider transition-colors outline-none bg-transparent border-none cursor-pointer p-0 font-bold"
+            >
+              Registry Review
+            </button>
+          )}
         </div>
       </div>
     </footer>
@@ -2937,7 +2946,7 @@ function App() {
     let pagePath = cleanPath.replace(/^\//, '');
     if (pagePath.endsWith('/') && pagePath !== '') pagePath = pagePath.slice(0, -1);
     
-    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker'];
+    const validPages = ['about', 'programs', 'impact-map', 'dashboard', 'research', 'impact', 'partnerships', 'contact', 'privacy', 'tracker', 'review'];
     
     if (validPages.includes(pagePath)) {
       _setCurrentPage(pagePath);
@@ -3157,6 +3166,10 @@ function App() {
 
       {currentPage === 'tracker' && (
         <ConflictTracker />
+      )}
+
+      {currentPage === 'review' && (
+        <ReviewPortal setCurrentPage={setCurrentPage} />
       )}
 
       {currentPage === 'research' && (

@@ -156,7 +156,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
     if (supabaseUrl && supabaseKey) {
       // Fetch data from Supabase REST API
-      fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
+      fetch(`${supabaseUrl}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc`, {
         headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
       })
       .then(res => res.json())

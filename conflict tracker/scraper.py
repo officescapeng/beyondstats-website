@@ -1260,6 +1260,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "source_name":   source_name_from_url(url),
                     "content_fp":    f"{art_fp}_{idx}",
                     "semantic_fp":   sem_fp,
+                    "status":        "pending",
                 }
 
                 safe_store(payload)

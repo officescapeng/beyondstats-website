@@ -266,7 +266,7 @@ export default function ConflictTracker() {
     async function fetchData() {
       try {
         setLoading(true);
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?select=*&order=date.desc`, {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
         });
         if (!res.ok) throw new Error('Supabase fetch failed');

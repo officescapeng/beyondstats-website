@@ -30,7 +30,7 @@ export default function LiveConflictFeed({ isDarkMode, incidents: initialInciden
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
       try {
-        const res = await fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc&limit=100`, {
+        const res = await fetch(`${supabaseUrl}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc&limit=100`, {
           headers: { 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` }
         });
         if (res.ok) {
