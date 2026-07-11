@@ -853,11 +853,11 @@ Text: {text}
 
 
 _groq_lock = _threading.Lock()
-_GROQ_MIN_INTERVAL = 5.0
+_GROQ_MIN_INTERVAL = 6.0
 _groq_last_call: list[float] = [0.0]
 
 _gemini_lock = _threading.Lock()
-_GEMINI_MIN_INTERVAL = 4.5  # Spaced to ensure max 13 RPM (under Gemini's 15 RPM limit)
+_GEMINI_MIN_INTERVAL = 6.0  # Spaced to ensure max 10 RPM (well under Gemini's 15 RPM limit)
 _gemini_last_call: list[float] = [0.0]
 
 _RETRY_AFTER_RE = re.compile(r"try again in\s+([\d.]+)s", re.IGNORECASE)
@@ -870,8 +870,8 @@ def _parse_retry_after(err_str: str) -> float | None:
     return None
 
 
-def extract_incidents_gemini(prompt: str, api_key: str) -> list[dict] | None:
-    """Fallback extraction using Gemini's API with strict rate-limiting/throttling."""
+def extract_incidents_gemini(prompt: str, api_key: str, retries: int = 2) -> list[dict] | None:
+    """Fallback extraction using Gemini's API with throttling and retries on 429."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
@@ -881,35 +881,49 @@ def extract_incidents_gemini(prompt: str, api_key: str) -> list[dict] | None:
         }
     }
     
-    with _gemini_lock:
-        elapsed = time.monotonic() - _gemini_last_call[0]
-        gap     = _GEMINI_MIN_INTERVAL - elapsed
-        if gap > 0:
-            time.sleep(gap)
-            
-        try:
-            log.info("  [LLM] Attempting failover to Gemini API (throttled)...")
-            r = requests.post(url, headers=headers, json=payload, timeout=20)
-            _gemini_last_call[0] = time.monotonic()
-            r.raise_for_status()
-            data = r.json()
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            
-            # Parse JSON from response markdown codeblocks if necessary
-            text_clean = text.strip()
-            if text_clean.startswith("```"):
-                lines = text_clean.splitlines()
-                if lines[0].startswith("```json"):
-                    text_clean = "\n".join(lines[1:-1])
-                elif lines[0].startswith("```"):
-                    text_clean = "\n".join(lines[1:-1])
-            
-            res_data = json.loads(text_clean)
-            return res_data.get("incidents", [])
-        except Exception as exc:
-            _gemini_last_call[0] = time.monotonic()
-            log.warning(f"  [LLM] Gemini failover error: {exc}")
-            return None
+    for attempt in range(retries):
+        with _gemini_lock:
+            elapsed = time.monotonic() - _gemini_last_call[0]
+            gap     = _GEMINI_MIN_INTERVAL - elapsed
+            if gap > 0:
+                time.sleep(gap)
+                
+            try:
+                log.info(f"  [LLM] Attempting failover to Gemini API (throttled, attempt {attempt + 1})...")
+                r = requests.post(url, headers=headers, json=payload, timeout=20)
+                _gemini_last_call[0] = time.monotonic()
+                
+                # Check for 429 status code
+                if r.status_code == 429:
+                    log.warning(f"  [LLM] Gemini rate limit hit (429). Retrying after lock release...")
+                    _gemini_last_call[0] = time.monotonic()
+                    # Sleep 10 seconds before retrying
+                    time.sleep(10.0)
+                    continue
+                    
+                r.raise_for_status()
+                data = r.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Parse JSON from response markdown codeblocks if necessary
+                text_clean = text.strip()
+                if text_clean.startswith("```"):
+                    lines = text_clean.splitlines()
+                    if lines[0].startswith("```json"):
+                        text_clean = "\n".join(lines[1:-1])
+                    elif lines[0].startswith("```"):
+                        text_clean = "\n".join(lines[1:-1])
+                
+                res_data = json.loads(text_clean)
+                return res_data.get("incidents", [])
+            except Exception as exc:
+                _gemini_last_call[0] = time.monotonic()
+                log.warning(f"  [LLM] Gemini attempt {attempt + 1} error: {exc}")
+                if attempt < retries - 1:
+                    time.sleep(5.0)
+                    continue
+                return None
+    return None
 
 
 def extract_incidents(title: str, text: str, article_date: str, retries: int = 3) -> list[dict] | None:
