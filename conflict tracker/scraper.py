@@ -367,9 +367,9 @@ def _parse_date(date_str) -> datetime | None:
 # ─────────────────────────────────────────────────────────────
 # IMPROVED DEDUPLICATION
 # ─────────────────────────────────────────────────────────────
-DEDUP_WINDOW_DAYS   = 7
-FATALITY_TOLERANCE  = 5
-ABDUCTION_TOLERANCE = 10
+DEDUP_WINDOW_DAYS   = 3
+FATALITY_TOLERANCE  = 1
+ABDUCTION_TOLERANCE = 2
 
 
 def casualty_band(n) -> str:
