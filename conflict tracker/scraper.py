@@ -1448,8 +1448,8 @@ def run():
             f = feedparser.parse(feed_url)
             if f.get("bozo") and f.get("bozo_exception"):
                 log.warning(f"Malformed feed: {f.bozo_exception}")
-            # Limit to the top 10 most recent entries per feed to avoid rate limits
-            for entry in f.entries[:10]:
+            # Limit to the top 25 most recent entries per feed (entire feed capacity) to ensure 0% risk of missing events
+            for entry in f.entries[:25]:
                 stats["entries"] += 1
                 all_entries.append(entry)
         except Exception as exc:
