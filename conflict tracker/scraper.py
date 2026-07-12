@@ -1371,7 +1371,6 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "injuries":      injuries,
                     "summary":       (incident.get("summary") or "").strip() or None,
                     "source_url":    url,
-                    "source_name":   source_name_from_url(url),
                     "content_fp":    f"{art_fp}_{idx}",
                     "semantic_fp":   sem_fp,
                     "status":        "pending",

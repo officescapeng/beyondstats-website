@@ -91,7 +91,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   }
 
   const links = [
-    { name: 'About', id: 'about', dropdown: true },
+    { name: 'About Us', id: 'about', dropdown: true },
     { name: 'Programs', id: 'programs', dropdown: true },
     { name: 'Research', id: 'research', disabled: true, soon: true },
     { name: 'Impact', id: 'impact', dropdown: true, disabled: true, soon: true },
@@ -430,7 +430,7 @@ function Footer({ setCurrentPage }) {
           </h4>
           <div className="flex flex-col gap-2">
             {[
-              { name: 'About', id: 'about' },
+              { name: 'About Us', id: 'about' },
               { name: 'What We Do', id: 'programs' },
               { name: 'Our Impact Map', id: 'impact-map', disabled: true },
               { name: 'Human Security Dashboard', id: 'dashboard' },

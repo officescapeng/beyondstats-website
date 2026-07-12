@@ -18,6 +18,17 @@ import {
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const getSourceName = (url, name) => {
+  if (name) return name;
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace('www.', '');
+  } catch (e) {
+    return 'News Link';
+  }
+};
+
 const STATES_LIST = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno", 
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT", "Gombe", "Imo", 
@@ -490,7 +501,7 @@ export default function ReviewPortal({ setCurrentPage }) {
                           rel="noopener noreferrer"
                           className="text-[#39B54A] hover:underline flex items-center gap-1 font-bold"
                         >
-                          Source: {inc.source_name || 'News Link'} <ExternalLink className="w-3 h-3" />
+                          Source: {getSourceName(inc.source_url, inc.source_name)} <ExternalLink className="w-3 h-3" />
                         </a>
                         <span className="text-[10px] text-slate-400 font-mono">
                           content_fp: {inc.content_fp || 'none'}

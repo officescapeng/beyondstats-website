@@ -5,6 +5,17 @@ import nigeriaMap from '@svg-maps/nigeria';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+const getSourceName = (url, name) => {
+  if (name) return name;
+  if (!url) return null;
+  try {
+    const hostname = new URL(url).hostname;
+    return hostname.replace('www.', '');
+  } catch (e) {
+    return 'News Link';
+  }
+};
+
 function computeStats(incidents) {
   const totalIncidents = incidents.length;
   const totalFatalities = incidents.reduce((s, i) => s + (i.fatalities || 0), 0);
@@ -230,14 +241,14 @@ function IncidentTable({ incidents, isDarkMode }) {
                   <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{incident.summary}</p>
                 </td>
                 <td className="py-3 px-3 text-center">
-                  {incident.source_name ? (
+                  {getSourceName(incident.source_url, incident.source_name) ? (
                     <a
                       href={incident.source_url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors ${isDarkMode ? 'bg-white/10 text-slate-400 hover:text-secondary hover:bg-white/20' : 'bg-slate-100 text-slate-500 hover:text-secondary hover:bg-slate-200'}`}
                     >
-                      {incident.source_name}
+                      {getSourceName(incident.source_url, incident.source_name)}
                     </a>
                   ) : (
                     <span className={`text-[10px] ${isDarkMode ? 'text-slate-600' : 'text-slate-300'}`}>&mdash;</span>
