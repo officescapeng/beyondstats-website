@@ -1156,6 +1156,7 @@ def safe_store(payload: dict):
         supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
     except Exception as exc:
         log.error(f"DB store error: {exc}")
+        raise exc
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1272,6 +1273,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
         log.info(f"  [OK] LLM extracted {len(incidents_list)} incidents")
 
         # Process each extracted incident
+        db_failed = False
         for idx, incident in enumerate(incidents_list):
             try:
                 log.debug(f"  [Incident {idx}]")
@@ -1383,11 +1385,15 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
             except Exception as exc:
                 log.error(f"  [SKIP] Incident [{idx}] error: {exc}", exc_info=True)
+                db_failed = True
 
-        # Cache the article fingerprint after processing all incidents
-        with dedup["lock"]:
-            dedup["article_fps"].add(art_fp)
-            save_local_cache(art_fp)
+        # Cache the article fingerprint after processing all incidents ONLY if database write succeeded!
+        if not db_failed:
+            with dedup["lock"]:
+                dedup["article_fps"].add(art_fp)
+                save_local_cache(art_fp)
+        else:
+            log.warning(f"  [RETRY] DB write failed for this article. Will retry on next run.")
 
     except Exception as exc:
         log.error(f"process_entry unhandled: {exc}", exc_info=True)
