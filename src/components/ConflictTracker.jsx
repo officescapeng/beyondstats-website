@@ -525,81 +525,49 @@ export default function ConflictTracker() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Methodology */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-secondary/20 text-secondary' : 'bg-secondary/10 text-secondary'}`}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16" />
-                    </svg>
-                  </div>
-                  <h3 className={`text-xs font-bold uppercase tracking-wider font-poppins ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                    Methodology & Pipeline
-                  </h3>
-                </div>
-                <ul className={`space-y-3 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Ingestion:</strong> Polling of RSS feeds from major Nigerian press outlets (Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV) every 5 hours.
-                    </span>
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                  Methodology & Sources
+                </h3>
+                <ul className={`space-y-2.5 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span><strong>News Ingestion:</strong> Automatically scans Premium Times, Daily Trust, Vanguard, Punch, The Cable, and Channels TV every 5 hours.</span>
                   </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Entity Extraction:</strong> Throttled LLM engines extract structured records (date, location, incident type, and casualties) directly from article body text.
-                    </span>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span><strong>AI Processing:</strong> AI extracts key event details (date, state, casualties) and merges duplicate reports to keep data clean.</span>
                   </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Deduplication:</strong> A semantic fingerprinting system checks coordinates and casualty details to merge duplicates and multi-source cross-reports.
-                    </span>
-                  </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Human Verification:</strong> Every incident is routed through an admin verification gateway before being published to the public registry.
-                    </span>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span><strong>Human Review:</strong> All incidents go through a verification check before appearing on the public tracker.</span>
                   </li>
                 </ul>
               </div>
 
               {/* Scope & Limitations */}
               <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-amber-500/20 text-amber-500' : 'bg-amber-500/10 text-amber-600'}`}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                  </div>
-                  <h3 className={`text-xs font-bold uppercase tracking-wider font-poppins ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
-                    Scope & Limitations
-                  </h3>
-                </div>
-                <ul className={`space-y-3 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Media Dependency:</strong> The registry relies on documented press coverage. Remote or offline conflict events are subject to media under-reporting.
-                    </span>
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                  Limitations
+                </h3>
+                <ul className={`space-y-2.5 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span><strong>Media Reporting:</strong> Relies on press coverage. Remote or offline conflict events are subject to under-reporting.</span>
                   </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Temporal Latency:</strong> New developments take up to 5 hours to sync. Rapidly changing or emerging reports will update sequentially.
-                    </span>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span><strong>Sync Latency:</strong> Updates occur in 5-hour intervals, which may cause a minor delay before new incidents appear.</span>
                   </li>
-                  <li className="flex gap-2.5">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
-                    <span>
-                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Registry Focus:</strong> To ensure high-quality policy indicators, only conflict events involving active casualties (fatalities, injuries, or abductions) are recorded.
-                    </span>
+                  <li className="flex gap-2">
+                    <span className="mt-1 w-1 h-1 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span><strong>Registry Focus:</strong> Only security incidents involving active casualties (killed, abducted, or injured) are logged.</span>
                   </li>
                 </ul>
               </div>
             </div>
             <div className={`mt-6 pt-4 border-t flex flex-col sm:flex-row sm:justify-between items-center gap-2 text-[10px] ${isDarkMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
-              <span>Beyond Statistics Observatory &middot; Abuja, FCT, Nigeria</span>
-              <span>For analytical, research, and policy planning purposes only.</span>
+              <span>Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria</span>
+              <span>For analytical and policy research purposes only.</span>
             </div>
           </div>
         </div>
