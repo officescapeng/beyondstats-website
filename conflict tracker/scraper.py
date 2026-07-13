@@ -1439,9 +1439,13 @@ def run():
         "lock":         _threading.Lock(),
     }
 
-    # Fetch all feed entries
+    # Fetch all feed entries (shuffled randomly to balance API load and rate limit risks)
     all_entries = []
-    for feed_url in FEEDS:
+    shuffled_feeds = list(FEEDS)
+    random.shuffle(shuffled_feeds)
+    log.info("Shuffled feed processing order")
+    
+    for feed_url in shuffled_feeds:
         stats["feeds"] += 1
         log.info(f"Parsing feed: {feed_url}")
         try:
