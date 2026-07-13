@@ -520,60 +520,90 @@ export default function ConflictTracker() {
 
       {/* Data sources & limitations explainer */}
       <div className="max-w-7xl mx-auto px-6 pb-10 mt-8">
-          <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
-            <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-white/10' : 'bg-secondary/10'}`}>
-                  <svg className={`w-3.5 h-3.5 ${isDarkMode ? 'text-secondary' : 'text-secondary'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16"/></svg>
+        <div className={`rounded-xl border ${isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200 shadow-sm'}`}>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Methodology */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-secondary/20 text-secondary' : 'bg-secondary/10 text-secondary'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m-6-8h6M4 6h16M4 18h16" />
+                    </svg>
+                  </div>
+                  <h3 className={`text-xs font-bold uppercase tracking-wider font-poppins ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Methodology & Pipeline
+                  </h3>
                 </div>
-                <div>
-                  <h3 className={`text-xs font-bold font-poppins ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>About This Tracker</h3>
-                </div>
+                <ul className={`space-y-3 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Ingestion:</strong> Polling of RSS feeds from major Nigerian press outlets (Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV) every 5 hours.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Entity Extraction:</strong> Throttled LLM engines extract structured records (date, location, incident type, and casualties) directly from article body text.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Deduplication:</strong> A semantic fingerprinting system checks coordinates and casualty details to merge duplicates and multi-source cross-reports.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Human Verification:</strong> Every incident is routed through an admin verification gateway before being published to the public registry.
+                    </span>
+                  </li>
+                </ul>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary' : 'bg-secondary'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>News Feeds:</strong> Premium Times, Daily Trust, Vanguard, Punch, The Cable, Channels TV scraped via GitHub Actions every 5 hours.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/70' : 'bg-secondary/70'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>AI Extraction:</strong> Groq (Llama 3.1 8B) extracts structured incident data from article text.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-secondary/50' : 'bg-secondary/50'}`}></span>
-                      <span><strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Storage:</strong> Supabase with semantic fingerprint deduplication.</span>
-                    </li>
-                  </ul>
+
+              {/* Scope & Limitations */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`p-1.5 rounded-md ${isDarkMode ? 'bg-amber-500/20 text-amber-500' : 'bg-amber-500/10 text-amber-600'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  </div>
+                  <h3 className={`text-xs font-bold uppercase tracking-wider font-poppins ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>
+                    Scope & Limitations
+                  </h3>
                 </div>
-                <div>
-                  <ul className={`space-y-1 text-[11px] leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/60' : 'bg-amber-500/60'}`}></span>
-                      <span>Media-dependent; may undercount remote incidents.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/50' : 'bg-amber-500/50'}`}></span>
-                      <span>5-hour update delay between occurrence and appearance.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/40' : 'bg-amber-500/40'}`}></span>
-                      <span>AI-extracted casualty figures may contain inaccuracies.</span>
-                    </li>
-                    <li className="flex gap-2">
-                      <span className={`mt-1 w-1 h-1 rounded-full flex-shrink-0 ${isDarkMode ? 'bg-amber-500/30' : 'bg-amber-500/30'}`}></span>
-                      <span>Only incidents with at least one casualty are logged.</span>
-                    </li>
-                  </ul>
-                </div>
+                <ul className={`space-y-3 text-[11px] leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Media Dependency:</strong> The registry relies on documented press coverage. Remote or offline conflict events are subject to media under-reporting.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Temporal Latency:</strong> New developments take up to 5 hours to sync. Rapidly changing or emerging reports will update sequentially.
+                    </span>
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0"></span>
+                    <span>
+                      <strong className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>Registry Focus:</strong> To ensure high-quality policy indicators, only conflict events involving active casualties (fatalities, injuries, or abductions) are recorded.
+                    </span>
+                  </li>
+                </ul>
               </div>
-              <div className={`mt-3 pt-2.5 border-t text-[10px] ${isDarkMode ? 'border-white/5 text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-                Beyond Statistics Secretariat &middot; Abuja, FCT, Nigeria &mdash; For research and policy planning only.
-              </div>
+            </div>
+            <div className={`mt-6 pt-4 border-t flex flex-col sm:flex-row sm:justify-between items-center gap-2 text-[10px] ${isDarkMode ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
+              <span>Beyond Statistics Observatory &middot; Abuja, FCT, Nigeria</span>
+              <span>For analytical, research, and policy planning purposes only.</span>
             </div>
           </div>
         </div>
+      </div>
     </div>
   );
 }
