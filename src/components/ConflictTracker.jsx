@@ -732,14 +732,14 @@ export default function ConflictTracker() {
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
               isDarkMode ? 'bg-white/10 text-slate-400' : 'bg-slate-100 text-slate-500'
             }`}>
-              {filteredIncidents.length} Match{filteredIncidents.length !== 1 ? 'es' : ''}
+              {Math.min(displayLimit, filteredIncidents.length)} of {filteredIncidents.length} Match{filteredIncidents.length !== 1 ? 'es' : ''}
             </span>
           </div>
           <IncidentTable incidents={filteredIncidents.slice(0, displayLimit)} isDarkMode={isDarkMode} />
-          {filteredIncidents.length > displayLimit && (
+          {displayLimit < 20 && filteredIncidents.length > displayLimit && (
             <div className={`flex justify-center p-4 border-t ${isDarkMode ? 'border-white/10' : 'border-slate-100'}`}>
               <button
-                onClick={() => setDisplayLimit((prev) => prev + 10)}
+                onClick={() => setDisplayLimit(20)}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider outline-none border cursor-pointer ${
                   isDarkMode 
                     ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' 
