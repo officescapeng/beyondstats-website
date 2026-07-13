@@ -38,7 +38,7 @@ const STATES_LIST = [
 ].sort();
 
 const INCIDENT_TYPES = [
-  "kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack", "other"
+  "kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack", "political conflict", "other"
 ];
 
 export default function ReviewPortal({ setCurrentPage }) {

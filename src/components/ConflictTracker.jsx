@@ -56,6 +56,7 @@ const INCIDENT_TYPE_COLORS = {
   'armed attack': '#e11d48',
   clash: '#9333ea',
   bombing: '#c026d3',
+  'political conflict': '#0284c7',
   other: '#6b7280',
 };
 
@@ -66,6 +67,7 @@ const INCIDENT_TYPE_LABELS = {
   'armed attack': 'Armed Attack',
   clash: 'Clash',
   bombing: 'Bombing',
+  'political conflict': 'Political Conflict',
   other: 'Other',
 };
 
@@ -198,6 +200,7 @@ function getIncidentTypeKey(type) {
   if (t.includes('attack')) return 'armed attack';
   if (t.includes('clash')) return 'clash';
   if (t.includes('bomb')) return 'bombing';
+  if (t.includes('polit') || t.includes('elect') || t.includes('party') || t.includes('protest') || t.includes('riot')) return 'political conflict';
   return 'other';
 }
 

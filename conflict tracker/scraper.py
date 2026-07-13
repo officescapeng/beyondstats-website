@@ -243,6 +243,8 @@ _CONFLICT_KEYWORDS = (
     "kidnap", "abduct", "hostage", "ransom", "ambush", "raid", "invasion",
     "shoot", "shooting", "gun", "bomb", "ied", "explos", "suicide",
     "militia", "cult", "cultism", "armed", "violence", "unrest", "riot",
+    "politic", "election", "campaign", "party clash", "protest", "demonstration",
+    "thug", "thugs", "ballot", "polling",
 )
 
 _NON_CONFLICT_KEYWORDS = (
@@ -273,6 +275,8 @@ def canonical_incident_type(raw: str) -> str:
     if any(k in it for k in ("attack", "ambush", "raid", "gun", "shoot",
                              "assault", "invasion", "militia", "armed", "killing")):
         return "armed attack"
+    if any(k in it for k in ("politic", "elect", "party", "protest", "riot", "campaign", "thug", "ballot")):
+        return "political conflict"
     return "other"
 
 
@@ -759,6 +763,7 @@ A qualifying incident is:
 - Communal / farmer-herder clashes
 - Armed robberies with deaths
 - Bombings / explosions
+- Political violence / election clashes / party clashes / protest unrest
 
 INCIDENTS SHOULD PREFERABLY HAVE AT LEAST ONE CASUALTY, BUT YOU MAY EXTRACT ZERO-CASUALTY OR UNKNOWN-CASUALTY ATTACKS IF THEY DESCRIBE HIGHLY RELEVANT CONFLICT ACTIONS (E.G. BOMBINGS, BANDIT ATTACKS, CLASHES, OR KIDNAPPING ATTEMPTS).
 
@@ -813,6 +818,7 @@ INCIDENT TYPE CLASSIFICATION:
 - "armed robbery with deaths" → "armed attack"
 - "kidnapping" → "kidnapping"
 - "bombing/explosion" → "bombing"
+- "political protest clash / election violence / party fight / thugs attack" → "political conflict"
 
 [OK] ALL OF THESE ARE VALID CONFLICT INCIDENTS
 
@@ -826,7 +832,7 @@ OTHERWISE: Extract every distinct incident with ALL these keys:
   "state": "State Name" or null,
   "lga": "LGA Name" or null,
   "community": "Village/Community Name" or "Unknown",
-  "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, other],
+  "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, political conflict, other],
   "fatalities": integer >= 0 or null,
   "abductions": integer >= 0 or null,
   "injuries": integer >= 0 or null,
