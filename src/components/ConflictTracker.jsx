@@ -104,7 +104,7 @@ function StatsCards({ overall, isDarkMode }) {
   );
 }
 
-function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
+function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filterYear, filterMonth }) {
   const statsMap = new Map(byState.map((s) => [s.state ? s.state.toLowerCase().trim() : '', s]));
   const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
   const [tooltip, setTooltip] = useState(null);
@@ -123,7 +123,17 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode }) {
 
   return (
     <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-      <h3 className={`text-sm font-bold mb-4 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Fatalities by State &mdash; Choropleth</h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
+          Fatalities by State &mdash; Choropleth
+        </h3>
+        <span className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
+          isDarkMode ? 'bg-white/10 text-secondary' : 'bg-secondary/10 text-secondary'
+        }`}>
+          {filterMonth ? `${MONTHS.find(m => m.value === filterMonth)?.label || filterMonth} ` : ''}
+          {filterYear ? `${filterYear} Incidents` : 'All-Time Incidents'}
+        </span>
+      </div>
       <div className="relative">
         <svg viewBox={nigeriaMap.viewBox} className="w-full h-auto drop-shadow-lg select-none">
           {nigeriaMap.locations.map(loc => {
@@ -263,6 +273,39 @@ function IncidentTable({ incidents, isDarkMode }) {
   );
 }
 
+const MONTHS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' }
+];
+
+const WEEKS = [
+  { value: '1', label: 'Week 1 (Days 1-7)' },
+  { value: '2', label: 'Week 2 (Days 8-14)' },
+  { value: '3', label: 'Week 3 (Days 15-21)' },
+  { value: '4', label: 'Week 4 (Days 22-28)' },
+  { value: '5', label: 'Week 5 (Days 29+)' }
+];
+
+const getWeekOfMonth = (dayStr) => {
+  const day = parseInt(dayStr, 10);
+  if (isNaN(day)) return '';
+  if (day <= 7) return '1';
+  if (day <= 14) return '2';
+  if (day <= 21) return '3';
+  if (day <= 28) return '4';
+  return '5';
+};
+
 export default function ConflictTracker() {
   const [incidents, setIncidents] = useState([]);
   const [stats, setStats] = useState(null);
@@ -273,10 +316,13 @@ export default function ConflictTracker() {
   const [selectedMapState, setSelectedMapState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(10);
+  const [filterYear, setFilterYear] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
+  const [filterWeek, setFilterWeek] = useState('');
 
   useEffect(() => {
     setDisplayLimit(10);
-  }, [filterState, filterType, selectedMapState]);
+  }, [filterState, filterType, selectedMapState, filterYear, filterMonth, filterWeek]);
 
   useEffect(() => {
     async function fetchData() {
@@ -308,15 +354,79 @@ export default function ConflictTracker() {
     fetchData();
   }, []);
 
+  // Filter incidents for map (exclude state, keep date and type)
+  const mapFilteredIncidents = incidents.filter((i) => {
+    if (filterType && getIncidentTypeKey(i.incident_type) !== filterType) return false;
+    if (i.date) {
+      const y = i.date.substring(0, 4);
+      const m = i.date.substring(5, 7);
+      const d = i.date.substring(8, 10);
+      if (filterYear && y !== filterYear) return false;
+      if (filterMonth && m !== filterMonth) return false;
+      if (filterWeek && getWeekOfMonth(d) !== filterWeek) return false;
+    }
+    return true;
+  });
+
+  // Filter incidents for registry and stats (include state, date, and type)
   const filteredIncidents = incidents.filter((i) => {
     const activeStateFilter = filterState || selectedMapState;
     if (activeStateFilter && i.state.toLowerCase() !== activeStateFilter.toLowerCase()) return false;
     if (filterType && getIncidentTypeKey(i.incident_type) !== filterType) return false;
+    if (i.date) {
+      const y = i.date.substring(0, 4);
+      const m = i.date.substring(5, 7);
+      const d = i.date.substring(8, 10);
+      if (filterYear && y !== filterYear) return false;
+      if (filterMonth && m !== filterMonth) return false;
+      if (filterWeek && getWeekOfMonth(d) !== filterWeek) return false;
+    }
     return true;
   });
 
+  const mapStats = computeStats(mapFilteredIncidents);
+  const pageStats = computeStats(filteredIncidents);
+
   const stateOptions = [...new Set(incidents.map((i) => i.state))].filter(Boolean).sort();
   const typeOptions = [...new Set(incidents.map((i) => getIncidentTypeKey(i.incident_type)))].filter(Boolean).sort();
+  const yearOptions = [...new Set(incidents.map((i) => i.date ? i.date.substring(0, 4) : ''))].filter(Boolean).sort().reverse();
+
+  const handleExportCSV = () => {
+    const headers = ['Date', 'State', 'LGA', 'Community', 'Incident Type', 'Fatalities', 'Abductions', 'Injuries', 'Summary', 'Source URL'];
+    
+    const rows = filteredIncidents.map(i => [
+      i.date || '',
+      i.state || '',
+      i.lga || '',
+      i.community || '',
+      i.incident_type || '',
+      i.fatalities || 0,
+      i.abductions || 0,
+      i.injuries || 0,
+      (i.summary || '').replace(/"/g, '""'),
+      i.source_url || ''
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(r => r.map(val => typeof val === 'string' ? `"${val}"` : val).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    
+    const yearStr = filterYear ? `-${filterYear}` : '';
+    const monthStr = filterMonth ? `-${filterMonth}` : '';
+    const weekStr = filterWeek ? `-week${filterWeek}` : '';
+    const stateStr = (filterState || selectedMapState) ? `-${filterState || selectedMapState}` : '';
+    link.setAttribute('download', `beyondstats-conflict-export${stateStr}${yearStr}${monthStr}${weekStr}.csv`);
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   if (loading) {
     return (
@@ -427,22 +537,164 @@ export default function ConflictTracker() {
       </div>
       <div className="max-w-7xl mx-auto px-6 py-12">
 
-        {stats && <StatsCards overall={stats.overall} isDarkMode={isDarkMode} />}
+        {/* UNIFIED FILTER & EXPORT BAR */}
+        <div className={`rounded-xl p-4 mb-6 shadow-sm border ${
+          isDarkMode ? 'bg-[#051630] border-white/10' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Year Select */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Year</label>
+                <select
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${
+                    isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <option value="">All Years</option>
+                  {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
 
-        {stats && (
+              {/* Month Select */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Month</label>
+                <select
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${
+                    isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <option value="">All Months</option>
+                  {MONTHS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+
+              {/* Week Select */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Week</label>
+                <select
+                  value={filterWeek}
+                  onChange={(e) => setFilterWeek(e.target.value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${
+                    isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <option value="">All Weeks</option>
+                  {WEEKS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+                </select>
+              </div>
+
+              {/* State Select */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>State</label>
+                <select
+                  value={filterState}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterState(val);
+                    setSelectedMapState(val || null);
+                  }}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${
+                    isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <option value="">All States</option>
+                  {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              {/* Incident Type Select */}
+              <div className="flex flex-col gap-1">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>Type</label>
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${
+                    isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'
+                  }`}
+                >
+                  <option value="">All Types</option>
+                  {typeOptions.map(t => <option key={t} value={t}>{INCIDENT_TYPE_LABELS[t] || t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end md:self-center">
+              {/* Reset button */}
+              {(filterYear || filterMonth || filterWeek || filterState || filterType || selectedMapState) && (
+                <button
+                  onClick={() => {
+                    setFilterYear('');
+                    setFilterMonth('');
+                    setFilterWeek('');
+                    setFilterState('');
+                    setFilterType('');
+                    setSelectedMapState(null);
+                  }}
+                  className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors uppercase tracking-wider cursor-pointer outline-none border-none bg-transparent ${
+                    isDarkMode ? 'text-slate-400 hover:text-red-400' : 'text-slate-500 hover:text-red-500'
+                  }`}
+                >
+                  Clear All
+                </button>
+              )}
+
+              {/* Export CSV button */}
+              <button
+                onClick={handleExportCSV}
+                className="px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider outline-none border cursor-pointer bg-secondary border-secondary text-white hover:bg-secondary/90 shadow-sm flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {pageStats && <StatsCards overall={pageStats.overall} isDarkMode={isDarkMode} />}
+
+        {pageStats && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
             <div className="lg:col-span-2">
-              <StateHeatmap byState={stats.byState} selectedState={selectedMapState} onStateClick={setSelectedMapState} isDarkMode={isDarkMode} />
+              <StateHeatmap
+                byState={mapStats.byState}
+                selectedState={selectedMapState}
+                onStateClick={(stateName) => {
+                  setSelectedMapState(stateName);
+                  setFilterState(stateName || '');
+                }}
+                isDarkMode={isDarkMode}
+                filterYear={filterYear}
+                filterMonth={filterMonth}
+              />
             </div>
-              <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
+            <div className={`rounded-xl p-5 shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>{selectedMapState ? `Incidents in ${selectedMapState}` : 'Incidents per State'}</h3>
-                {(filterType || filterState || selectedMapState) && (
-                  <button onClick={() => { setFilterType(''); setFilterState(''); setSelectedMapState(null); }} className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}>Clear</button>
+                {(filterType || filterState || selectedMapState || filterYear || filterMonth || filterWeek) && (
+                  <button
+                    onClick={() => {
+                      setFilterType('');
+                      setFilterState('');
+                      setSelectedMapState(null);
+                      setFilterYear('');
+                      setFilterMonth('');
+                      setFilterWeek('');
+                    }}
+                    className={`text-[10px] font-semibold uppercase tracking-wider bg-transparent border-none cursor-pointer outline-none ${isDarkMode ? 'text-slate-500 hover:text-red-400' : 'text-slate-400 hover:text-red-500'}`}
+                  >
+                    Clear
+                  </button>
                 )}
               </div>
               {selectedMapState && (() => {
-                const s = stats.byState.find(s => s.state === selectedMapState);
+                const s = pageStats.byState.find(s => s.state === selectedMapState);
                 if (!s) return null;
                 return (
                   <div className="grid grid-cols-2 gap-2 mb-4">
@@ -475,30 +727,13 @@ export default function ConflictTracker() {
         )}
 
         <div className={`rounded-xl overflow-hidden shadow-sm ${isDarkMode ? 'bg-[#051630] border border-white/10' : 'bg-white border border-slate-200'}`}>
-          <div className={`p-5 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
-            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents</h3>
-            <div className="flex gap-3">
-              <select
-                id="conflict-filter-state"
-                name="filterState"
-                value={filterState}
-                onChange={(e) => setFilterState(e.target.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
-              >
-                <option value="">All States</option>
-                {stateOptions.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select
-                id="conflict-filter-type"
-                name="filterType"
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold outline-none focus:ring-1 focus:ring-secondary focus:border-secondary ${isDarkMode ? 'bg-[#030e20] border border-white/20 text-slate-200' : 'bg-white border border-slate-300 text-slate-700'}`}
-              >
-                <option value="">All Types</option>
-                {typeOptions.map((t) => <option key={t} value={t}>{INCIDENT_TYPE_LABELS[t] || t}</option>)}
-              </select>
-            </div>
+          <div className={`p-5 border-b flex flex-row items-center justify-between gap-4 ${isDarkMode ? 'border-white/10' : 'border-slate-200'}`}>
+            <h3 className={`text-sm font-bold ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>Incidents Registry</h3>
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+              isDarkMode ? 'bg-white/10 text-slate-400' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {filteredIncidents.length} Match{filteredIncidents.length !== 1 ? 'es' : ''}
+            </span>
           </div>
           <IncidentTable incidents={filteredIncidents.slice(0, displayLimit)} isDarkMode={isDarkMode} />
           {filteredIncidents.length > displayLimit && (
