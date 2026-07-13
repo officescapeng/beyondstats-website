@@ -272,6 +272,11 @@ export default function ConflictTracker() {
   const [filterType, setFilterType] = useState('');
   const [selectedMapState, setSelectedMapState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(10);
+
+  useEffect(() => {
+    setDisplayLimit(10);
+  }, [filterState, filterType, selectedMapState]);
 
   useEffect(() => {
     async function fetchData() {
@@ -495,7 +500,21 @@ export default function ConflictTracker() {
               </select>
             </div>
           </div>
-          <IncidentTable incidents={filteredIncidents} isDarkMode={isDarkMode} />
+          <IncidentTable incidents={filteredIncidents.slice(0, displayLimit)} isDarkMode={isDarkMode} />
+          {filteredIncidents.length > displayLimit && (
+            <div className={`flex justify-center p-4 border-t ${isDarkMode ? 'border-white/10' : 'border-slate-100'}`}>
+              <button
+                onClick={() => setDisplayLimit((prev) => prev + 10)}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-wider outline-none border cursor-pointer ${
+                  isDarkMode 
+                    ? 'bg-white/5 border-white/10 text-white hover:bg-white/10' 
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                Load More Events
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
