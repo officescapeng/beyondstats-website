@@ -861,10 +861,12 @@ Text: {text}
 _groq_lock = _threading.Lock()
 _GROQ_MIN_INTERVAL = 6.0
 _groq_last_call: list[float] = [0.0]
+_groq_cooldown_until: list[float] = [0.0]
 
 _gemini_lock = _threading.Lock()
 _GEMINI_MIN_INTERVAL = 6.0  # Spaced to ensure max 10 RPM (well under Gemini's 15 RPM limit)
 _gemini_last_call: list[float] = [0.0]
+_gemini_cooldown_until: list[float] = [0.0]
 
 _RETRY_AFTER_RE = re.compile(r"try again in\s+([\d.]+)s", re.IGNORECASE)
 
@@ -889,6 +891,15 @@ def extract_incidents_gemini(prompt: str, api_key: str, retries: int = 2) -> lis
     
     backoff = 10.0
     for attempt in range(retries):
+        # Wait for global cooldown if active
+        while True:
+            now = time.monotonic()
+            cooldown_gap = _gemini_cooldown_until[0] - now
+            if cooldown_gap > 0:
+                time.sleep(cooldown_gap)
+            else:
+                break
+
         # Enforce spacing gap under lock
         with _gemini_lock:
             elapsed = time.monotonic() - _gemini_last_call[0]
@@ -903,7 +914,9 @@ def extract_incidents_gemini(prompt: str, api_key: str, retries: int = 2) -> lis
             
             # Check for 429 status code
             if r.status_code == 429:
-                log.warning(f"  [LLM] Gemini rate limit hit (429). Retrying after lock release...")
+                log.warning(f"  [LLM] Gemini rate limit hit (429). Setting global cooldown for {backoff:.1f}s...")
+                with _gemini_lock:
+                    _gemini_cooldown_until[0] = time.monotonic() + backoff
                 time.sleep(backoff)
                 backoff *= 2
                 continue
@@ -938,6 +951,15 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
     gemini_key = os.environ.get("GEMINI_API_KEY")
 
     for attempt in range(retries):
+        # Wait for global cooldown if active
+        while True:
+            now = time.monotonic()
+            cooldown_gap = _groq_cooldown_until[0] - now
+            if cooldown_gap > 0:
+                time.sleep(cooldown_gap)
+            else:
+                break
+
         success = False
         res = None
         exc_to_raise = None
@@ -1009,7 +1031,9 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
             if is_rate_limit:
                 retry_after = _parse_retry_after(err_str) or (backoff * 4)
                 log.warning(f"  [LLM] 429 rate limit (attempt {attempt + 1}). "
-                            f"Waiting {retry_after:.1f}s (released lock)")
+                            f"Setting global cooldown for {retry_after:.1f}s")
+                with _groq_lock:
+                    _groq_cooldown_until[0] = time.monotonic() + retry_after
                 time.sleep(retry_after)
             else:
                 wait = backoff
