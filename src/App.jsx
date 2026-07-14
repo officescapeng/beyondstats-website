@@ -109,7 +109,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
         </span>
       </div>
 
-      <div className="hidden md:flex items-center gap-7">
+      <div className="hidden md:flex items-center gap-10">
         {links.map((link) => {
           const isAbout = link.id === 'about';
           const isPrograms = link.id === 'programs';
@@ -141,12 +141,12 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
 
                 {/* Dropdown Menu */}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
-                  <div className="bg-[#051c44] border border-white/5 rounded-2xl p-2 w-48 shadow-xl flex flex-col gap-1.5">
+                  <div className="bg-[#051c44] border border-white/5 rounded-2xl p-3 w-56 shadow-xl flex flex-col gap-2">
                     {isAbout ? (
                       <>
                         <button
                           onClick={() => setCurrentPage('programs')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
                         >
                           What We Do
                         </button>
@@ -155,18 +155,18 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                       <>
                         <button
                           onClick={() => setCurrentPage('dashboard')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
                         >
                           HSRI Dashboard
                         </button>
                         <button
                           onClick={() => setCurrentPage('tracker')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
                         >
                           Conflict Tracker
                         </button>
                         <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
                         >
                           <span>Research Hub</span>
                           <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
@@ -177,7 +177,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                     ) : (
                       <>
                         <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
                         >
                           <span>Our Impact Stories</span>
                           <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
@@ -185,7 +185,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                           </span>
                         </button>
                         <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full"
+                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
                         >
                           <span>Our Impact Map</span>
                           <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
