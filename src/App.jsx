@@ -140,58 +140,106 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                 </button>
 
                 {/* Dropdown Menu */}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto transition-all duration-300 z-50">
-                  <div className="bg-[#0c285c]/95 backdrop-blur-md border border-white/10 rounded-2xl p-3 w-56 shadow-2xl flex flex-col gap-2">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto group-hover/nav:translate-y-0 translate-y-2 transition-all duration-300 z-50">
+                  <div className="bg-[#0c285c]/95 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 w-64 shadow-2xl flex flex-col gap-1">
                     {isAbout ? (
                       <>
                         <button
                           onClick={() => setCurrentPage('programs')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
+                          className="flex items-start gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer outline-none text-left w-full transition-all duration-200"
                         >
-                          What We Do
+                          <Globe className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-poppins text-xs font-bold text-white tracking-wide">
+                              What We Do
+                            </span>
+                            <span className="text-[9px] text-white/50 leading-relaxed font-inter">
+                              Our founding mission and focus areas
+                            </span>
+                          </div>
                         </button>
                       </>
                     ) : isPrograms ? (
                       <>
                         <button
                           onClick={() => setCurrentPage('dashboard')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
+                          className="flex items-start gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer outline-none text-left w-full transition-all duration-200"
                         >
-                          HSRI Dashboard
+                          <Compass className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-poppins text-xs font-bold text-white tracking-wide">
+                              HSRI Dashboard
+                            </span>
+                            <span className="text-[9px] text-white/50 leading-relaxed font-inter">
+                              Explore state-level security indicators
+                            </span>
+                          </div>
                         </button>
                         <button
                           onClick={() => setCurrentPage('tracker')}
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider transition-all duration-200"
+                          className="flex items-start gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer outline-none text-left w-full transition-all duration-200"
                         >
-                          Conflict Tracker
+                          <AlertCircle className="w-4 h-4 text-secondary mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-poppins text-xs font-bold text-white tracking-wide">
+                              Conflict Tracker
+                            </span>
+                            <span className="text-[9px] text-white/50 leading-relaxed font-inter">
+                              Real-time registry of security incidents
+                            </span>
+                          </div>
                         </button>
-                        <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
-                        >
-                          <span>Research Hub</span>
-                          <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
-                            Soon
-                          </span>
-                        </button>
+                        <div className="flex items-start gap-3 p-2 rounded-xl text-left w-full opacity-40 cursor-not-allowed select-none">
+                          <FileText className="w-4 h-4 text-white/40 mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-poppins text-xs font-bold text-white/80 tracking-wide">
+                                Research Hub
+                              </span>
+                              <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/10 text-white/50 border border-white/10 rounded-full tracking-widest uppercase leading-none scale-90">
+                                Soon
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-white/40 leading-relaxed font-inter">
+                              Evidence-based publications & briefs
+                            </span>
+                          </div>
+                        </div>
                       </>
                     ) : (
                       <>
-                        <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
-                        >
-                          <span>Our Impact Stories</span>
-                          <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
-                            Soon
-                          </span>
-                        </button>
-                        <button
-                          className="font-inter text-[10px] font-bold text-left px-4 py-3 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full transition-all duration-200"
-                        >
-                          <span>Our Impact Map</span>
-                          <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
-                            Soon
-                          </span>
-                        </button>
+                        <div className="flex items-start gap-3 p-2 rounded-xl text-left w-full opacity-40 cursor-not-allowed select-none">
+                          <Heart className="w-4 h-4 text-white/40 mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-poppins text-xs font-bold text-white/80 tracking-wide">
+                                Impact Stories
+                              </span>
+                              <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/10 text-white/50 border border-white/10 rounded-full tracking-widest uppercase leading-none scale-90">
+                                Soon
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-white/40 leading-relaxed font-inter">
+                              Stories of community-level change
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3 p-2 rounded-xl text-left w-full opacity-40 cursor-not-allowed select-none">
+                          <MapPin className="w-4 h-4 text-white/40 mt-0.5 flex-shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-poppins text-xs font-bold text-white/80 tracking-wide">
+                                Impact Map
+                              </span>
+                              <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/10 text-white/50 border border-white/10 rounded-full tracking-widest uppercase leading-none scale-90">
+                                Soon
+                              </span>
+                            </div>
+                            <span className="text-[9px] text-white/40 leading-relaxed font-inter">
+                              Geographic footprint of interventions
+                            </span>
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
