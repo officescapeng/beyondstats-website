@@ -141,7 +141,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
 
                 {/* Dropdown Menu */}
                 <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 pointer-events-none group-hover/nav:opacity-100 group-hover/nav:pointer-events-auto group-hover/nav:translate-y-0 translate-y-2 transition-all duration-300 z-50">
-                  <div className="bg-[#0c285c]/95 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 w-60 shadow-2xl flex flex-col gap-1">
+                  <div className="bg-[#0c285c]/95 backdrop-blur-md border border-white/10 rounded-2xl p-2.5 w-52 shadow-2xl flex flex-col gap-1">
                     {isAbout ? (
                       <>
                         <button
