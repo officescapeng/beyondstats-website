@@ -93,7 +93,6 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
   const links = [
     { name: 'About Us', id: 'about', dropdown: true },
     { name: 'Programs', id: 'programs', dropdown: true },
-    { name: 'Research', id: 'research', disabled: true, soon: true },
     { name: 'Impact', id: 'impact', dropdown: true, disabled: true, soon: true },
     { name: 'Contact', id: 'contact' }
   ]
@@ -125,7 +124,7 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                     link.disabled ? 'text-white/40 hover:text-white/40' :
                     (currentPage === link.id && link.id !== 'programs') ||
                     (link.id === 'about' && (currentPage === 'about' || currentPage === 'programs')) ||
-                    (link.id === 'programs' && (currentPage === 'dashboard' || currentPage === 'tracker')) ||
+                    (link.id === 'programs' && (currentPage === 'dashboard' || currentPage === 'tracker' || currentPage === 'research')) ||
                     (link.id === 'impact' && (currentPage === 'impact' || currentPage === 'impact-map'))
                       ? 'text-secondary'
                       : 'text-white/80 hover:text-secondary'
@@ -165,6 +164,14 @@ function Header({ currentPage, setCurrentPage, setIsMenuOpen, setSelectedStateId
                           className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/70 hover:text-secondary hover:bg-white/5 cursor-pointer outline-none uppercase tracking-wider"
                         >
                           Conflict Tracker
+                        </button>
+                        <button
+                          className="font-inter text-[10px] font-bold text-left px-4 py-2.5 rounded-lg text-white/30 cursor-not-allowed outline-none uppercase tracking-wider bg-transparent border-none flex items-center justify-between w-full"
+                        >
+                          <span>Research Hub</span>
+                          <span className="px-1.5 py-0.5 text-[7px] font-black bg-white/5 text-white/30 border border-white/10 rounded-full tracking-widest uppercase leading-none">
+                            Soon
+                          </span>
                         </button>
                       </>
                     ) : (
@@ -3092,7 +3099,7 @@ function App() {
               { name: 'What We Do', id: 'programs', indent: true },
               { name: 'Human Security Dashboard', id: 'dashboard' },
               { name: 'Conflict Tracker', id: 'tracker', indent: true },
-              { name: 'Research Hub', id: 'research', disabled: true },
+              { name: 'Research Hub', id: 'research', indent: true, disabled: true },
               { name: 'Our Impact Stories', id: 'impact', disabled: true },
               { name: 'Our Impact Map', id: 'impact-map', indent: true, disabled: true },
               { name: 'Support & Partnerships', id: 'partnerships' },
