@@ -223,9 +223,10 @@ def is_nigeria_relevant(title: str, text: str) -> bool:
 def is_conflict_relevant(title: str, text: str) -> bool:
     """
     Check if the article contains conflict-related keywords.
-    Only articles with at least one conflict marker are sent to the LLM.
+    Only articles with at least one conflict marker in the title are sent to the LLM.
     We skip articles containing non-conflict or sports/financial keywords.
     """
+    title_lower = title.lower()
     combined = f"{title} {text}".lower()
     
     # 1. Reject if any non-conflict keywords are present
@@ -247,8 +248,21 @@ def is_conflict_relevant(title: str, text: str) -> bool:
         )
         if not any(kw in combined for kw in violence_keywords):
             return False
+
+    # 3. Require the title itself to contain at least one conflict/security keyword.
+    # This prevents general articles with random keyword matches in the body from passing.
+    title_conflict_keywords = (
+        "attack", "assault", "killing", "killed", "kill", "massacre", "slain", "slay", "murder", 
+        "dead", "death", "fatal", "gunmen", "gunman", "bandit", "banditry", "terror", "insurg", 
+        "boko", "iswap", "clash", "reprisal", "herdsmen", "herder", "fulani", "kidnap", 
+        "abduct", "hostage", "ransom", "ambush", "raid", "invasion", "shoot", "gun", "bomb", 
+        "ied", "explos", "suicide", "militia", "cult", "armed", "violence", "unrest", "riot", 
+        "protest", "thug", "rescue", "robber", "hijack", "neutraliz", "clashed"
+    )
+    if not any(kw in title_lower for kw in title_conflict_keywords):
+        return False
             
-    # 3. Accept only if conflict keywords are present
+    # 4. Accept only if conflict keywords are present in the combined text
     return any(kw in combined for kw in _CONFLICT_KEYWORDS)
 
 
