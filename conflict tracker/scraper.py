@@ -915,57 +915,56 @@ def extract_incidents_gemini(prompt: str, api_key: str, retries: int = 2) -> lis
     
     backoff = 10.0
     for attempt in range(retries):
-        # Wait for global cooldown if active
-        while True:
-            now = time.monotonic()
-            cooldown_gap = _gemini_cooldown_until[0] - now
-            if cooldown_gap > 0:
-                time.sleep(cooldown_gap)
-            else:
-                break
-
-        # Enforce spacing gap under lock
         with _gemini_lock:
+            # Wait for global cooldown if active
+            while True:
+                now = time.monotonic()
+                cooldown_gap = _gemini_cooldown_until[0] - now
+                if cooldown_gap > 0:
+                    time.sleep(cooldown_gap)
+                else:
+                    break
+
+            # Enforce spacing gap
             elapsed = time.monotonic() - _gemini_last_call[0]
             gap     = _GEMINI_MIN_INTERVAL - elapsed
             if gap > 0:
                 time.sleep(gap)
             _gemini_last_call[0] = time.monotonic()
             
-        try:
-            log.info(f"  [LLM] Attempting failover to Gemini API (throttled, attempt {attempt + 1})...")
-            r = requests.post(url, headers=headers, json=payload, timeout=20)
-            
-            # Check for 429 status code
-            if r.status_code == 429:
-                log.warning(f"  [LLM] Gemini rate limit hit (429). Setting global cooldown for {backoff:.1f}s...")
-                with _gemini_lock:
-                    _gemini_cooldown_until[0] = time.monotonic() + backoff
-                time.sleep(backoff)
-                backoff *= 2
-                continue
+            try:
+                log.info(f"  [LLM] Attempting failover to Gemini API (throttled, attempt {attempt + 1})...")
+                r = requests.post(url, headers=headers, json=payload, timeout=20)
                 
-            r.raise_for_status()
-            data = r.json()
-            text = data["candidates"][0]["content"]["parts"][0]["text"]
-            
-            # Parse JSON from response markdown codeblocks if necessary
-            text_clean = text.strip()
-            if text_clean.startswith("```"):
-                lines = text_clean.splitlines()
-                if lines[0].startswith("```json"):
-                    text_clean = "\n".join(lines[1:-1])
-                elif lines[0].startswith("```"):
-                    text_clean = "\n".join(lines[1:-1])
-            
-            res_data = json.loads(text_clean)
-            return res_data.get("incidents", [])
-        except Exception as exc:
-            log.warning(f"  [LLM] Gemini attempt {attempt + 1} error: {exc}")
-            if attempt < retries - 1:
-                time.sleep(5.0)
-                continue
-            return None
+                # Check for 429 status code
+                if r.status_code == 429:
+                    log.warning(f"  [LLM] Gemini rate limit hit (429). Setting global cooldown for {backoff:.1f}s...")
+                    _gemini_cooldown_until[0] = time.monotonic() + backoff
+                    time.sleep(backoff)
+                    backoff *= 2
+                    continue
+                    
+                r.raise_for_status()
+                data = r.json()
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Parse JSON from response markdown codeblocks if necessary
+                text_clean = text.strip()
+                if text_clean.startswith("```"):
+                    lines = text_clean.splitlines()
+                    if lines[0].startswith("```json"):
+                        text_clean = "\n".join(lines[1:-1])
+                    elif lines[0].startswith("```"):
+                        text_clean = "\n".join(lines[1:-1])
+                
+                res_data = json.loads(text_clean)
+                return res_data.get("incidents", [])
+            except Exception as exc:
+                log.warning(f"  [LLM] Gemini attempt {attempt + 1} error: {exc}")
+                if attempt < retries - 1:
+                    time.sleep(5.0)
+                    continue
+                return None
     return None
 
 
