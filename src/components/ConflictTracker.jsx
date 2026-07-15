@@ -111,7 +111,10 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
   const maxFatalities = Math.max(...byState.map((s) => s.fatalities), 1);
   const [tooltip, setTooltip] = useState(null);
 
-  const nameOverrides = { 'Federal Capital Territory': 'FCT' };
+  const nameOverrides = {
+    'Federal Capital Territory': 'FCT',
+    'Nassarawa': 'Nasarawa'
+  };
 
   function getHeatColor(fatalities) {
     if (fatalities === 0) return '#e2e8f0';
@@ -158,7 +161,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
                   const svg = e.target.closest('svg');
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
-                  setTooltip({ state: loc.name, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                  setTooltip({ state: stateName, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
                 }}
                 onMouseMove={e => {
                   const svg = e.target.closest('svg');
