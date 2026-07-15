@@ -232,7 +232,23 @@ def is_conflict_relevant(title: str, text: str) -> bool:
     if any(kw in combined for kw in _NON_CONFLICT_KEYWORDS):
         return False
         
-    # 2. Accept only if conflict keywords are present
+    # 2. Check political articles specifically:
+    # If the article matches peaceful political/electoral keywords, it MUST also contain 
+    # at least one violence/disruption keyword to be considered a political conflict.
+    political_keywords = ("politic", "election", "campaign", "ballot", "polling", "vote", "party")
+    has_political = any(kw in combined for kw in political_keywords)
+    
+    if has_political:
+        violence_keywords = (
+            "clash", "violence", "thug", "attack", "riot", "protest", "fight", 
+            "disrupt", "kill", "arrest", "hijack", "snatch", "threat", "chaos", 
+            "crisis", "assault", "armed", "clashed", "shooting", "shoot", "bomb", 
+            "weapons", "firearms", "clashed", "killed", "killings"
+        )
+        if not any(kw in combined for kw in violence_keywords):
+            return False
+            
+    # 3. Accept only if conflict keywords are present
     return any(kw in combined for kw in _CONFLICT_KEYWORDS)
 
 
@@ -272,6 +288,10 @@ _NON_CONFLICT_KEYWORDS = (
     
     # Infrastructure & routine administration
     "clean water supply", "tree planting", "pension records update",
+
+    # Legal, white-collar crime, and peaceful court cases
+    "cyberstalking", "money laundering", "financial fraud", "defamation", "libel",
+    "divorce suit", "sued for", "breach of contract",
 
     # Foreign / International news indicators
     "gaza", "israel", "palestin", "hamas", "netanyahu", "tel aviv",
