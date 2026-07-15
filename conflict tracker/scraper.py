@@ -228,8 +228,15 @@ def is_conflict_relevant(title: str, text: str) -> bool:
     """
     Check if the article contains conflict-related keywords.
     Only articles with at least one conflict marker are sent to the LLM.
+    We skip articles containing non-conflict or sports/financial keywords.
     """
     combined = f"{title} {text}".lower()
+    
+    # 1. Reject if any non-conflict keywords are present
+    if any(kw in combined for kw in _NON_CONFLICT_KEYWORDS):
+        return False
+        
+    # 2. Accept only if conflict keywords are present
     return any(kw in combined for kw in _CONFLICT_KEYWORDS)
 
 
@@ -248,10 +255,27 @@ _CONFLICT_KEYWORDS = (
 )
 
 _NON_CONFLICT_KEYWORDS = (
-    "accident", "crash", "collision", "collapse", "flood", "fire outbreak",
-    "stampede", "drown", "electrocut", "lightning", "disease", "cholera",
-    "outbreak", "epidemic", "poison", "food poisoning", "suicide bid",
-    "childbirth", "capsize", "tanker explosion",
+    # Natural disasters & accidents
+    "accident", "car crash", "plane crash", "train collision", "boat mishap", "drown",
+    "flood", "fire outbreak", "cholera", "malaria", "polio", "covid", "epidemic",
+    "food poisoning", "childbirth", "electrocut", "lightning", "building collapse",
+    
+    # Sports news
+    "football", "soccer", "super falcons", "super eagles", "world cup", "wafcon", 
+    "championship", "tournament", "premier league", "la liga", "champions league", 
+    "olympics", "stadium", "trophy", "goal scorer", "match preview", "match report",
+    
+    # Entertainment & fashion
+    "nollywood", "musician", "singer", "album release", "movie premiere", "fashion show",
+    "book launch", "creative director",
+    
+    # Pure business & finance
+    "fintech", "startup funding", "venture capital", "stock market", "bond offer",
+    "treasury bills", "pension scheme", "pension records", "cooking gas distribution",
+    "economic growth", "inflation rate",
+    
+    # Infrastructure & routine administration
+    "clean water supply", "tree planting", "pension records update",
 )
 
 
