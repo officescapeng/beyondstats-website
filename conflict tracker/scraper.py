@@ -291,7 +291,11 @@ _NON_CONFLICT_KEYWORDS = (
 
     # Legal, white-collar crime, and peaceful court cases
     "cyberstalking", "money laundering", "financial fraud", "defamation", "libel",
-    "divorce suit", "sued for", "breach of contract",
+    "divorce suit", "sued for", "breach of contract", "forfeiture", "forfeited",
+    "court orders", "court order", "supreme court", "high court", "appeal court",
+    "court of appeal", "federal high court", "ruling", "judgment", "judgement",
+    "acquitted", "acquittal", "indicted", "indictment", "litigation", "prosecute",
+    "prosecution", "prosecutor",
 
     # Foreign / International news indicators
     "gaza", "israel", "palestin", "hamas", "netanyahu", "tel aviv",
@@ -1033,6 +1037,11 @@ def extract_incidents(title: str, text: str, article_date: str, retries: int = 3
             except Exception as exc:
                 _groq_last_call[0] = time.monotonic()
                 exc_to_raise = exc
+                err_str = str(exc)
+                if "rate" in err_str.lower() or "429" in err_str:
+                    # Capture or estimate retry-after seconds
+                    retry_after = _parse_retry_after(err_str) or 8.0
+                    _groq_cooldown_until[0] = time.monotonic() + retry_after
 
         if success and res:
             try:
