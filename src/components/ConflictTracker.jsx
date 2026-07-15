@@ -26,7 +26,9 @@ function computeStats(incidents) {
   for (const i of incidents) {
     if (!i.state) continue;
     const rawState = i.state.trim();
-    const normalizedState = rawState.charAt(0).toUpperCase() + rawState.slice(1).toLowerCase();
+    const normalizedState = rawState.toUpperCase() === 'FCT' 
+      ? 'FCT' 
+      : rawState.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 
     if (!stateMap[normalizedState]) stateMap[normalizedState] = { state: normalizedState, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
     stateMap[normalizedState].count++;
@@ -700,7 +702,7 @@ export default function ConflictTracker() {
                 )}
               </div>
               {selectedMapState && (() => {
-                const s = pageStats.byState.find(s => s.state === selectedMapState);
+                const s = pageStats.byState.find(s => s.state && s.state.toLowerCase() === selectedMapState.toLowerCase());
                 if (!s) return null;
                 return (
                   <div className="grid grid-cols-2 gap-2 mb-4">
