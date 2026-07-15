@@ -190,16 +190,8 @@ def resolve_state(raw: str):
 
 
 # ─────────────────────────────────────────────────────────────
-# NIGERIA RELEVANCE FILTER (LESS STRICT)
+# NIGERIA RELEVANCE FILTER
 # ─────────────────────────────────────────────────────────────
-_NIGERIA_PATTERNS = [
-    re.compile(r"\b" + re.escape(t) + r"\b", re.IGNORECASE) for t in [
-        "nigeria", "nigerian", "abuja", "lagos", "kaduna", "kano", "borno", "plateau",
-        "army", "police", "dss", "bandits", "banditry", "boko haram", "herdsmen",
-        "kidnap", "kidnapped", "kidnapping", "abducted", "abduction", "hostage", "ransom",
-    ]
-]
-
 MIN_TEXT_LENGTH  = 150
 MAX_ARTICLE_CHARS = 1500
 
@@ -210,18 +202,22 @@ EVENT_START_DATE = datetime(2026, 7, 1, tzinfo=timezone.utc)
 
 
 def nigeria_score(text: str) -> int:
-    return sum(1 for p in _NIGERIA_PATTERNS if p.search(text))
+    combined = text.lower()
+    nigeria_markers = ["nigeria", "nigerian", "naira", "abuja", "lagos"] + list(STATE_MAP.keys())
+    return sum(1 for marker in nigeria_markers if marker in combined)
 
 
 def is_nigeria_relevant(title: str, text: str) -> bool:
     """
-    Require 1+ Nigeria markers for relevance (relaxed).
-    Catches more legitimate Nigerian security articles.
+    Require actual Nigerian markers for relevance.
+    Prevents matching generic international news mentioning 'police' or 'army'.
     """
     if len(text) < MIN_TEXT_LENGTH:
         return False
-    score = nigeria_score(f"{title} {text}")
-    return score >= 1
+    combined = f"{title} {text}".lower()
+    
+    nigeria_markers = ["nigeria", "nigerian", "naira", "abuja", "lagos"] + list(STATE_MAP.keys())
+    return any(marker in combined for marker in nigeria_markers)
 
 
 def is_conflict_relevant(title: str, text: str) -> bool:
@@ -276,6 +272,17 @@ _NON_CONFLICT_KEYWORDS = (
     
     # Infrastructure & routine administration
     "clean water supply", "tree planting", "pension records update",
+
+    # Foreign / International news indicators
+    "gaza", "israel", "palestin", "hamas", "netanyahu", "tel aviv",
+    "ukraine", "russia", "putin", "zelensky", "kyiv", "moscow",
+    "us military", "pentagon", "white house", "biden", "trump", "harris", "democrats", "republicans",
+    "iran", "tehran", "hormuz", "yemen", "houthi", "red sea",
+    "kenya", "nairobi", "ruto", "sudan", "khartoum", "somalia", "mogadishu", "al-shabaab",
+    "syria", "damascus", "lebanon", "beirut", "hezbollah",
+    "china", "beijing", "taiwan", "india", "delhi",
+    "north korea", "south korea", "pyongyang", "seoul",
+    "united kingdom", "london", "downing street", "macron", "france", "paris",
 )
 
 
