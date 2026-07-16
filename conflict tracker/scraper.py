@@ -497,6 +497,13 @@ def _is_duplicate(sig: dict, recent: list[dict]) -> bool:
     """
     Fuzzy duplicate detection: same real-world event reported by different sources.
     """
+    def clean_words(s: str) -> set[str]:
+        if not s:
+            return set()
+        words = re.sub(r"[^\w\s]", "", s.lower()).split()
+        ignore = {"area", "village", "town", "lga", "community", "street", "road", "near", "at", "in", "of"}
+        return {w for w in words if w not in ignore and len(w) > 2}
+
     for r in recent:
         # State must match exactly
         if r["state"] != sig["state"]:
@@ -504,12 +511,6 @@ def _is_duplicate(sig: dict, recent: list[dict]) -> bool:
         
         # Incident type must match exactly
         if r["incident_type"] != sig["incident_type"]:
-            continue
-        
-        # LGA must be compatible
-        r_lga = (r.get("lga") or "").strip().lower() or None
-        s_lga = (sig.get("lga") or "").strip().lower() or None
-        if r_lga and s_lga and r_lga != s_lga:
             continue
         
         # Date must be within window
@@ -523,6 +524,19 @@ def _is_duplicate(sig: dict, recent: list[dict]) -> bool:
         if abs(r.get("fatalities", 0) - sig.get("fatalities", 0)) > FATALITY_TOLERANCE:
             continue
         if abs(r.get("abductions", 0) - sig.get("abductions", 0)) > ABDUCTION_TOLERANCE:
+            continue
+
+        # Location compatibility check (LGAs must match OR communities must overlap)
+        r_lga = (r.get("lga") or "").strip().lower() or None
+        s_lga = (sig.get("lga") or "").strip().lower() or None
+        
+        r_comm = clean_words(r.get("community", ""))
+        s_comm = clean_words(sig.get("community", ""))
+        comm_overlap = len(r_comm & s_comm) > 0 if (r_comm and s_comm) else False
+        
+        lga_match = (r_lga == s_lga) if (r_lga and s_lga) else True
+        
+        if not (lga_match or comm_overlap):
             continue
         
         return True
@@ -1189,7 +1203,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
         res    = supabase.table("incidents").select(
-            "date,state,lga,incident_type,fatalities,abductions,semantic_fp"
+            "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
         ).gte("date", cutoff).execute()
     
         fps  = set()
@@ -1201,6 +1215,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
             sigs.append({
                 "state":         row.get("state"),
                 "lga":           (row.get("lga") or "").strip().lower() or None,
+                "community":     row.get("community"),
                 "incident_type": canonical_incident_type(row.get("incident_type")),
                 "date":          _parse_date(row.get("date")),
                 "fatalities":    _safe_int(row.get("fatalities")),
@@ -1214,7 +1229,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
             res    = supabase.table("incidents").select(
-                "date,state,lga,incident_type,fatalities,abductions,semantic_fp"
+                "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
             ).gte("date", cutoff).execute()
             fps  = set()
             sigs = []
@@ -1225,6 +1240,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
                 sigs.append({
                     "state":         row.get("state"),
                     "lga":           (row.get("lga") or "").strip().lower() or None,
+                    "community":     row.get("community"),
                     "incident_type": canonical_incident_type(row.get("incident_type")),
                     "date":          _parse_date(row.get("date")),
                     "fatalities":    _safe_int(row.get("fatalities")),
@@ -1438,6 +1454,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 sig = {
                     "state":         clean_state,
                     "lga":           (lga or "").strip().lower() or None,
+                    "community":     incident.get("community"),
                     "incident_type": canon_type,
                     "date":          _parse_date(occurrence_date),
                     "fatalities":    fatalities,
