@@ -165,7 +165,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
                   const svg = e.target.closest('svg');
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
-                  setTooltip({ state: stateName, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                  setTooltip({ state: stateName, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, injuries: stats?.injuries || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
                 }}
                 onMouseMove={e => {
                   const svg = e.target.closest('svg');
@@ -184,6 +184,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
             <p className={isDarkMode ? 'text-slate-300' : 'text-slate-500'}>{tooltip.incidents} incidents</p>
             <p className="text-red-500">{tooltip.fatalities} killed</p>
             <p className="text-amber-600">{tooltip.abductions} abducted</p>
+            <p className="text-orange-500">{tooltip.injuries} injured</p>
           </div>
         )}
       </div>
