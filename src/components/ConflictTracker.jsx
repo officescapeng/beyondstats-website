@@ -118,8 +118,9 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
     'Nassarawa': 'Nasarawa'
   };
 
-  function getHeatColor(fatalities) {
-    if (fatalities === 0) return '#e2e8f0';
+  function getHeatColor(fatalities, count = 0) {
+    if (count === 0) return '#e2e8f0';
+    if (fatalities === 0) return '#fed7aa';
     const ratio = fatalities / maxFatalities;
     if (ratio > 0.75) return '#7f1d1d';
     if (ratio > 0.5) return '#b91c1c';
@@ -147,7 +148,8 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
             const stateName = nameOverrides[loc.name] || loc.name;
             const stats = statsMap.get(stateName.toLowerCase().trim());
             const fatalities = stats?.fatalities || 0;
-            const color = getHeatColor(fatalities);
+            const count = stats?.count || 0;
+            const color = getHeatColor(fatalities, count);
             const isSelected = selectedState && selectedState.toLowerCase() === stateName.toLowerCase();
             return (
               <path
@@ -188,6 +190,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
         <div className={`flex items-center gap-3 justify-center mt-4 text-xs ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>
         <span>Intensity:</span>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm border border-slate-300" style={{backgroundColor:'#e2e8f0'}} /><span>0</span></div>
+        <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#fed7aa'}} /><span>Non-fatal</span></div>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#fca5a5'}} /><span>Low</span></div>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#dc2626'}} /><span>Med</span></div>
         <div className="flex items-center gap-1"><div className="w-4 h-3 rounded-sm" style={{backgroundColor:'#7f1d1d'}} /><span>High</span></div>
