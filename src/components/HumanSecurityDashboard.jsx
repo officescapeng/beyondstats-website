@@ -1141,7 +1141,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return [
       { label: "National Average Risk Index", value: `${averageRisk}/100`, desc: "Moderate Human Security Threat", color: "text-amber-500", icon: Scale },
       { label: "Total Internally Displaced Persons", value: totalIDPs.toLocaleString(), desc: "Active IDPs tracked in NEMA & IOM registries", color: "text-rose-500", icon: Users },
-      { label: "Critical Risk States", value: `${criticalStatesCount} / 37`, desc: "Composite score ≥ 75 (mostly Borno/North)", color: "text-rose-600", icon: Shield },
+      { label: "Critical Risk States", value: `${criticalStatesCount} / 37`, desc: "Composite score ≥ 75", color: "text-rose-600", icon: Shield },
       { label: "Conflict Fatalities (1 Year)", value: totalFatalities.toLocaleString(), desc: "Beyond# Live Tracker incident fatalities", color: "text-red-500", icon: Activity }
     ];
   };
