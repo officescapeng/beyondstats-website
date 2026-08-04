@@ -328,8 +328,8 @@ export default function ConflictTracker() {
   const [selectedMapState, setSelectedMapState] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(10);
-  const [filterYear, setFilterYear] = useState('');
-  const [filterMonth, setFilterMonth] = useState('');
+  const [filterYear, setFilterYear] = useState(() => String(new Date().getFullYear()));
+  const [filterMonth, setFilterMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
   const [filterWeek, setFilterWeek] = useState('');
 
   useEffect(() => {
