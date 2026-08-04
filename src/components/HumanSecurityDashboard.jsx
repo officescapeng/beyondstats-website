@@ -277,14 +277,14 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             stateTotals[stateId].fatalities += (inc.fatalities || 0);
           });
 
-          // Compute new scores and update stateDataList
-          setStateDataList(prevData => {
-            const updated = prevData.map(item => {
+          // Compute new scores and update stateDataList using STATIC_STATE_DATA as the baseline
+          setStateDataList(() => {
+            const updated = STATIC_STATE_DATA.map(item => {
               const totals = stateTotals[item.id] || { incidents: 0, fatalities: 0 };
               const updatedPeaceSecurity = {
                 ...item.peaceSecurity,
-                conflictIncidents: totals.incidents,
-                fatalities: totals.fatalities
+                conflictIncidents: (item.peaceSecurity.conflictIncidents || 0) + totals.incidents,
+                fatalities: (item.peaceSecurity.fatalities || 0) + totals.fatalities
               };
               
               // Recalculate risks using computeStateRisks helper
