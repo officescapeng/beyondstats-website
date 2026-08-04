@@ -49,6 +49,95 @@ import {
   ChevronDown,
 } from 'lucide-react';
 
+function computeNationalAverages(stateList) {
+  const count = stateList.length || 1;
+  const sums = {
+    poverty: { mpi: 0, unemployment: 0, inflationImpact: 0 },
+    education: { attendance: 0, outOfSchool: 0, literacy: 0 },
+    health: { maternalHealth: 0, childHealth: 0, healthcareAccess: 0 },
+    foodSecurity: { foodConsumption: 0, acuteInsecurity: 0, nutritionRisk: 0 },
+    displacement: { idps: 0, returnees: 0, newEvents: 0 },
+    peaceSecurity: { conflictIncidents: 0, fatalities: 0, communitySecurity: 0 },
+    risks: { poverty: 0, education: 0, health: 0, foodSecurity: 0, displacement: 0, peaceSecurity: 0, composite: 0 }
+  };
+
+  stateList.forEach(state => {
+    sums.poverty.mpi += state.poverty.mpi || 0;
+    sums.poverty.unemployment += state.poverty.unemployment || 0;
+    sums.poverty.inflationImpact += state.poverty.inflationImpact || 0;
+
+    sums.education.attendance += state.education.attendance || 0;
+    sums.education.outOfSchool += state.education.outOfSchool || 0;
+    sums.education.literacy += state.education.literacy || 0;
+
+    sums.health.maternalHealth += state.health.maternalHealth || 0;
+    sums.health.childHealth += state.health.childHealth || 0;
+    sums.health.healthcareAccess += state.health.healthcareAccess || 0;
+
+    sums.foodSecurity.foodConsumption += state.foodSecurity.foodConsumption || 0;
+    sums.foodSecurity.acuteInsecurity += state.foodSecurity.acuteInsecurity || 0;
+    sums.foodSecurity.nutritionRisk += state.foodSecurity.nutritionRisk || 0;
+
+    sums.displacement.idps += state.displacement.idps || 0;
+    sums.displacement.returnees += state.displacement.returnees || 0;
+    sums.displacement.newEvents += state.displacement.newEvents || 0;
+
+    sums.peaceSecurity.conflictIncidents += state.peaceSecurity.conflictIncidents || 0;
+    sums.peaceSecurity.fatalities += state.peaceSecurity.fatalities || 0;
+    sums.peaceSecurity.communitySecurity += state.peaceSecurity.communitySecurity || 0;
+
+    sums.risks.poverty += state.risks.poverty || 0;
+    sums.risks.education += state.risks.education || 0;
+    sums.risks.health += state.risks.health || 0;
+    sums.risks.foodSecurity += state.risks.foodSecurity || 0;
+    sums.risks.displacement += state.risks.displacement || 0;
+    sums.risks.peaceSecurity += state.risks.peaceSecurity || 0;
+    sums.risks.composite += state.risks.composite || 0;
+  });
+
+  return {
+    poverty: {
+      mpi: Math.round((sums.poverty.mpi / count) * 10) / 10,
+      unemployment: Math.round((sums.poverty.unemployment / count) * 10) / 10,
+      inflationImpact: Math.round((sums.poverty.inflationImpact / count) * 10) / 10
+    },
+    education: {
+      attendance: Math.round((sums.education.attendance / count) * 10) / 10,
+      outOfSchool: Math.round((sums.education.outOfSchool / count) * 10) / 10,
+      literacy: Math.round((sums.education.literacy / count) * 10) / 10
+    },
+    health: {
+      maternalHealth: Math.round((sums.health.maternalHealth / count) * 10) / 10,
+      childHealth: Math.round((sums.health.childHealth / count) * 10) / 10,
+      healthcareAccess: Math.round((sums.health.healthcareAccess / count) * 10) / 10
+    },
+    foodSecurity: {
+      foodConsumption: Math.round((sums.foodSecurity.foodConsumption / count) * 10) / 10,
+      acuteInsecurity: Math.round((sums.foodSecurity.acuteInsecurity / count) * 10) / 10,
+      nutritionRisk: Math.round((sums.foodSecurity.nutritionRisk / count) * 10) / 10
+    },
+    displacement: {
+      idps: Math.round(sums.displacement.idps / count),
+      returnees: Math.round(sums.displacement.returnees / count),
+      newEvents: Math.round((sums.displacement.newEvents / count) * 10) / 10
+    },
+    peaceSecurity: {
+      conflictIncidents: Math.round((sums.peaceSecurity.conflictIncidents / count) * 10) / 10,
+      fatalities: Math.round((sums.peaceSecurity.fatalities / count) * 10) / 10,
+      communitySecurity: Math.round((sums.peaceSecurity.communitySecurity / count) * 10) / 10
+    },
+    risks: {
+      poverty: Math.round(sums.risks.poverty / count),
+      education: Math.round(sums.risks.education / count),
+      health: Math.round(sums.risks.health / count),
+      foodSecurity: Math.round(sums.risks.foodSecurity / count),
+      displacement: Math.round(sums.risks.displacement / count),
+      peaceSecurity: Math.round(sums.risks.peaceSecurity / count),
+      composite: Math.round(sums.risks.composite / count)
+    }
+  };
+}
+
 export default function HumanSecurityDashboard({ selectedStateId: propStateId, setSelectedStateId: propSetSelectedStateId }) {
   const [stateDataList, setStateDataList] = useState(STATIC_STATE_DATA);
   const [nationalAverages, setNationalAverages] = useState(STATIC_AVG_DATA);
@@ -185,30 +274,33 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
         // Compute new scores and update stateDataList
         setStateDataList(prevData => {
-          return prevData.map(item => {
-            const totals = stateTotals[item.id];
-            if (totals) {
-              const updatedPeaceSecurity = {
-                ...item.peaceSecurity,
-                conflictIncidents: (item.peaceSecurity.conflictIncidents || 0) + totals.incidents,
-                fatalities: (item.peaceSecurity.fatalities || 0) + totals.fatalities
-              };
-              
-              // Recalculate risks using computeStateRisks helper
-              const rawStateItem = {
-                ...item,
-                peaceSecurity: updatedPeaceSecurity
-              };
-              const recalculated = computeStateRisks(rawStateItem);
-              return {
-                ...item,
-                peaceSecurity: updatedPeaceSecurity,
-                risks: recalculated,
-                category: getRiskCategory(recalculated.composite)
-              };
-            }
-            return item;
+          const updated = prevData.map(item => {
+            const totals = stateTotals[item.id] || { incidents: 0, fatalities: 0 };
+            const updatedPeaceSecurity = {
+              ...item.peaceSecurity,
+              conflictIncidents: totals.incidents,
+              fatalities: totals.fatalities
+            };
+            
+            // Recalculate risks using computeStateRisks helper
+            const rawStateItem = {
+              ...item,
+              peaceSecurity: updatedPeaceSecurity
+            };
+            const recalculated = computeStateRisks(rawStateItem);
+            return {
+              ...item,
+              peaceSecurity: updatedPeaceSecurity,
+              risks: recalculated,
+              category: getRiskCategory(recalculated.composite)
+            };
           });
+
+          // Also update national averages using the updated data!
+          const newAverages = computeNationalAverages(updated);
+          setNationalAverages(newAverages);
+
+          return updated;
         });
 
         setIsCheckingUpdates(false);
@@ -297,20 +389,8 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
     return combined;
   };
   useEffect(() => {
-    const lastCheck = localStorage.getItem('beyond_dashboard_last_daily_check');
-    if (!lastCheck) {
-      triggerDailyCheck(true);
-    } else {
-      const lastCheckDate = new Date(lastCheck);
-      const oneDayAgo = new Date();
-      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-      if (lastCheckDate < oneDayAgo) {
-        triggerDailyCheck(false);
-      } else {
-        // Run silent check on mount to ensure Supabase data is loaded in state
-        triggerDailyCheck(true);
-      }
-    }
+    // Run live check on mount to pull latest Supabase incidents
+    triggerDailyCheck(true);
   }, []);
 
   const activeState = PROCESSED_STATE_DATA.find(s => s.id === selectedStateId) || PROCESSED_STATE_DATA[0];
