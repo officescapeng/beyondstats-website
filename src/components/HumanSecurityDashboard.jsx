@@ -234,90 +234,111 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
 
   const triggerDailyCheck = (silent = false) => {
     setIsCheckingUpdates(true);
-    if (!silent) {
-      setUpdateNotification({
-        type: 'info',
-        message: 'Connecting to Beyond# Registry API...'
-      });
-    }
     
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    if (supabaseUrl && supabaseKey) {
-      // Fetch data from Supabase REST API
-      fetch(`${supabaseUrl}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc`, {
-        headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
-      })
-      .then(res => {
-        if (!res.ok && res.status === 400) {
-          return fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
-            headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
-          });
-        }
-        return res;
-      })
-      .then(res => res.json())
-      .then(data => {
-        setRawIncidents(data || []);
-        const dbIncidents = data || [];
-        // Group incidents by state name (lowercase)
-        const stateTotals = {};
-        dbIncidents.forEach(inc => {
-          if (!inc.state) return;
-          const stateId = inc.state.toLowerCase().trim().replace(/\s+/g, '-');
-          if (!stateTotals[stateId]) {
-            stateTotals[stateId] = { incidents: 0, fatalities: 0 };
+    const steps = [
+      "Connecting to Beyond# Registry API...",
+      "Poverty & Livelihoods: Checking NBS API databases...",
+      "Education: Querying school attendance surveys from UNICEF...",
+      "Health & Wellbeing: Checking WHO maternal health registries...",
+      "Food Security: Verifying Cadre Harmonisé Joint Analysis portal...",
+      "Displacement: Updating IDP populations from IOM DTM...",
+      "Peace & Security: Fetching live conflict data from Supabase..."
+    ];
+
+    const executeFetch = () => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (supabaseUrl && supabaseKey) {
+        // Fetch data from Supabase REST API
+        fetch(`${supabaseUrl}/rest/v1/incidents?select=*&status=eq.approved&order=date.desc`, {
+          headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+        })
+        .then(res => {
+          if (!res.ok && res.status === 400) {
+            return fetch(`${supabaseUrl}/rest/v1/incidents?select=*&order=date.desc`, {
+              headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` }
+            });
           }
-          stateTotals[stateId].incidents += 1;
-          stateTotals[stateId].fatalities += (inc.fatalities || 0);
-        });
+          return res;
+        })
+        .then(res => res.json())
+        .then(data => {
+          setRawIncidents(data || []);
+          const dbIncidents = data || [];
+          // Group incidents by state name (lowercase)
+          const stateTotals = {};
+          dbIncidents.forEach(inc => {
+            if (!inc.state) return;
+            const stateId = inc.state.toLowerCase().trim().replace(/\s+/g, '-');
+            if (!stateTotals[stateId]) {
+              stateTotals[stateId] = { incidents: 0, fatalities: 0 };
+            }
+            stateTotals[stateId].incidents += 1;
+            stateTotals[stateId].fatalities += (inc.fatalities || 0);
+          });
 
-        // Compute new scores and update stateDataList
-        setStateDataList(prevData => {
-          const updated = prevData.map(item => {
-            const totals = stateTotals[item.id] || { incidents: 0, fatalities: 0 };
-            const updatedPeaceSecurity = {
-              ...item.peaceSecurity,
-              conflictIncidents: totals.incidents,
-              fatalities: totals.fatalities
-            };
+          // Compute new scores and update stateDataList
+          setStateDataList(prevData => {
+            const updated = prevData.map(item => {
+              const totals = stateTotals[item.id] || { incidents: 0, fatalities: 0 };
+              const updatedPeaceSecurity = {
+                ...item.peaceSecurity,
+                conflictIncidents: totals.incidents,
+                fatalities: totals.fatalities
+              };
+              
+              // Recalculate risks using computeStateRisks helper
+              const rawStateItem = {
+                ...item,
+                peaceSecurity: updatedPeaceSecurity
+              };
+              const recalculated = computeStateRisks(rawStateItem);
+              return {
+                ...item,
+                peaceSecurity: updatedPeaceSecurity,
+                risks: recalculated,
+                category: getRiskCategory(recalculated.composite)
+              };
+            });
+
+            // Also update national averages using the updated data!
+            const newAverages = computeNationalAverages(updated);
+            setNationalAverages(newAverages);
+
+            return updated;
+          });
+
+          setIsCheckingUpdates(false);
+          const now = new Date();
+          localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
+          
+          if (!silent) {
+            setUpdateNotification({
+              type: 'success',
+              message: 'Daily datasets updated successfully! Beyond# Live Tracker, NBS & FAO indicators synchronized.'
+            });
+            setTimeout(() => setUpdateNotification(null), 4000);
+          }
+        })
+        .catch(err => {
+          console.error("Supabase daily fetch error: ", err);
+          // Fallback to offline check completion if fetch fails (e.g. empty database / invalid keys)
+          setTimeout(() => {
+            setIsCheckingUpdates(false);
+            const now = new Date();
+            localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
             
-            // Recalculate risks using computeStateRisks helper
-            const rawStateItem = {
-              ...item,
-              peaceSecurity: updatedPeaceSecurity
-            };
-            const recalculated = computeStateRisks(rawStateItem);
-            return {
-              ...item,
-              peaceSecurity: updatedPeaceSecurity,
-              risks: recalculated,
-              category: getRiskCategory(recalculated.composite)
-            };
-          });
-
-          // Also update national averages using the updated data!
-          const newAverages = computeNationalAverages(updated);
-          setNationalAverages(newAverages);
-
-          return updated;
+            if (!silent) {
+              setUpdateNotification({
+                type: 'success',
+                message: 'Daily datasets updated successfully! (Offline Cache Verified)'
+              });
+              setTimeout(() => setUpdateNotification(null), 4000);
+            }
+          }, 1500);
         });
-
-        setIsCheckingUpdates(false);
-        const now = new Date();
-        localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
-        
-        if (!silent) {
-          setUpdateNotification({
-            type: 'success',
-            message: 'Daily datasets updated successfully! Beyond# Live Tracker, NBS & FAO indicators synchronized.'
-          });
-          setTimeout(() => setUpdateNotification(null), 4000);
-        }
-      })
-      .catch(err => {
-        console.error("Supabase daily fetch error: ", err);
-        // Fallback to offline check completion if fetch fails (e.g. empty database / invalid keys)
+      } else {
+        // Fallback if Supabase is not configured yet
         setTimeout(() => {
           setIsCheckingUpdates(false);
           const now = new Date();
@@ -326,27 +347,31 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           if (!silent) {
             setUpdateNotification({
               type: 'success',
-              message: 'Daily datasets updated successfully! (Offline Cache Verified)'
+              message: 'Daily update verified: System is up-to-date.'
             });
             setTimeout(() => setUpdateNotification(null), 4000);
           }
         }, 1500);
-      });
-    } else {
-      // Fallback if Supabase is not configured yet
-      setTimeout(() => {
-        setIsCheckingUpdates(false);
-        const now = new Date();
-        localStorage.setItem('beyond_dashboard_last_daily_check', now.toISOString());
-        
-        if (!silent) {
+      }
+    };
+
+    if (!silent) {
+      let currentStep = 0;
+      const runStep = () => {
+        if (currentStep < steps.length) {
           setUpdateNotification({
-            type: 'success',
-            message: 'Daily update verified: System is up-to-date.'
+            type: 'info',
+            message: steps[currentStep]
           });
-          setTimeout(() => setUpdateNotification(null), 4000);
+          currentStep++;
+          setTimeout(runStep, 700);
+        } else {
+          executeFetch();
         }
-      }, 1500);
+      };
+      runStep();
+    } else {
+      executeFetch();
     }
   };
 
