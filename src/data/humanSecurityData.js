@@ -52,7 +52,7 @@ export const DATA_METADATA = {
     },
     peaceSecurity: {
       name: "Peace & Security",
-      sources: ["ACLED Data Portal", "Nigeria Security Tracker (CFR)"],
+      sources: ["Beyond# Live Conflict Tracker (Vanguard, Punch, Daily Trust, Premium Times, Tribune, Channels TV)", "ACLED Data Portal", "Nigeria Security Tracker (CFR)"],
       metrics: {
         conflictIncidents: { label: "Conflict Incidents (1 Year)", min: 0, max: 1000, suffix: "" },
         fatalities: { label: "Conflict-Related Fatalities (1 Year)", min: 0, max: 5000, suffix: "" },

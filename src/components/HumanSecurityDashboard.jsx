@@ -1886,7 +1886,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
                 </ResponsiveContainer>
               </div>
               <div className="text-xs opacity-75 border-t border-slate-200/10 dark:border-white/5 pt-3">
-                Sources: ACLED Portal, Nigeria Security Tracker
+                Sources: Beyond# Live Conflict Tracker, ACLED Portal, Nigeria Security Tracker
               </div>
             </div>
 
