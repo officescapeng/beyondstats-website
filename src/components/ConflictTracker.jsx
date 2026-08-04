@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sun, Moon, AlertTriangle, Skull, Users, Activity } from 'lucide-react';
+import { Sun, Moon, AlertTriangle, Skull, Users, Activity, HeartHandshake } from 'lucide-react';
 import nigeriaMap from '@svg-maps/nigeria';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -21,6 +21,7 @@ function computeStats(incidents) {
   const totalFatalities = incidents.reduce((s, i) => s + (i.fatalities || 0), 0);
   const totalAbductions = incidents.reduce((s, i) => s + (i.abductions || 0), 0);
   const totalInjuries = incidents.reduce((s, i) => s + (i.injuries || 0), 0);
+  const totalRescued = incidents.reduce((s, i) => s + (i.rescued || 0), 0);
   const stateMap = {};
   const typeMap = {};
   for (const i of incidents) {
@@ -30,22 +31,24 @@ function computeStats(incidents) {
       ? 'FCT' 
       : rawState.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 
-    if (!stateMap[normalizedState]) stateMap[normalizedState] = { state: normalizedState, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    if (!stateMap[normalizedState]) stateMap[normalizedState] = { state: normalizedState, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     stateMap[normalizedState].count++;
     stateMap[normalizedState].fatalities += i.fatalities || 0;
     stateMap[normalizedState].abductions += i.abductions || 0;
     stateMap[normalizedState].injuries += i.injuries || 0;
+    stateMap[normalizedState].rescued += i.rescued || 0;
 
     const rawType = i.incident_type || 'other';
     const typeKey = getIncidentTypeKey(rawType);
-    if (!typeMap[typeKey]) typeMap[typeKey] = { incidentType: typeKey, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    if (!typeMap[typeKey]) typeMap[typeKey] = { incidentType: typeKey, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     typeMap[typeKey].count++;
     typeMap[typeKey].fatalities += i.fatalities || 0;
     typeMap[typeKey].abductions += i.abductions || 0;
     typeMap[typeKey].injuries += i.injuries || 0;
+    typeMap[typeKey].rescued += i.rescued || 0;
   }
   return {
-    overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries },
+    overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries, totalRescued },
     byState: Object.values(stateMap).sort((a, b) => b.fatalities - a.fatalities),
     byType: Object.values(typeMap).sort((a, b) => b.count - a.count),
   };
@@ -88,10 +91,11 @@ function StatsCards({ overall, isDarkMode }) {
     { label: 'People Killed', value: overall.totalFatalities.toLocaleString(), color: 'text-rose-500', icon: Skull },
     { label: 'People Abducted', value: overall.totalAbductions.toLocaleString(), color: 'text-amber-500', icon: Users },
     { label: 'People Injured', value: overall.totalInjuries.toLocaleString(), color: 'text-orange-500', icon: Activity },
+    { label: 'People Rescued', value: (overall.totalRescued || 0).toLocaleString(), color: 'text-emerald-500', icon: HeartHandshake },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
       {cards.map((card) => {
         const IconComponent = card.icon;
         return (
@@ -165,7 +169,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
                   const svg = e.target.closest('svg');
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
-                  setTooltip({ state: stateName, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, injuries: stats?.injuries || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                  setTooltip({ state: stateName, fatalities, incidents: stats?.count || 0, abductions: stats?.abductions || 0, injuries: stats?.injuries || 0, rescued: stats?.rescued || 0, x: e.clientX - rect.left, y: e.clientY - rect.top });
                 }}
                 onMouseMove={e => {
                   const svg = e.target.closest('svg');
@@ -185,6 +189,7 @@ function StateHeatmap({ byState, selectedState, onStateClick, isDarkMode, filter
             <p className="text-red-500">{tooltip.fatalities} killed</p>
             <p className="text-amber-600">{tooltip.abductions} abducted</p>
             <p className="text-orange-500">{tooltip.injuries} injured</p>
+            <p className="text-emerald-500">{tooltip.rescued} rescued</p>
           </div>
         )}
       </div>
@@ -229,6 +234,7 @@ function IncidentTable({ incidents, isDarkMode }) {
             <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Killed</th>
             <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Abducted</th>
             <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Injured</th>
+            <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Rescued</th>
             <th className={`text-left py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'} hidden lg:table-cell`}>Summary</th>
             <th className={`text-center py-3 px-3 font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>Source</th>
           </tr>
@@ -258,6 +264,9 @@ function IncidentTable({ incidents, isDarkMode }) {
                 </td>
                 <td className="py-3 px-3 text-center">
                   {incident.injuries > 0 ? <span className="font-bold text-orange-600">{incident.injuries}</span> : <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>&mdash;</span>}
+                </td>
+                <td className="py-3 px-3 text-center">
+                  {incident.rescued > 0 ? <span className="font-bold text-emerald-600">{incident.rescued}</span> : <span className={isDarkMode ? 'text-slate-600' : 'text-slate-300'}>&mdash;</span>}
                 </td>
                 <td className="py-3 px-3 hidden lg:table-cell max-w-xs">
                   <p className={`text-xs leading-relaxed line-clamp-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{incident.summary}</p>
@@ -404,7 +413,7 @@ export default function ConflictTracker() {
   const yearOptions = [...new Set(incidents.map((i) => i.date ? i.date.substring(0, 4) : ''))].filter(Boolean).sort().reverse();
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'State', 'LGA', 'Community', 'Incident Type', 'Fatalities', 'Abductions', 'Injuries', 'Summary', 'Source URL'];
+    const headers = ['Date', 'State', 'LGA', 'Community', 'Incident Type', 'Fatalities', 'Abductions', 'Injuries', 'Rescued', 'Summary', 'Source URL'];
     
     const rows = filteredIncidents.map(i => [
       i.date || '',
@@ -415,6 +424,7 @@ export default function ConflictTracker() {
       i.fatalities || 0,
       i.abductions || 0,
       i.injuries || 0,
+      i.rescued || 0,
       (i.summary || '').replace(/"/g, '""'),
       i.source_url || ''
     ]);
@@ -722,7 +732,11 @@ export default function ConflictTracker() {
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-500">Abducted</div>
                       <div className="text-lg font-bold text-amber-600">{s.abductions}</div>
                     </div>
-                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'}`}>
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-[#064e3b]/30' : 'bg-emerald-50'}`}>
+                      <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500">Rescued</div>
+                      <div className="text-lg font-bold text-emerald-600">{s.rescued || 0}</div>
+                    </div>
+                    <div className={`rounded-lg p-2.5 text-center ${isDarkMode ? 'bg-orange-950/40' : 'bg-orange-50'} col-span-2`}>
                       <div className="text-[10px] font-semibold uppercase tracking-wider text-orange-500">Injured</div>
                       <div className="text-lg font-bold text-orange-600">{s.injuries}</div>
                     </div>

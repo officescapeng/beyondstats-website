@@ -349,7 +349,7 @@ def canonical_incident_type(raw: str) -> str:
     return "other"
 
 
-def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, injuries: int = 0) -> bool:
+def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, injuries: int = 0, rescued: int = 0) -> bool:
     """
     Check if the incident matches a conflict event.
     Since we verify manually, we are relaxed and allow zero-casualty events
@@ -358,6 +358,7 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, i
     fatalities = _safe_int(fatalities)
     abductions = _safe_int(abductions)
     injuries   = _safe_int(injuries)
+    rescued    = _safe_int(rescued)
 
     it = (incident_type or "").lower().strip()
 
@@ -366,9 +367,9 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, i
         log.debug(f"    [SKIP] Non-conflict keyword found in: {incident_type}")
         return False
 
-    # (2) Abduction is always conflict
-    if abductions > 0:
-        log.debug(f"    [OK] Has abductions ({abductions})")
+    # (2) Abduction or rescue is always conflict
+    if abductions > 0 or rescued > 0:
+        log.debug(f"    [OK] Has abductions/rescued ({abductions}/{rescued})")
         return True
 
     # (3) Standard casualty filter
@@ -783,6 +784,23 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
                     log.debug(f"  [Fix] Detected {fixed_count} injuries (LLM missed)")
                     incident["injuries"] = fixed_count
                     break
+    # ── Fix 2C: Detect rescued ────────────────────────────────
+    current_rescued = _safe_int(incident.get("rescued"))
+    if current_rescued == 0:
+        rescue_patterns = [
+            r'(\d+)\s+(rescued|freed|released|saved)',
+            r'(rescued|freed|released|saved)\s+(\d+)',
+            r'(\d+)\s+(people|residents|persons?|civilians?|villagers?)\s+(rescued|freed|released)',
+        ]
+        for pattern in rescue_patterns:
+            match = re.search(pattern, text_lower)
+            if match:
+                numbers = [g for g in match.groups() if g and g.isdigit()]
+                if numbers:
+                    fixed_count = int(numbers[0])
+                    log.debug(f"  [Fix] Detected {fixed_count} rescued (LLM missed)")
+                    incident["rescued"] = fixed_count
+                    break
     
     # ── Fix 3: Correct date year mismatches ────────────────────
     occ_date = (incident.get("occurrence_date") or "")[:10]
@@ -817,8 +835,9 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
     fatalities = _safe_int(incident.get("fatalities"))
     abductions = _safe_int(incident.get("abductions"))
     injuries   = _safe_int(incident.get("injuries"))
+    rescued    = _safe_int(incident.get("rescued"))
     
-    if fatalities <= 0 and abductions <= 0 and injuries <= 0:
+    if fatalities <= 0 and abductions <= 0 and injuries <= 0 and rescued <= 0:
         recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack"]
         canon = canonical_incident_type(incident.get("incident_type"))
         if canon in recognized_types:
@@ -871,8 +890,13 @@ CASUALTY EXTRACTION RULES:
    - Same rules as above.
    - Default to 0 if not mentioned.
 
-3. REJECTION GATE:
-   - If fatalities = 0, abductions = 0, and injuries = 0, you should STILL extract the incident if it describes a significant security event (e.g. gun attack, explosion, communal clash). Only return an empty list if there are no security incidents reported.
+4. RESCUED (people rescued or released):
+   - Look for: "rescued", "released", "freed", "escaped", "saved"
+   - Same rules as above.
+   - Default to 0 if not mentioned.
+
+5. REJECTION GATE:
+   - If fatalities = 0, abductions = 0, injuries = 0, and rescued = 0, you should STILL extract the incident if it describes a significant security event (e.g. gun attack, explosion, communal clash). Only return an empty list if there are no security incidents reported.
 
 ════════════════════════════════════════════════════════════════
 
@@ -919,6 +943,7 @@ OTHERWISE: Extract every distinct incident with ALL these keys:
   "fatalities": integer >= 0 or null,
   "abductions": integer >= 0 or null,
   "injuries": integer >= 0 or null,
+  "rescued": integer >= 0 or null,
   "occurrence_date": "YYYY-MM-DD" or null,
   "summary": "Brief description of what happened"
 }}
@@ -932,6 +957,7 @@ VALID EXAMPLE:
   "fatalities": 48,
   "abductions": 0,
   "injuries": 12,
+  "rescued": 0,
   "occurrence_date": "2026-07-07",
   "summary": "At least 48 people were killed in a farmer herder clash in Shiroro LGA, Niger State."
 }}
@@ -1202,9 +1228,22 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
     """Load recent incidents for deduplication."""
     try:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
-        res    = supabase.table("incidents").select(
-            "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
-        ).gte("date", cutoff).execute()
+        
+        # Try selecting with rescued column first
+        try:
+            res = supabase.table("incidents").select(
+                "date,state,lga,community,incident_type,fatalities,abductions,rescued,semantic_fp"
+            ).gte("date", cutoff).execute()
+            has_rescued = True
+        except Exception as exc:
+            if "rescued" in str(exc):
+                # Fallback to query without rescued column
+                res = supabase.table("incidents").select(
+                    "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
+                ).gte("date", cutoff).execute()
+                has_rescued = False
+            else:
+                raise exc
     
         fps  = set()
         sigs = []
@@ -1220,6 +1259,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
                 "date":          _parse_date(row.get("date")),
                 "fatalities":    _safe_int(row.get("fatalities")),
                 "abductions":    _safe_int(row.get("abductions")),
+                "rescued":       _safe_int(row.get("rescued")) if has_rescued else 0,
             })
         log.info(f"Loaded {len(fps)} semantic FPs and {len(sigs)} incident sigs from DB (last {lookback_days}d)")
         return fps, sigs
@@ -1228,9 +1268,20 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
         # Try with a shorter lookback in case of timeout
         try:
             cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-            res    = supabase.table("incidents").select(
-                "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
-            ).gte("date", cutoff).execute()
+            try:
+                res = supabase.table("incidents").select(
+                    "date,state,lga,community,incident_type,fatalities,abductions,rescued,semantic_fp"
+                ).gte("date", cutoff).execute()
+                has_rescued = True
+            except Exception as inner_exc:
+                if "rescued" in str(inner_exc):
+                    res = supabase.table("incidents").select(
+                        "date,state,lga,community,incident_type,fatalities,abductions,semantic_fp"
+                    ).gte("date", cutoff).execute()
+                    has_rescued = False
+                else:
+                    raise inner_exc
+
             fps  = set()
             sigs = []
             for row in res.data or []:
@@ -1245,6 +1296,7 @@ def load_recent_incidents(lookback_days: int = 30) -> tuple[set[str], list[dict]
                     "date":          _parse_date(row.get("date")),
                     "fatalities":    _safe_int(row.get("fatalities")),
                     "abductions":    _safe_int(row.get("abductions")),
+                    "rescued":       _safe_int(row.get("rescued")) if has_rescued else 0,
                 })
             log.info(f"Fallback: loaded {len(fps)} semantic FPs (last 7d)")
             return fps, sigs
@@ -1274,8 +1326,23 @@ def safe_store(payload: dict):
     try:
         supabase.table("incidents").upsert(payload, on_conflict="semantic_fp").execute()
     except Exception as exc:
-        log.error(f"DB store error: {exc}")
-        raise exc
+        err_msg = str(exc)
+        if "rescued" in err_msg and ("PGRST204" in err_msg or "column" in err_msg.lower()):
+            log.warning("⚠️  DB Warning: The 'rescued' column is missing in the database. "
+                        "Please run this SQL in your Supabase SQL Editor:\n"
+                        "    ALTER TABLE public.incidents ADD COLUMN rescued INTEGER DEFAULT 0;\n"
+                        "Retrying insert without 'rescued' field...")
+            retry_payload = payload.copy()
+            if "rescued" in retry_payload:
+                del retry_payload["rescued"]
+            try:
+                supabase.table("incidents").upsert(retry_payload, on_conflict="semantic_fp").execute()
+            except Exception as retry_exc:
+                log.error(f"DB store retry error: {retry_exc}")
+                raise retry_exc
+        else:
+            log.error(f"DB store error: {exc}")
+            raise exc
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1412,14 +1479,15 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                 fatalities  = _safe_int(incident.get("fatalities", 0))
                 abductions  = _safe_int(incident.get("abductions", 0))
                 injuries    = _safe_int(incident.get("injuries", 0))
+                rescued     = _safe_int(incident.get("rescued", 0))
                 raw_type    = (incident.get("incident_type") or "").strip()
                 canon_type  = canonical_incident_type(raw_type)
                 
                 log.debug(f"    Type: {raw_type} → {canon_type}")
-                log.debug(f"    Casualties: {fatalities}K / {abductions}A")
+                log.debug(f"    Casualties: {fatalities}K / {abductions}A / {rescued}R")
 
                 # ══ CONFLICT-CASUALTY GATE ══════════════════════════
-                if not is_conflict_casualty(raw_type, fatalities, abductions, injuries):
+                if not is_conflict_casualty(raw_type, fatalities, abductions, injuries, rescued):
                     log.debug(f"    [SKIP] Rejected by conflict-casualty gate")
                     result["skipped_no_casualties"] += 1
                     continue
@@ -1459,6 +1527,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "date":          _parse_date(occurrence_date),
                     "fatalities":    fatalities,
                     "abductions":    abductions,
+                    "rescued":       rescued,
                 }
 
                 # ══ DEDUPLICATION ═══════════════════════════════════
@@ -1491,6 +1560,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
                     "fatalities":    fatalities,
                     "abductions":    abductions,
                     "injuries":      injuries,
+                    "rescued":       rescued,
                     "summary":       (incident.get("summary") or "").strip() or None,
                     "source_url":    url,
                     "content_fp":    f"{art_fp}_{idx}",
@@ -1500,7 +1570,7 @@ def process_entry(entry, dedup, default_date: str) -> dict:
 
                 safe_store(payload)
                 log.info(f"  [OK] SAVED: {clean_state} | {occurrence_date} | {canon_type} | "
-                         f"{fatalities}K / {abductions}A")
+                         f"{fatalities}K / {abductions}A / {rescued}R")
                 result["saved_incidents"] += 1
 
             except Exception as exc:
