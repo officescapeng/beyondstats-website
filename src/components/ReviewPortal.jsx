@@ -502,7 +502,7 @@ export default function ReviewPortal({ setCurrentPage }) {
                           <Calendar className="w-3.5 h-3.5 text-slate-400" /> {inc.date}
                         </span>
                         <span className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400" /> {inc.state} {inc.lga && `| {inc.lga} LGA`} {inc.community && `| {inc.community}`}
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" /> {inc.state} {inc.lga && `| ${inc.lga} LGA`} {inc.community && `| ${inc.community}`}
                         </span>
                       </div>
                       

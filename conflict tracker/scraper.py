@@ -747,8 +747,13 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
         match = re.search(r'at least (\d+)\s+(abducted|kidnapped|missing)', text_lower)
         if match:
             fixed_count = int(match.group(1))
-            log.debug(f"  [Fix] Detected {fixed_count} abductions from 'at least'")
-            incident["abductions"] = fixed_count
+            context = text_lower[max(0, match.start() - 30):min(len(text_lower), match.end() + 30)]
+            if any(w in context for w in ("rescue", "free", "release", "escape", "liberat", "saved")):
+                log.debug(f"  [Fix] Detected {fixed_count} rescued (not abducted) from 'at least' context")
+                incident["rescued"] = fixed_count
+            else:
+                log.debug(f"  [Fix] Detected {fixed_count} abductions from 'at least'")
+                incident["abductions"] = fixed_count
         else:
             # Fallback: other patterns
             abduction_patterns = [
@@ -763,8 +768,13 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
                     numbers = [g for g in match.groups() if g and g.isdigit()]
                     if numbers:
                         fixed_count = int(numbers[0])
-                        log.debug(f"  [Fix] Detected {fixed_count} abductions (LLM missed)")
-                        incident["abductions"] = fixed_count
+                        context = text_lower[max(0, match.start() - 30):min(len(text_lower), match.end() + 30)]
+                        if any(w in context for w in ("rescue", "free", "release", "escape", "liberat", "saved")):
+                            log.debug(f"  [Fix] Detected {fixed_count} rescued (not abducted) from fallback context")
+                            incident["rescued"] = fixed_count
+                        else:
+                            log.debug(f"  [Fix] Detected {fixed_count} abductions (LLM missed)")
+                            incident["abductions"] = fixed_count
                         break
     
     # ── Fix 2B: Detect injuries ─────────────────────────────
@@ -830,6 +840,14 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
         if any(marker in text_lower for marker in violence_markers):
             log.debug(f"  [Fix] Reclassified 'robbery' → 'armed attack'")
             incident["incident_type"] = "armed attack"
+
+    # ── Fix 5: Swapping abductions to rescued for pure rescue events ──
+    summary_lower = (incident.get("summary") or "").lower()
+    if any(w in summary_lower for w in ("rescue", "freed", "released", "liberated", "saved")):
+        if _safe_int(incident.get("rescued")) == 0 and _safe_int(incident.get("abductions")) > 0:
+            log.debug(f"  [Fix] Swapped {_safe_int(incident.get('abductions'))} abductions to rescued based on summary keywords")
+            incident["rescued"] = incident["abductions"]
+            incident["abductions"] = 0
     
     # ── Final validation ───────────────────────────────────────
     fatalities = _safe_int(incident.get("fatalities"))

@@ -410,8 +410,20 @@ export function validateAndFixIncident(
       if (match) {
         const nums = match.filter((g, i) => i > 0 && g && /^\d+$/.test(g));
         if (nums.length > 0) {
-          abductions = parseInt(nums[0], 10);
-          incident.abductions = abductions;
+          const fixedCount = parseInt(nums[0], 10);
+          
+          // Context check to prevent logging rescue/release numbers as abductions
+          const matchIndex = textLower.indexOf(match[0]);
+          const contextStart = Math.max(0, matchIndex - 30);
+          const contextEnd = Math.min(textLower.length, matchIndex + match[0].length + 30);
+          const context = textLower.substring(contextStart, contextEnd);
+          
+          if (["rescue", "free", "release", "escape", "liberat", "saved"].some(w => context.includes(w))) {
+            incident.rescued = fixedCount;
+          } else {
+            abductions = fixedCount;
+            incident.abductions = abductions;
+          }
           break;
         }
       }
@@ -481,6 +493,17 @@ export function validateAndFixIncident(
     const violenceMarkers = ["gun", "shot", "killed", "attack", "armed", "gunfire", "wound"];
     if (violenceMarkers.some((m) => textLower.includes(m))) {
       incident.incident_type = "armed attack";
+    }
+  }
+
+  // ── Fix 7: Swapping abductions to rescued for pure rescue events ──
+  const summaryLower = String(incident.summary || "").toLowerCase();
+  if (["rescue", "freed", "released", "liberated", "saved"].some(w => summaryLower.includes(w))) {
+    const currentRescued = Number(incident.rescued) || 0;
+    const currentAbductions = Number(incident.abductions) || 0;
+    if (currentRescued === 0 && currentAbductions > 0) {
+      incident.rescued = currentAbductions;
+      incident.abductions = 0;
     }
   }
 
