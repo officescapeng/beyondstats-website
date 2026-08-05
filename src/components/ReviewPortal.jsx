@@ -149,7 +149,7 @@ export default function ReviewPortal({ setCurrentPage }) {
       
       const payload = updatedFields ? { ...updatedFields, status: statusUpdate } : { status: statusUpdate };
       
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?id=eq.${id}`, {
+      let res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?id=eq.${id}`, {
         method: 'PATCH',
         headers: { 
           'apikey': SUPABASE_KEY, 
@@ -160,7 +160,28 @@ export default function ReviewPortal({ setCurrentPage }) {
         body: JSON.stringify(payload)
       });
       
-      if (!res.ok) throw new Error(`Failed to update incident: ${res.statusText}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.message || '';
+        const errCode = errData.code || '';
+        
+        if (res.status === 400 && (errMsg.includes('rescued') || errCode === 'PGRST204') && payload.hasOwnProperty('rescued')) {
+          console.warn("Retrying incident update without 'rescued' column because it is missing in Supabase.");
+          const { rescued, ...retryPayload } = payload;
+          res = await fetch(`${SUPABASE_URL}/rest/v1/incidents?id=eq.${id}`, {
+            method: 'PATCH',
+            headers: { 
+              'apikey': SUPABASE_KEY, 
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify(retryPayload)
+          });
+        }
+      }
+      
+      if (!res.ok) throw new Error(`Failed to update incident: ${res.statusText || res.status}`);
       
       setSuccessMsg(`Incident successfully ${statusUpdate === 'approved' ? 'approved' : 'rejected'}!`);
       setEditingId(null);

@@ -440,6 +440,28 @@ export function validateAndFixIncident(
     }
   }
 
+  // ── Fix 6: Detect missed rescues ──
+  let rescued = Number(incident.rescued) || 0;
+  if (rescued === 0) {
+    const patterns = [
+      /(\d+)\s+(?:rescued|freed|released|saved)/,
+      /(?:rescued|freed|released|saved)\s+(\d+)/,
+      /at least (\d+)\s+(?:rescued|freed|released|saved)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = textLower.match(pattern);
+      if (match) {
+        const nums = match.filter((g, i) => i > 0 && g && /^\d+$/.test(g));
+        if (nums.length > 0) {
+          rescued = parseInt(nums[0], 10);
+          incident.rescued = rescued;
+          break;
+        }
+      }
+    }
+  }
+
   // ── Fix 4: Correct date year mismatches ──
   const occDate = String(incident.occurrence_date || "").slice(0, 10);
   if (occDate && occDate.length >= 4) {
@@ -466,9 +488,10 @@ export function validateAndFixIncident(
   fatalities = Number(incident.fatalities) || 0;
   abductions = Number(incident.abductions) || 0;
   injuries = Number(incident.injuries) || 0;
+  rescued = Number(incident.rescued) || 0;
 
-  // FIX #4: Accept injuries as valid too
-  if (fatalities <= 0 && abductions <= 0 && injuries <= 0) {
+  // FIX #4: Accept injuries and rescues as valid too
+  if (fatalities <= 0 && abductions <= 0 && injuries <= 0 && rescued <= 0) {
     return null;
   }
 
@@ -516,8 +539,13 @@ CASUALTY EXTRACTION RULES:
    - Same rules as above.
    - This is IMPORTANT - do not omit injured counts.
 
-4. REJECTION GATE:
-   - If fatalities = 0 AND abductions = 0 AND injuries = 0 → Return {{"incidents": []}}
+4. RESCUED (people saved/freed/released/rescued):
+   - Look for: "rescued", "saved", "freed", "released"
+   - Same rules as above.
+   - This is IMPORTANT - do not omit rescued counts.
+
+5. REJECTION GATE:
+   - If fatalities = 0 AND abductions = 0 AND injuries = 0 AND rescued = 0 → Return {{"incidents": []}}
    - At least ONE must be > 0 to extract
 
 ════════════════════════════════════════════════════════════════
@@ -564,6 +592,7 @@ OTHERWISE: Extract every distinct incident with ALL these keys:
   "fatalities": integer >= 0 or null,
   "abductions": integer >= 0 or null,
   "injuries": integer >= 0 or null,
+  "rescued": integer >= 0 or null,
   "occurrence_date": "YYYY-MM-DD" or null,
   "summary": "Brief description of what happened"
 }}

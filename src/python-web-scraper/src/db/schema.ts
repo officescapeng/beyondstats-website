@@ -12,6 +12,7 @@ export const incidents = pgTable(
     fatalities: integer("fatalities").default(0).notNull(),
     abductions: integer("abductions").default(0).notNull(),
     injuries: integer("injuries").default(0).notNull(),
+    rescued: integer("rescued").default(0).notNull(),
     summary: text("summary"),
     sourceUrl: text("source_url"),
     contentFp: text("content_fp"),
