@@ -205,6 +205,7 @@ export default function ReviewPortal({ setCurrentPage }) {
       fatalities: inc.fatalities || 0,
       abductions: inc.abductions || 0,
       injuries: inc.injuries || 0,
+      rescued: inc.rescued || 0,
       summary: inc.summary || '',
       source_url: inc.source_url || '',
     });
@@ -214,7 +215,7 @@ export default function ReviewPortal({ setCurrentPage }) {
     const { name, value } = e.target;
     setEditForm(prev => ({
       ...prev,
-      [name]: ['fatalities', 'abductions', 'injuries'].includes(name) ? parseInt(value) || 0 : value
+      [name]: ['fatalities', 'abductions', 'injuries', 'rescued'].includes(name) ? parseInt(value) || 0 : value
     }));
   };
 
@@ -364,7 +365,7 @@ export default function ReviewPortal({ setCurrentPage }) {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       {/* Incident Type */}
                       <div className="flex flex-col gap-1.5">
                         <label className="font-semibold text-slate-500">Incident Type</label>
@@ -411,6 +412,19 @@ export default function ReviewPortal({ setCurrentPage }) {
                           type="number" 
                           name="injuries"
                           value={editForm.injuries} 
+                          onChange={handleEditChange}
+                          min="0"
+                          className="bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
+                        />
+                      </div>
+
+                      {/* Rescued */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-semibold text-slate-500">Rescued (Saved)</label>
+                        <input 
+                          type="number" 
+                          name="rescued"
+                          value={editForm.rescued} 
                           onChange={handleEditChange}
                           min="0"
                           className="bg-white border border-slate-300 rounded-lg p-2.5 text-slate-800 outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
@@ -484,6 +498,9 @@ export default function ReviewPortal({ setCurrentPage }) {
                             {inc.injuries || 0} Injured
                           </span>
                         )}
+                        <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-1 rounded-lg text-xs font-bold">
+                          {inc.rescued || 0} Rescued
+                        </span>
                       </div>
                     </div>
 
