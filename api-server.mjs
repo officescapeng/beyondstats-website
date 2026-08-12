@@ -214,6 +214,7 @@ function generateSeedIncidents() {
       fatalities: Math.random() < 0.6 ? randomInt(1, 15) : 0,
       abductions: Math.random() < 0.4 ? randomInt(1, 20) : 0,
       injuries: Math.random() < 0.5 ? randomInt(1, 20) : 0,
+      rescued: Math.random() < 0.3 ? randomInt(1, 15) : 0,
       summary: `${pick(ACTORS)} attacked ${pick(LOCS)}, triggering a security response.`,
       source_name: pick(NEWS_SOURCES).name,
       source_url: pick(NEWS_SOURCES).feed,
@@ -229,35 +230,40 @@ function computeStats(list) {
   const totalFatalities = list.reduce((s, i) => s + (i.fatalities || 0), 0);
   const totalAbductions = list.reduce((s, i) => s + (i.abductions || 0), 0);
   const totalInjuries = list.reduce((s, i) => s + (i.injuries || 0), 0);
+  const totalRescued = list.reduce((s, i) => s + (i.rescued || 0), 0);
   const stateMap = {};
   const typeMap = {};
   const dateMap = {};
   const lgaMap = {};
   for (const i of list) {
-    if (!stateMap[i.state]) stateMap[i.state] = { state: i.state, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    if (!stateMap[i.state]) stateMap[i.state] = { state: i.state, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     stateMap[i.state].count++;
     stateMap[i.state].fatalities += i.fatalities || 0;
     stateMap[i.state].abductions += i.abductions || 0;
     stateMap[i.state].injuries += i.injuries || 0;
-    if (!typeMap[i.incident_type]) typeMap[i.incident_type] = { incidentType: i.incident_type, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    stateMap[i.state].rescued += i.rescued || 0;
+    if (!typeMap[i.incident_type]) typeMap[i.incident_type] = { incidentType: i.incident_type, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     typeMap[i.incident_type].count++;
     typeMap[i.incident_type].fatalities += i.fatalities || 0;
     typeMap[i.incident_type].abductions += i.abductions || 0;
     typeMap[i.incident_type].injuries += i.injuries || 0;
-    if (!dateMap[i.date]) dateMap[i.date] = { date: i.date, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    typeMap[i.incident_type].rescued += i.rescued || 0;
+    if (!dateMap[i.date]) dateMap[i.date] = { date: i.date, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     dateMap[i.date].count++;
     dateMap[i.date].fatalities += i.fatalities || 0;
     dateMap[i.date].abductions += i.abductions || 0;
     dateMap[i.date].injuries += i.injuries || 0;
+    dateMap[i.date].rescued += i.rescued || 0;
     const lgaKey = `${i.state}/${i.lga}`;
-    if (!lgaMap[lgaKey]) lgaMap[lgaKey] = { state: i.state, lga: i.lga, count: 0, fatalities: 0, abductions: 0, injuries: 0 };
+    if (!lgaMap[lgaKey]) lgaMap[lgaKey] = { state: i.state, lga: i.lga, count: 0, fatalities: 0, abductions: 0, injuries: 0, rescued: 0 };
     lgaMap[lgaKey].count++;
     lgaMap[lgaKey].fatalities += i.fatalities || 0;
     lgaMap[lgaKey].abductions += i.abductions || 0;
     lgaMap[lgaKey].injuries += i.injuries || 0;
+    lgaMap[lgaKey].rescued += i.rescued || 0;
   }
   return {
-    overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries },
+    overall: { totalIncidents, totalFatalities, totalAbductions, totalInjuries, totalRescued },
     byState: Object.values(stateMap).sort((a, b) => b.fatalities - a.fatalities),
     byType: Object.values(typeMap).sort((a, b) => b.count - a.count),
     byDate: Object.values(dateMap).sort((a, b) => b.date.localeCompare(a.date)),

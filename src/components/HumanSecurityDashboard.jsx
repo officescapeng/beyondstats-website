@@ -1955,7 +1955,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             
             {/* Forecast Line Chart (LG: 7 columns) */}
-            <div className="lg:col-span-7 h-[280px] w-full flex flex-col justify-between">
+            <div className="lg:col-span-7 h-[280px] 3xl:h-[350px] 4xl:h-[420px] w-full flex flex-col justify-between">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">Composite Risk Trajectory</span>
               <ResponsiveContainer width="100%" height="90%">
                 <LineChart data={getForecastChartData(activeState)} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
@@ -2162,7 +2162,7 @@ export default function HumanSecurityDashboard({ selectedStateId: propStateId, s
             </div>
 
             {/* Radar Chart (LG: 5 columns) */}
-            <div className="lg:col-span-5 h-[280px] w-full flex items-center justify-center">
+            <div className="lg:col-span-5 h-[280px] 3xl:h-[350px] 4xl:h-[420px] w-full flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={getComparisonRadarData()}>
                   <PolarGrid stroke={isDarkMode ? "#ffffff15" : "#00000015"} />

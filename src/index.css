@@ -6,6 +6,22 @@
   --font-poppins: "Poppins", sans-serif;
   --color-primary: #062b66;
   --color-secondary: #39b54a;
+  --breakpoint-3xl: 1920px;
+  --breakpoint-4xl: 2560px;
+}
+
+html {
+  font-size: 16px;
+}
+@media (min-width: 1920px) {
+  html {
+    font-size: 17px;
+  }
+}
+@media (min-width: 2560px) {
+  html {
+    font-size: 18px;
+  }
 }
 
 body {
@@ -14,6 +30,33 @@ body {
   color: #ffffff;
   overflow-x: hidden;
   margin: 0;
+}
+
+/* Custom breakpoints and utility overrides for wide screens */
+@utility max-w-7xl {
+  max-width: 80rem; /* default 1280px */
+  @media (min-width: 1536px) {
+    max-width: 90rem; /* 1440px */
+  }
+  @media (min-width: 1920px) {
+    max-width: 105rem; /* 1680px */
+  }
+  @media (min-width: 2560px) {
+    max-width: 120rem; /* 1920px */
+  }
+}
+
+@utility max-w-6xl {
+  max-width: 72rem; /* default 1152px */
+  @media (min-width: 1536px) {
+    max-width: 82rem; /* 1312px */
+  }
+  @media (min-width: 1920px) {
+    max-width: 95rem; /* 1520px */
+  }
+  @media (min-width: 2560px) {
+    max-width: 110rem; /* 1760px */
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {

@@ -682,7 +682,7 @@ export default function ImpactMapPage() {
               </div>
 
               {/* MAP COMPONENT */}
-              <div className="w-full flex-1 h-[350px] lg:h-[580px] relative z-0">
+              <div className="w-full flex-1 h-[350px] lg:h-[580px] 3xl:h-[700px] 4xl:h-[820px] relative z-0">
                 <MapContainer 
                   center={NIGERIA_CENTER} 
                   zoom={DEFAULT_ZOOM} 

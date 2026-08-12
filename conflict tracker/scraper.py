@@ -220,6 +220,23 @@ def is_nigeria_relevant(title: str, text: str) -> bool:
     return any(marker in combined for marker in nigeria_markers)
 
 
+# Regular expression to match security/conflict keywords in titles as whole words.
+# This prevents substring false positives (e.g. matching "deadline" or "deadlock" on the keyword "dead").
+_TITLE_CONFLICT_RE = re.compile(
+    r'\b(attacks?|assaults?|kills?|killed|killings?|massacres?|massacred|slays?|slain|'
+    r'murders?|murdered|murdering|dead|deadly|deaths?|fatal|fatalities|fatality|'
+    r'gunmen|gunman|guns?|gunned|gunfire|bandits?|banditry|terror(ist)?s?|terrorism|'
+    r'insurgents?|insurgency|boko|iswap|clash(es|ed)?|reprisals?|herdsmen|herders?|fulani|'
+    r'kidnaps?|kidnapped|kidnappings?|abducts?|abducted|abductions?|hostages?|ransoms?|'
+    r'ambush(es|ed)?|raids?|raided|raiding|invasions?|invaded|shoots?|shooting|shootings?|'
+    r'shot|bombs?|bombed|bombings?|ieds?|explosions?|explosives?|suicide|militias?|'
+    r'militants?|cults?|cultists?|armed|violence|violent|unrest|riots?|rioting|'
+    r'protests?|protesting|thugs?|thuggery|rescued?|rescuing|rescue|robber(s|ies|y)?|'
+    r'hijack(s|ed|ing)?|neutraliz(e|ed|ing)?)\b',
+    re.IGNORECASE
+)
+
+
 def is_conflict_relevant(title: str, text: str) -> bool:
     """
     Check if the article contains conflict-related keywords.
@@ -249,17 +266,10 @@ def is_conflict_relevant(title: str, text: str) -> bool:
         if not any(kw in combined for kw in violence_keywords):
             return False
 
-    # 3. Require the title itself to contain at least one conflict/security keyword.
-    # This prevents general articles with random keyword matches in the body from passing.
-    title_conflict_keywords = (
-        "attack", "assault", "killing", "killed", "kill", "massacre", "slain", "slay", "murder", 
-        "dead", "death", "fatal", "gunmen", "gunman", "bandit", "banditry", "terror", "insurg", 
-        "boko", "iswap", "clash", "reprisal", "herdsmen", "herder", "fulani", "kidnap", 
-        "abduct", "hostage", "ransom", "ambush", "raid", "invasion", "shoot", "gun", "bomb", 
-        "ied", "explos", "suicide", "militia", "cult", "armed", "violence", "unrest", "riot", 
-        "protest", "thug", "rescue", "robber", "hijack", "neutraliz", "clashed"
-    )
-    if not any(kw in title_lower for kw in title_conflict_keywords):
+    # 3. Require the title itself to contain at least one conflict/security keyword as a whole word.
+    # This prevents general articles with random keyword matches in the body from passing,
+    # and avoids false positives on words like "deadline" or "deadlock".
+    if not _TITLE_CONFLICT_RE.search(title_lower):
         return False
             
     # 4. Accept only if conflict keywords are present in the combined text
@@ -874,6 +884,11 @@ _PROMPT_TEMPLATE = """\
 The article was published on: {article_date}.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no preamble.
+
+CRITICAL FOCUS RULE:
+- Extract ONLY the security incident that is the PRIMARY SUBJECT of the article (matching the title/headline).
+- Do NOT extract unrelated incidents mentioned in sidebars, "latest news" sections, related articles feeds, headers, footers, or advertisements.
+- If the main article text itself is not about a conflict or security incident (e.g. it is about Hajj fares, general news, sports, economics), you MUST return {"incidents": []}, even if there are security headlines mentioned in the sidebars or related links.
 
 Extract ONLY conflict-related security incidents (with or without casualties) in Nigeria.
 
