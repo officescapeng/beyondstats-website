@@ -888,7 +888,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no code fences, no preamble.
 CRITICAL FOCUS RULE:
 - Extract ONLY the security incident that is the PRIMARY SUBJECT of the article (matching the title/headline).
 - Do NOT extract unrelated incidents mentioned in sidebars, "latest news" sections, related articles feeds, headers, footers, or advertisements.
-- If the main article text itself is not about a conflict or security incident (e.g. it is about Hajj fares, general news, sports, economics), you MUST return {"incidents": []}, even if there are security headlines mentioned in the sidebars or related links.
+- If the main article text itself is not about a conflict or security incident (e.g. it is about Hajj fares, general news, sports, economics), you MUST return {{"incidents": []}}, even if there are security headlines mentioned in the sidebars or related links.
 
 Extract ONLY conflict-related security incidents (with or without casualties) in Nigeria.
 
