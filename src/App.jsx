@@ -646,57 +646,57 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
           {/* Impact Indicators Grid */}
           <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-up-delay-4">
             
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+            <div className="bg-black/50 backdrop-blur-md border border-white/15 p-5 rounded-2xl flex flex-col gap-3 shadow-lg shadow-black/20 hover:bg-black/60 hover:border-secondary/40 hover:shadow-secondary/10 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
                 <BarChart3 className="w-5 h-5 text-secondary" />
               </div>
               <div>
                 <h4 className="font-poppins font-semibold text-sm uppercase tracking-wider mb-1">
                   DATA
                 </h4>
-                <p className="font-inter text-white/60 text-[11px] leading-relaxed">
+                <p className="font-inter text-white/75 text-[11px] leading-relaxed">
                   Monitor critical human security indicators
                 </p>
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+            <div className="bg-black/50 backdrop-blur-md border border-white/15 p-5 rounded-2xl flex flex-col gap-3 shadow-lg shadow-black/20 hover:bg-black/60 hover:border-secondary/40 hover:shadow-secondary/10 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
                 <Lightbulb className="w-5 h-5 text-secondary" />
               </div>
               <div>
                 <h4 className="font-poppins font-semibold text-sm uppercase tracking-wider mb-1">
                   INSIGHT
                 </h4>
-                <p className="font-inter text-white/60 text-[11px] leading-relaxed">
+                <p className="font-inter text-white/75 text-[11px] leading-relaxed">
                   Generate evidence-based recommendations
                 </p>
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+            <div className="bg-black/50 backdrop-blur-md border border-white/15 p-5 rounded-2xl flex flex-col gap-3 shadow-lg shadow-black/20 hover:bg-black/60 hover:border-secondary/40 hover:shadow-secondary/10 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
                 <Target className="w-5 h-5 text-secondary" />
               </div>
               <div>
                 <h4 className="font-poppins font-semibold text-sm uppercase tracking-wider mb-1">
                   ACTION
                 </h4>
-                <p className="font-inter text-white/60 text-[11px] leading-relaxed">
+                <p className="font-inter text-white/75 text-[11px] leading-relaxed">
                   Design practical community solutions
                 </p>
               </div>
             </div>
 
-            <div className="bg-black/25 backdrop-blur-sm border border-white/5 p-5 rounded-2xl flex flex-col gap-3 hover:bg-black/35 hover:-translate-y-1 transition-all duration-300">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10">
+            <div className="bg-black/50 backdrop-blur-md border border-white/15 p-5 rounded-2xl flex flex-col gap-3 shadow-lg shadow-black/20 hover:bg-black/60 hover:border-secondary/40 hover:shadow-secondary/10 hover:-translate-y-1 transition-all duration-300">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/15">
                 <HeartHandshake className="w-5 h-5 text-secondary" />
               </div>
               <div>
                 <h4 className="font-poppins font-semibold text-sm uppercase tracking-wider mb-1">
                   IMPACT
                 </h4>
-                <p className="font-inter text-white/60 text-[11px] leading-relaxed">
+                <p className="font-inter text-white/75 text-[11px] leading-relaxed">
                   Measure meaningful social change
                 </p>
               </div>
