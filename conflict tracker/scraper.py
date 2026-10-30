@@ -390,7 +390,7 @@ def is_conflict_casualty(incident_type: str, fatalities: int, abductions: int, i
             return True
 
     # (4) Relaxed: Allow zero-casualty events if they are recognized conflict types
-    recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack"]
+    recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack", "political conflict", "rescue"]
     canon = canonical_incident_type(incident_type)
     if canon in recognized_types:
         log.debug(f"    [OK] Allowing zero-casualty/unknown incident of recognized type: {canon}")
@@ -866,7 +866,7 @@ def validate_and_fix_incident(incident: dict, article_text: str, article_date: s
     rescued    = _safe_int(incident.get("rescued"))
     
     if fatalities <= 0 and abductions <= 0 and injuries <= 0 and rescued <= 0:
-        recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack"]
+        recognized_types = ["kidnapping", "terrorism", "banditry", "bombing", "clash", "armed attack", "political conflict", "rescue"]
         canon = canonical_incident_type(incident.get("incident_type"))
         if canon in recognized_types:
             log.debug(f"  [Validation] Allowing zero-casualty incident of recognized type: {canon}")
@@ -959,6 +959,7 @@ INCIDENT TYPE CLASSIFICATION:
 - "kidnapping" → "kidnapping"
 - "bombing/explosion" → "bombing"
 - "political protest clash / election violence / party fight / thugs attack" → "political conflict"
+- "troops / police rescue kidnapped victims / hostages freed / abducted students rescued" → "rescue" (DO NOT label a rescue operation as "kidnapping" if the report is about the rescue operation)
 
 [OK] ALL OF THESE ARE VALID CONFLICT INCIDENTS
 
@@ -972,7 +973,7 @@ OTHERWISE: Extract every distinct incident with ALL these keys:
   "state": "State Name" or null,
   "lga": "LGA Name" or null,
   "community": "Village/Community Name" or "Unknown",
-  "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, political conflict, other],
+  "incident_type": one of [kidnapping, terrorism, banditry, bombing, clash, armed attack, political conflict, rescue, other],
   "fatalities": integer >= 0 or null,
   "abductions": integer >= 0 or null,
   "injuries": integer >= 0 or null,
