@@ -594,7 +594,7 @@ function HomePage({ slides, currentSlide, setCurrentPage }) {
             />
           </div>
         ))}
-        <div className="absolute inset-0 bg-black/65 z-1"></div>
+        <div className="absolute inset-0 bg-black/45 z-1"></div>
       </div>
 
       {/* Main Hero Content */}
